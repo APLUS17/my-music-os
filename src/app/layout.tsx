@@ -18,7 +18,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "My Music OS | Antigravity",
+  title: "Lyriq Lab | Antigravity",
   description: "A deterministic, AI-powered second brain for music artists.",
 };
 

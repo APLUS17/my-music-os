@@ -28,7 +28,7 @@ export default async function Home() {
             Vibecode // OS_TERMINAL
           </div>
           <h1 className="text-5xl font-bold tracking-tighter text-white uppercase italic">
-            Sonic <span className="text-vibecode-primary">Vault</span>
+            Lyriq <span className="text-vibecode-primary">Lab</span>
           </h1>
         </div>
 
