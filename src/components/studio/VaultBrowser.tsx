@@ -109,7 +109,7 @@ export function VaultBrowser({ projectId, className, onSelectTrack }: VaultBrows
                 </h3>
 
                 <label className="cursor-pointer">
-                    <input type="file" className="hidden" onChange={handleUpload} accept="audio/*" disabled={uploading} />
+                    <input type="file" className="hidden" onChange={handleUpload} accept=".mp3,.wav,audio/mpeg,audio/wav,audio/x-wav,audio/wave" disabled={uploading} />
                     <div className="flex items-center gap-2 text-[9px] font-mono font-bold uppercase tracking-widest bg-vibecode-primary hover:bg-opacity-90 transition-all rounded px-4 py-2 text-white shadow-[0_4px_12px_rgba(249,115,22,0.2)]">
                         {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                         In_Put
