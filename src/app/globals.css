@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --panel: #18181b;
+  --border: #27272a;
+  --primary: #f97316;
+  --secondary: #22c55e;
+  --muted: #71717a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-vibecode-dark: var(--background);
+  --color-vibecode-card: var(--panel);
+  --color-vibecode-border: var(--border);
+  --color-vibecode-primary: var(--primary);
+  --color-vibecode-secondary: var(--secondary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-playfair);
+
+  --radius-panel: 16px;
+  --radius-card: 12px;
+  --radius-button: 6px;
+
+  --bg-hero-gradient: linear-gradient(135deg, #2dd4bf 0%, #a855f7 100%);
+  --grain-overlay: url("https://grainy-gradients.vercel.app/noise.svg");
+
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer utilities {
+  .grain {
+    position: relative;
+  }
+
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--grain-overlay);
+    opacity: 0.05;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+    z-index: 50;
+  }
+
+  .edge-light {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .glass-panel {
+    @apply bg-vibecode-card/80 backdrop-blur-xl border border-vibecode-border/50;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 1px solid rgba(255, 255, 255, 0.03);
+  }
+}
+
+
+
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes pulse {
+  0% {
+    height: 20%;
+  }
+
+  50% {
+    height: 80%;
+  }
+
+  100% {
+    height: 20%;
+  }
 }

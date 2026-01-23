@@ -1,65 +1,60 @@
-import Image from "next/image";
+import { ProjectList } from "@/components/dashboard/ProjectList";
+import { Button } from "@/components/ui/Button";
+import { getProjects, createProject } from "./actions";
+import { Sparkles, Plus } from "lucide-react";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function Home() {
+  const projects = await getProjects();
+
+  async function handleCreate(formData: FormData) {
+    "use server";
+    const title = formData.get("title") as string;
+    if (title) {
+      await createProject(title);
+      redirect("/");
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen p-8 sm:p-12 font-sans bg-vibecode-dark text-foreground relative overflow-hidden">
+      {/* Background Ambience */}
+      <div className="absolute top-0 left-0 w-full h-[600px] bg-gradient-to-b from-vibecode-primary/5 via-transparent to-transparent pointer-events-none" />
+
+      <header className="flex justify-between items-end mb-16 relative z-10 w-full animate-slide-up">
+        <div>
+          <div className="flex items-center gap-2 text-vibecode-secondary font-mono text-[10px] tracking-[0.3em] uppercase mb-4 opacity-60">
+            <div className="w-1.5 h-1.5 rounded-full bg-vibecode-secondary shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+            Vibecode // OS_TERMINAL
+          </div>
+          <h1 className="text-5xl font-bold tracking-tighter text-white uppercase italic">
+            Sonic <span className="text-vibecode-primary">Vault</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        <form action={handleCreate} className="flex gap-2">
+          <input
+            name="title"
+            placeholder="New Project Title..."
+            className="bg-vibecode-card border border-vibecode-border rounded-md px-4 py-2 text-sm focus:outline-none focus:border-vibecode-primary text-white"
+            required
+          />
+          <Button type="submit" size="sm" variant="primary" className="gap-2">
+            <Plus size={16} /> Create
+          </Button>
+        </form>
+      </header>
+
+      <main className="relative z-10 animate-fade-in">
+        <ProjectList initialProjects={projects} />
       </main>
+
+      {/* Quick Actions (Floating) */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <Button variant="secondary" size="lg" className="rounded-full shadow-2xl gap-2">
+          <Sparkles size={18} /> Quick Idea
+        </Button>
+      </div>
     </div>
   );
 }
