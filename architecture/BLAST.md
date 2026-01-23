@@ -1,4 +1,4 @@
-# The BLAST Framework (My Music OS)
+# The BLAST Framework (Lyriq Lab)
 
 > **Original Directive**: Build a deterministic, self-healing, full-stack "Personal Music Artist Vault App."
 
