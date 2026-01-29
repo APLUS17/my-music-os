@@ -1,74 +1,79 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --panel: #18181b;
-  --border: #27272a;
-  --primary: #f97316;
-  --secondary: #22c55e;
-  --muted: #71717a;
+  --bg-charcoal: #0a0a0a;
+  --card-surface: #141414;
+  --card-dark: #161616;
+  --border-soft: #1f1f1f;
+  --text-muted: #737373;
+  --text-high: #e5e5e5;
+  --primary: #a1a1aa;
+  --accent-red: #ff5545;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-vibecode-dark: var(--background);
-  --color-vibecode-card: var(--panel);
-  --color-vibecode-border: var(--border);
-  --color-vibecode-primary: var(--primary);
-  --color-vibecode-secondary: var(--secondary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-playfair);
+  --color-background: var(--bg-charcoal);
+  --color-foreground: var(--text-high);
+  --color-card-surface: var(--card-surface);
+  --color-card-dark: var(--card-dark);
+  --color-border-soft: var(--border-soft);
+  --color-text-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-accent-red: var(--accent-red);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
 
-  --radius-panel: 16px;
-  --radius-card: 12px;
-  --radius-button: 6px;
-
-  --bg-hero-gradient: linear-gradient(135deg, #2dd4bf 0%, #a855f7 100%);
-  --grain-overlay: url("https://grainy-gradients.vercel.app/noise.svg");
-
-  --animate-fade-in: fade-in 0.5s ease-out;
-  --animate-slide-up: slide-up 0.5s ease-out;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
 }
 
-@layer utilities {
-  .grain {
-    position: relative;
-  }
-
-  .grain::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: var(--grain-overlay);
-    opacity: 0.05;
-    pointer-events: none;
-    mix-blend-mode: overlay;
-    z-index: 50;
-  }
-
-  .edge-light {
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 1px solid rgba(255, 255, 255, 0.03);
-  }
-
-  .glass-panel {
-    @apply bg-vibecode-card/80 backdrop-blur-xl border border-vibecode-border/50;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 1px solid rgba(255, 255, 255, 0.03);
-  }
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-charcoal);
+  color: var(--text-high);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
 }
 
+.technical-font {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+}
 
+.orb-gradient-1 {
+  background: radial-gradient(circle at 30% 30%, #4ade80 0%, transparent 60%),
+              radial-gradient(circle at 70% 70%, #a855f7 0%, transparent 60%),
+              #1e1e1e;
+}
 
+.orb-gradient-2 {
+  background: radial-gradient(circle at 50% 50%, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.orb-gradient-3 {
+  background: radial-gradient(circle at 20% 80%, #ec4899 0%, transparent 70%),
+              radial-gradient(circle at 80% 20%, #f97316 0%, transparent 70%),
+              #2d2d2d;
+}
+
+.glass-nav {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.soft-card-shadow {
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
 
 @keyframes fade-in {
   from {
     opacity: 0;
   }
-
   to {
     opacity: 1;
   }
@@ -79,30 +84,18 @@
     opacity: 0;
     transform: translateY(10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-@keyframes pulse {
-  0% {
-    height: 20%;
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
   }
-
-  50% {
-    height: 80%;
-  }
-
-  100% {
-    height: 20%;
+  
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out;
   }
 }
