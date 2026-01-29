@@ -50,8 +50,8 @@ export function LibraryScreen({ projects, createAction }: LibraryScreenProps) {
                         <button
                             onClick={() => setActiveTab('songs')}
                             className={`pb-3 pr-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'songs'
-                                    ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                    : 'text-[#525252] hover:text-[#737373]'
+                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
+                                : 'text-[#525252] hover:text-[#737373]'
                                 }`}
                         >
                             Songs
@@ -59,8 +59,8 @@ export function LibraryScreen({ projects, createAction }: LibraryScreenProps) {
                         <button
                             onClick={() => setActiveTab('verses')}
                             className={`pb-3 px-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'verses'
-                                    ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                    : 'text-[#525252] hover:text-[#737373]'
+                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
+                                : 'text-[#525252] hover:text-[#737373]'
                                 }`}
                         >
                             Verses
@@ -68,8 +68,8 @@ export function LibraryScreen({ projects, createAction }: LibraryScreenProps) {
                         <button
                             onClick={() => setActiveTab('takes')}
                             className={`pb-3 px-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'takes'
-                                    ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                    : 'text-[#525252] hover:text-[#737373]'
+                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
+                                : 'text-[#525252] hover:text-[#737373]'
                                 }`}
                         >
                             Takes
@@ -211,7 +211,7 @@ function SongsView({
             </form>
 
             {/* Empty State */}
-            {projects.length === 0 && (
+            {!activeProject && otherProjects.length === 0 && (
                 <div className="text-center py-16 text-[#525252]">
                     <span className="material-symbols-outlined text-[48px] mb-4 block opacity-30">library_music</span>
                     <p className="text-[14px]">No songs yet. Create your first one!</p>
