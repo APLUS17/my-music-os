@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { JetBrains_Mono, Inter } from "next/font/google";
+import { JetBrains_Mono, Inter, Poppins, Righteous } from "next/font/google";
 import "./globals.css";
 
 const jetBrainsMono = JetBrains_Mono({
@@ -12,6 +12,18 @@ const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
+});
+
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const righteous = Righteous({
+  variable: "--font-righteous",
+  subsets: ["latin"],
+  weight: ["400"],
 });
 
 export const metadata: Metadata = {
@@ -33,7 +45,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${jetBrainsMono.variable} ${inter.variable} antialiased min-h-screen`}
+        className={`${jetBrainsMono.variable} ${inter.variable} ${poppins.variable} ${righteous.variable} antialiased min-h-screen`}
       >
         {children}
       </body>

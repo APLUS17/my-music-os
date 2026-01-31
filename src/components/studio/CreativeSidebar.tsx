@@ -52,50 +52,34 @@ export function CreativeSidebar({ className, externalQuery }: CreativeSidebarPro
     };
 
     const modes = [
-        { id: "rel_rhy", label: "Perfect", icon: Zap },
-        { id: "rel_nry", label: "Slant", icon: Cloud },
-        { id: "ml", label: "Vibe", icon: Compass },
+        { id: "rel_rhy", label: "Perfect", icon: "offline_bolt" },
+        { id: "rel_nry", label: "Slant", icon: "cloud" },
+        { id: "ml", label: "Vibe", icon: "explore" },
     ];
 
     return (
-        <div className={cn("flex h-full flex-col border-l border-vibecode-border bg-black/40 backdrop-blur-3xl", className)}>
-            <div className="border-b border-white/5 p-5">
-                <motion.h3
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                        visible: { transition: { staggerChildren: 0.05 } }
-                    }}
-                    className="mb-6 flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-[0.4em] text-white/30"
-                >
-                    <Sparkles size={11} className="text-vibecode-primary animate-pulse" />
-                    {"Creative // Intelligence".split("").map((char, i) => (
-                        <motion.span
-                            key={i}
-                            variants={{
-                                hidden: { opacity: 0, y: 10, filter: "blur(5px)" },
-                                visible: { opacity: 1, y: 0, filter: "blur(0px)" }
-                            }}
-                        >
-                            {char}
-                        </motion.span>
-                    ))}
-                </motion.h3>
+        <div className={cn("flex h-full flex-col bg-transparent", className)}>
+            <div className="p-5 border-b border-white/5">
+                <div className="flex items-center gap-2 mb-6 opacity-30">
+                    <span className="material-symbols-outlined text-[18px] text-pink-500 animate-pulse">auto_awesome</span>
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">
+                        Engine
+                    </h3>
+                </div>
 
-
-                <div className="relative mb-5 group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/5 transition-colors group-hover:text-vibecode-primary/40 truncate" size={13} />
+                <div className="relative mb-6 group">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-white/20 text-[18px] transition-colors group-hover:text-pink-500/50">search</span>
                     <input
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="INPUT SIGNAL..."
-                        className="w-full rounded-[4px] bg-white/[0.02] border border-white/5 py-3 pl-10 pr-4 text-[11px] font-mono text-white/60 placeholder:text-white/10 focus:outline-none focus:border-vibecode-primary/30 focus:bg-white/[0.04] transition-all uppercase tracking-[0.2em]"
+                        placeholder="SEARCH ENGINE"
+                        className="w-full rounded-2xl bg-white/5 border border-white/5 py-4 pl-10 pr-4 text-[13px] font-medium text-white placeholder:text-white/20 focus:outline-none focus:border-white/10 focus:bg-white/10 transition-all"
                     />
                 </div>
 
-                <div className="flex gap-1.5 p-1 rounded-[6px] bg-white/[0.02] border border-white/5">
+                <div className="flex gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/5">
                     {modes.map((m) => (
                         <button
                             key={m.id}
@@ -104,39 +88,41 @@ export function CreativeSidebar({ className, externalQuery }: CreativeSidebarPro
                                 fetchResults(query, m.id as SearchMode);
                             }}
                             className={cn(
-                                "flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[4px] text-[8px] font-mono font-bold uppercase tracking-[0.15em] transition-all duration-300",
+                                "flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl transition-all duration-300",
                                 mode === m.id
-                                    ? "bg-vibecode-primary/5 text-vibecode-primary border border-vibecode-primary/10 shadow-[inner_0_0_10px_rgba(249,115,22,0.05)]"
-                                    : "text-white/20 hover:text-white/40 hover:bg-white/[0.02]"
+                                    ? "bg-white text-black shadow-lg shadow-white/5"
+                                    : "text-white/30 hover:text-white/50 hover:bg-white/5"
                             )}
                         >
-                            <m.icon size={11} className={cn("transition-transform", mode === m.id && "scale-110")} />
-                            {m.label}
+                            <span className={cn("material-symbols-outlined text-[18px]", mode === m.id && "fill-current")}>
+                                {m.icon}
+                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest">{m.label}</span>
                         </button>
                     ))}
                 </div>
-
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
                 {loading ? (
-                    <div className="flex h-32 items-center justify-center">
-                        <Loader2 className="animate-spin text-vibecode-primary/40" size={24} />
+                    <div className="flex h-32 items-center justify-center opacity-30">
+                        <span className="material-symbols-outlined animate-spin text-[24px]">progress_activity</span>
                     </div>
                 ) : results.length > 0 ? (
-                    <div className="space-y-1.5">
-                        {results.map((item) => (
+                    <div className="space-y-1">
+                        {results.map((item, index) => (
                             <motion.div
-                                initial={{ opacity: 0, x: 5 }}
+                                initial={{ opacity: 0, x: 10 }}
                                 animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.02 }}
                                 key={item.word}
-                                className="group flex cursor-pointer items-center justify-between rounded px-3 py-2.5 hover:bg-vibecode-primary/5 border border-transparent hover:border-vibecode-primary/10 transition-all"
+                                className="group flex cursor-pointer items-center justify-between rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/10 transition-all"
                             >
-                                <span className="text-xs font-medium text-zinc-400 group-hover:text-vibecode-primary transition-colors tracking-wide">
+                                <span className="text-[14px] font-medium text-white/50 group-hover:text-white transition-colors">
                                     {item.word.toLowerCase()}
                                 </span>
                                 {item.numSyllables && (
-                                    <span className="text-[8px] font-mono text-vibecode-primary/40 bg-vibecode-primary/5 px-2 py-0.5 rounded-full border border-vibecode-primary/10 uppercase">
+                                    <span className="text-[9px] font-mono font-bold text-white/20 uppercase tracking-tighter">
                                         {item.numSyllables} SYL
                                     </span>
                                 )}
@@ -144,10 +130,10 @@ export function CreativeSidebar({ className, externalQuery }: CreativeSidebarPro
                         ))}
                     </div>
                 ) : (
-                    <div className="mt-20 text-center px-10">
-                        <Compass className="mx-auto mb-5 text-zinc-900" size={40} strokeWidth={1} />
-                        <p className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest leading-relaxed">
-                            {query ? "DATA NOT FOUND" : "WAITING FOR INPUT SIGNAL..."}
+                    <div className="flex flex-col items-center justify-center h-48 py-10 opacity-20">
+                        <span className="material-symbols-outlined text-[32px] mb-4">analytics</span>
+                        <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-center">
+                            {query ? "Null_Result" : "Engine_Idle"}
                         </p>
                     </div>
                 )}
@@ -155,3 +141,4 @@ export function CreativeSidebar({ className, externalQuery }: CreativeSidebarPro
         </div>
     );
 }
+

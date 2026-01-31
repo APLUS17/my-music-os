@@ -38,6 +38,22 @@ export async function getProjects() {
     }
 }
 
+export async function getProject(id: string) {
+    try {
+        const { data, error } = await supabase
+            .from("projects")
+            .select("*")
+            .eq("id", id)
+            .single();
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error("Supabase Error:", error);
+        return null;
+    }
+}
+
 export async function deleteProject(id: string) {
     try {
         const { error } = await supabase

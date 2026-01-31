@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { GlobalNav } from "@/components/navigation/GlobalNav";
 
 interface Project {
     id: string;
@@ -15,301 +17,207 @@ interface LibraryScreenProps {
     createAction: (formData: FormData) => Promise<void>;
 }
 
-// Mock data for verses and takes
-const mockVerses = [
-    { id: "v1", title: "Midnight Thoughts - Verse 1", project: "Midnight Session", updatedAt: "2h ago" },
-    { id: "v2", title: "Golden Hour - Hook", project: "Golden Hour", updatedAt: "5h ago" },
-    { id: "v3", title: "Neon Dreams - Bridge", project: "Neon Dreams", updatedAt: "Yesterday" },
+// Mock data
+const mockSongs = [
+    { id: "s1", title: "Midnight Session", creator: "yoy", updated: "2h ago", isPrivate: true, cover: "from-indigo-500 via-purple-500 to-pink-500" },
+    { id: "s2", title: "Golden Hour", creator: "yoy", updated: "5h ago", isPrivate: false, cover: "from-amber-200 via-yellow-400 to-orange-500" },
+    { id: "s3", title: "Neon Dreams", creator: "yoy", updated: "Yesterday", isPrivate: true, cover: "from-cyan-400 via-blue-500 to-indigo-600" },
 ];
 
-const mockTakes = [
-    { id: "t1", title: "Vocal Demo Take 1", duration: "2:35", updatedAt: "2h ago" },
-    { id: "t2", title: "Freestyle Session", duration: "4:12", updatedAt: "5h ago" },
-    { id: "t3", title: "Melody Idea", duration: "0:45", updatedAt: "Yesterday" },
+const mockBeats = [
+    { id: "b1", title: "Cloud Trap", creator: "yoy", updated: "1h ago", isPrivate: true, cover: "from-fuchsia-500 via-pink-600 to-rose-500" },
+    { id: "b2", title: "Soul Sample 02", creator: "yoy", updated: "4h ago", isPrivate: true, cover: "from-teal-400 via-emerald-500 to-green-600" },
 ];
 
 export function LibraryScreen({ projects, createAction }: LibraryScreenProps) {
-    const [activeTab, setActiveTab] = useState<"songs" | "verses" | "takes">("songs");
-
-    // Find the most recently updated project as "active session"
-    const activeProject = projects.length > 0 ? projects[0] : null;
-    const otherProjects = projects.slice(1);
+    const [activeTab, setActiveTab] = useState<"projects" | "songs" | "beats">("projects");
+    const [isSearchActive, setIsSearchActive] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-[#e5e5e5]">
-            {/* Status Bar Spacer */}
-            <div className="h-12 w-full"></div>
+        <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] font-sans selection:bg-[var(--accent-primary)]/30">
+            {/* Ambient Background Light */}
+            <div className="fixed inset-0 pointer-events-none opacity-40 mix-blend-screen">
+                <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-[var(--accent-primary)]/20 rounded-full blur-[120px]" />
+                <div className="absolute top-[10%] right-[-10%] w-[500px] h-[500px] bg-[var(--accent-cta)]/15 rounded-full blur-[100px]" />
+            </div>
 
-            {/* Header */}
-            <div className="px-6 mb-8 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-medium tracking-tight text-[#e5e5e5] mb-6">Library</h1>
+            {/* Header - Large Title Style */}
+            <header className="sticky top-0 z-[var(--z-sticky)] pt-safe-top transition-all duration-[var(--duration-normal)]">
+                <div className="absolute inset-0 glass-nav" />
 
-                    {/* Tab Navigation - Underline Style */}
-                    <div className="flex border-b border-[#262626]">
-                        <button
-                            onClick={() => setActiveTab('songs')}
-                            className={`pb-3 pr-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'songs'
-                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                : 'text-[#525252] hover:text-[#737373]'
-                                }`}
-                        >
-                            Songs
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('verses')}
-                            className={`pb-3 px-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'verses'
-                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                : 'text-[#525252] hover:text-[#737373]'
-                                }`}
-                        >
-                            Verses
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('takes')}
-                            className={`pb-3 px-6 text-[11px] uppercase tracking-wider transition-all technical-font ${activeTab === 'takes'
-                                ? 'text-[#e5e5e5] border-b-2 border-[#ff5545]'
-                                : 'text-[#525252] hover:text-[#737373]'
-                                }`}
-                        >
-                            Takes
+                <div className="relative px-6 h-[72px] flex items-center justify-between">
+                    {!isSearchActive ? (
+                        <>
+                            <h1 className="font-display text-3xl font-bold tracking-tight text-[var(--text-primary)] drop-shadow-sm">
+                                Library
+                            </h1>
+                            <div className="flex items-center gap-3">
+                                <HeaderIconButton icon="search" onClick={() => setIsSearchActive(true)} />
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-pink-500 p-[2px]">
+                                    <div className="w-full h-full rounded-full bg-black/50 backdrop-blur-sm overflow-hidden">
+                                        {/* Avatar Placeholder */}
+                                        <div className="w-full h-full bg-white/10" />
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex items-center gap-3 animate-in fade-in slide-in-from-right-2 duration-300">
+                            <div className="flex-1 relative group">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-white/50 text-[20px]">search</span>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Find in Library"
+                                    className="w-full h-10 pl-10 pr-4 bg-white/10 rounded-xl text-[16px] text-white placeholder:text-white/40 outline-none focus:bg-white/15 transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsSearchActive(false);
+                                    setSearchQuery("");
+                                }}
+                                className="text-[16px] font-medium text-[var(--accent-primary)] hover:text-[var(--accent-secondary)] transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Sub-navigation / Filters */}
+                {!isSearchActive && (
+                    <div className="relative px-6 pb-4 flex items-center gap-4 overflow-x-auto no-scrollbar">
+                        {["projects", "songs", "beats"].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab as any)}
+                                className={cn(
+                                    "text-[15px] font-medium transition-colors duration-[var(--duration-fast)] relative py-2 cursor-pointer",
+                                    activeTab === tab
+                                        ? "text-[var(--text-primary)]"
+                                        : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                                )}
+                            >
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                {activeTab === tab && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--accent-primary)] rounded-full shadow-[0_0_12px_var(--accent-primary)]" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </header>
+
+            {/* Main Content */}
+            <main className="px-6 pt-6 pb-32">
+                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-6 duration-500 ease-out">
+                    {/* Projects Section */}
+                    {activeTab === 'projects' && projects.map((p) => (
+                        <GridCard
+                            key={p.id}
+                            title={p.title}
+                            subtitle="Project"
+                            gradient="from-slate-800 to-slate-700"
+                            href={`/project/${p.id}`}
+                        />
+                    ))}
+
+                    {activeTab === 'songs' && mockSongs.map((s) => (
+                        <GridCard
+                            key={s.id}
+                            title={s.title}
+                            subtitle={s.creator}
+                            gradient={s.cover}
+                            href={`/song/${s.id}`}
+                            isPlayable
+                        />
+                    ))}
+
+                    {activeTab === 'beats' && mockBeats.map((b) => (
+                        <GridCard
+                            key={b.id}
+                            title={b.title}
+                            subtitle={b.creator}
+                            gradient={b.cover}
+                            href={`/beat/${b.id}`}
+                            isPlayable
+                        />
+                    ))}
+                </div>
+
+                {/* Updated Empty State */}
+                {((activeTab === 'projects' && projects.length === 0)) && (
+                    <div className="flex flex-col items-center justify-center py-32 opacity-60">
+                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 backdrop-blur-2xl">
+                            <span className="material-symbols-outlined text-[32px] text-white/40">library_add</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-white mb-2">It's quiet here.</h3>
+                        <p className="text-white/40 text-sm text-center max-w-[200px]">Start a new project or record something fresh.</p>
+                        <button className="mt-6 px-6 py-2.5 bg-white text-black rounded-full font-medium shadow-lg shadow-white/10 hover:scale-105 transition-transform">
+                            Create New
                         </button>
                     </div>
-                </div>
-
-                {/* Settings Button */}
-                <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#1a1a1a] text-[#737373] transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">settings</span>
-                </button>
-            </div>
-
-            {/* Content Area */}
-            <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32">
-
-                {/* SONGS TAB */}
-                {activeTab === 'songs' && (
-                    <SongsView
-                        activeProject={activeProject}
-                        otherProjects={otherProjects}
-                        createAction={createAction}
-                    />
                 )}
+            </main>
 
-                {/* VERSES TAB */}
-                {activeTab === 'verses' && (
-                    <VersesView verses={mockVerses} />
-                )}
-
-                {/* TAKES TAB */}
-                {activeTab === 'takes' && (
-                    <TakesView takes={mockTakes} />
-                )}
-            </div>
-
-            {/* Floating Action Button */}
-            <div className="fixed bottom-24 right-6 z-40">
-                <button className="w-14 h-14 bg-[#1a1a1a] border border-[#262626] rounded-full flex items-center justify-center shadow-lg shadow-black/40 hover:bg-[#262626] transition-all active:scale-95">
-                    <span className="material-symbols-outlined text-[#e5e5e5] text-[24px]">add</span>
-                </button>
-            </div>
-
-            {/* Bottom Navigation - Simplified for now */}
-            <nav className="fixed bottom-0 left-0 right-0 z-50 px-6 pb-8 pt-3 bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-[#1a1a1a]">
-                <div className="max-w-md mx-auto flex items-center justify-between">
-                    <button className="flex flex-col items-center gap-1.5 text-[#e5e5e5]">
-                        <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>library_music</span>
-                        <span className="text-[9px] font-medium tracking-wide">Library</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1.5 text-[#525252] hover:text-[#737373] transition-colors">
-                        <span className="material-symbols-outlined text-[24px]">edit_note</span>
-                        <span className="text-[9px] tracking-wide">Write</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1.5 text-[#525252] hover:text-[#737373] transition-colors">
-                        <span className="material-symbols-outlined text-[24px]">mic</span>
-                        <span className="text-[9px] tracking-wide">Record</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1.5 text-[#525252] hover:text-[#737373] transition-colors">
-                        <span className="material-symbols-outlined text-[24px]">grid_view</span>
-                        <span className="text-[9px] tracking-wide">Browse</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1.5 text-[#525252] hover:text-[#737373] transition-colors">
-                        <span className="material-symbols-outlined text-[24px]">search</span>
-                        <span className="text-[9px] tracking-wide">Search</span>
-                    </button>
-                </div>
-            </nav>
+            {/* Global Navigation */}
+            <GlobalNav />
         </div>
     );
 }
 
 // ============================================
-// SONGS VIEW
+// COMPONENT LIBRARY (Local)
 // ============================================
-function SongsView({
-    activeProject,
-    otherProjects,
-    createAction
-}: {
-    activeProject: Project | null;
-    otherProjects: Project[];
-    createAction: (formData: FormData) => Promise<void>;
+
+function HeaderIconButton({ icon, onClick }: { icon: string, onClick?: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-95 transition-all"
+        >
+            <span className="material-symbols-outlined text-[20px] text-white/80">{icon}</span>
+        </button>
+    );
+}
+
+function GridCard({ title, subtitle, gradient, href, isPlayable }: {
+    title: string,
+    subtitle: string,
+    gradient: string,
+    href: string,
+    isPlayable?: boolean
 }) {
     return (
-        <div className="space-y-3">
-            {/* Active Session Card */}
-            {activeProject && (
-                <Link
-                    href={`/project/${activeProject.id}`}
-                    className="bg-[#141414] border border-[#262626] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-[#404040] transition-all group"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] border border-[#262626] flex items-center justify-center text-[#e5e5e5] group-hover:bg-[#262626] transition-colors">
-                            <span className="material-symbols-outlined text-[20px]">edit_note</span>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">{activeProject.title}</h3>
-                            <p className="text-[10px] technical-font text-[#ff5545] uppercase tracking-wider">Active Session</p>
+        <Link href={href} className="group flex flex-col gap-3 active:scale-[0.98] transition-transform duration-300">
+            {/* Artwork Container */}
+            <div className={`aspect-square rounded-2xl overflow-hidden relative shadow-lg bg-gradient-to-br ${gradient}`}>
+                {/* Overlay Gradient for consistency */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20" />
+
+                {/* Play Button Overlay */}
+                {isPlayable && (
+                    <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 shadow-xl transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                            <span className="material-symbols-outlined text-white text-[28px] ml-1">play_arrow</span>
                         </div>
                     </div>
-                    <span className="material-symbols-outlined text-[#404040] text-[18px] group-hover:text-[#737373] transition-colors">chevron_right</span>
-                </Link>
-            )}
+                )}
+            </div>
 
-            {/* Other Projects */}
-            {otherProjects.map((project) => (
-                <Link
-                    key={project.id}
-                    href={`/project/${project.id}`}
-                    className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4 flex items-center justify-between cursor-pointer opacity-80 hover:opacity-100 hover:border-[#262626] transition-all group"
-                >
-                    <div>
-                        <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">{project.title}</h3>
-                        <p className="text-[10px] technical-font text-[#525252] uppercase tracking-wider">
-                            {getTimeAgo(new Date(project.updatedAt))} • {project.status}
-                        </p>
-                    </div>
-                    <span className="material-symbols-outlined text-[#404040] text-[18px] group-hover:text-[#737373] transition-colors">chevron_right</span>
-                </Link>
-            ))}
-
-            {/* Create New Project */}
-            <form action={createAction}>
-                <div className="border border-dashed border-[#262626] rounded-xl p-4 flex items-center gap-4 hover:border-[#404040] transition-all cursor-pointer group">
-                    <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] flex items-center justify-center text-[#404040] group-hover:text-[#737373] transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">add</span>
-                    </div>
-                    <input
-                        name="title"
-                        placeholder="New song title..."
-                        className="flex-grow bg-transparent text-sm text-[#e5e5e5] placeholder-[#404040] focus:outline-none"
-                        required
-                    />
-                    <button type="submit" className="text-[#ff5545] hover:text-[#ff7565] transition-colors">
-                        <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-                    </button>
-                </div>
-            </form>
-
-            {/* Empty State */}
-            {!activeProject && otherProjects.length === 0 && (
-                <div className="text-center py-16 text-[#525252]">
-                    <span className="material-symbols-outlined text-[48px] mb-4 block opacity-30">library_music</span>
-                    <p className="text-[14px]">No songs yet. Create your first one!</p>
-                </div>
-            )}
-        </div>
+            {/* Metadata */}
+            <div className="px-1">
+                <h3 className="text-[15px] font-semibold text-[var(--text-primary)] leading-tight truncate group-hover:text-[var(--accent-primary)] transition-colors duration-[var(--duration-fast)]">
+                    {title}
+                </h3>
+                <p className="text-[13px] text-[var(--text-muted)] truncate mt-0.5">
+                    {subtitle}
+                </p>
+            </div>
+        </Link>
     );
-}
-
-// ============================================
-// VERSES VIEW
-// ============================================
-function VersesView({ verses }: { verses: typeof mockVerses }) {
-    return (
-        <div className="space-y-3">
-            {verses.map((verse) => (
-                <div
-                    key={verse.id}
-                    className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-[#262626] transition-all group"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] border border-[#262626] flex items-center justify-center text-[#737373]">
-                            <span className="material-symbols-outlined text-[20px]">article</span>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">{verse.title}</h3>
-                            <p className="text-[10px] technical-font text-[#525252] uppercase tracking-wider">
-                                {verse.project} • {verse.updatedAt}
-                            </p>
-                        </div>
-                    </div>
-                    <span className="material-symbols-outlined text-[#404040] text-[18px] group-hover:text-[#737373] transition-colors">chevron_right</span>
-                </div>
-            ))}
-
-            {verses.length === 0 && (
-                <div className="text-center py-16 text-[#525252]">
-                    <span className="material-symbols-outlined text-[48px] mb-4 block opacity-30">article</span>
-                    <p className="text-[14px]">No verses yet. Start writing!</p>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ============================================
-// TAKES VIEW
-// ============================================
-function TakesView({ takes }: { takes: typeof mockTakes }) {
-    return (
-        <div className="space-y-3">
-            {takes.map((take) => (
-                <div
-                    key={take.id}
-                    className="bg-[#141414] border border-[#1f1f1f] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-[#262626] transition-all group"
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] border border-[#262626] flex items-center justify-center text-[#737373]">
-                            <span className="material-symbols-outlined text-[20px]">mic</span>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-medium text-[#e5e5e5] mb-1">{take.title}</h3>
-                            <p className="text-[10px] technical-font text-[#525252] uppercase tracking-wider">
-                                {take.duration} • {take.updatedAt}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center text-[#737373] hover:text-[#e5e5e5] hover:bg-[#262626] transition-colors">
-                            <span className="material-symbols-outlined text-[16px]">play_arrow</span>
-                        </button>
-                        <span className="material-symbols-outlined text-[#404040] text-[18px] group-hover:text-[#737373] transition-colors">chevron_right</span>
-                    </div>
-                </div>
-            ))}
-
-            {takes.length === 0 && (
-                <div className="text-center py-16 text-[#525252]">
-                    <span className="material-symbols-outlined text-[48px] mb-4 block opacity-30">mic</span>
-                    <p className="text-[14px]">No takes yet. Start recording!</p>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ============================================
-// HELPERS
-// ============================================
-function getTimeAgo(date: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffHours < 1) return "Just now";
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
 }

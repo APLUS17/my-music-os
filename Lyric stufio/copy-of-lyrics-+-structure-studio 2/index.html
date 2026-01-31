@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Studio Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Default (Dark/Carbon) */
+    :root {
+      --bg-main: #050505;
+      --bg-card: #0A0A0A;
+      --bg-hover: rgba(255, 255, 255, 0.05);
+      --bg-secondary: #18181B; /* zinc-900 */
+      
+      --border-main: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 255, 255, 0.2);
+      
+      --text-main: #E5E5E5;
+      --text-secondary: #A1A1AA; /* zinc-400 */
+      --text-tertiary: #52525B; /* zinc-600 */
+      
+      --accent: #FFFFFF;
+      --accent-dim: rgba(255, 255, 255, 0.4);
+      
+      --glass: rgba(10, 10, 10, 0.8);
+      
+      /* Shapes & Fonts Defaults */
+      --radius-sm: 0.125rem;
+      --radius-md: 0.375rem;
+      --radius-lg: 0.5rem;
+      --radius-xl: 0.75rem;
+      
+      --font-body: 'Inter', sans-serif;
+    }
+
+    /* Light (Paper) */
+    [data-theme="light"] {
+      --bg-main: #F5F5F4; /* stone-100 */
+      --bg-card: #FFFFFF;
+      --bg-hover: rgba(0, 0, 0, 0.04);
+      --bg-secondary: #E7E5E4; /* stone-200 */
+      
+      --border-main: rgba(0, 0, 0, 0.08);
+      --border-focus: rgba(0, 0, 0, 0.2);
+      
+      --text-main: #1C1917; /* stone-900 */
+      --text-secondary: #78716C; /* stone-500 */
+      --text-tertiary: #A8A29E; /* stone-400 */
+      
+      --accent: #000000;
+      --accent-dim: rgba(0, 0, 0, 0.4);
+      
+      --glass: rgba(255, 255, 255, 0.8);
+      
+      --radius-sm: 0.125rem;
+      --radius-md: 0.375rem;
+      --radius-lg: 0.5rem;
+      --radius-xl: 0.75rem;
+      
+      --font-body: 'Inter', sans-serif;
+    }
+
+    /* Midnight (Azure) */
+    [data-theme="midnight"] {
+      --bg-main: #020617; /* slate-950 */
+      --bg-card: #0F172A; /* slate-900 */
+      --bg-hover: rgba(56, 189, 248, 0.08);
+      --bg-secondary: #1E293B; /* slate-800 */
+      
+      --border-main: rgba(56, 189, 248, 0.15);
+      --border-focus: rgba(56, 189, 248, 0.4);
+      
+      --text-main: #F8FAFC; /* slate-50 */
+      --text-secondary: #94A3B8; /* slate-400 */
+      --text-tertiary: #475569; /* slate-600 */
+      
+      --accent: #38BDF8; /* sky-400 */
+      --accent-dim: rgba(56, 189, 248, 0.4);
+      
+      --glass: rgba(15, 23, 42, 0.8);
+      
+      --radius-sm: 0.125rem;
+      --radius-md: 0.375rem;
+      --radius-lg: 0.5rem;
+      --radius-xl: 0.75rem;
+      
+      --font-body: 'Inter', sans-serif;
+    }
+
+    /* Terminal (Retro) */
+    [data-theme="terminal"] {
+      --bg-main: #000000;
+      --bg-card: #000000;
+      --bg-hover: #111111;
+      --bg-secondary: #0A0A0A;
+      
+      --border-main: #333333;
+      --border-focus: #4AF626;
+      
+      --text-main: #4AF626; /* Bright Green */
+      --text-secondary: #248A12;
+      --text-tertiary: #155E09;
+      
+      --accent: #4AF626;
+      --accent-dim: rgba(74, 246, 38, 0.2);
+      
+      --glass: #000000;
+      
+      /* Boxy, sharp edges for terminal feel */
+      --radius-sm: 0px;
+      --radius-md: 0px;
+      --radius-lg: 0px;
+      --radius-xl: 0px;
+      
+      /* Everything monospaced */
+      --font-body: 'JetBrains Mono', monospace;
+    }
+
+    /* Ethereal (Soft) */
+    [data-theme="ethereal"] {
+      --bg-main: #FFF1F2; /* Rose 50 */
+      --bg-card: #FFFFFF;
+      --bg-hover: #FFE4E6;
+      --bg-secondary: #FFE4E6; /* Rose 100 */
+      
+      --border-main: rgba(244, 63, 94, 0.1); /* Rose 500 low opacity */
+      --border-focus: rgba(244, 63, 94, 0.3);
+      
+      --text-main: #881337; /* Rose 900 */
+      --text-secondary: #BE123C; /* Rose 700 */
+      --text-tertiary: #E11D48; /* Rose 600 */
+      
+      --accent: #E11D48;
+      --accent-dim: rgba(225, 29, 72, 0.1);
+      
+      --glass: rgba(255, 255, 255, 0.6);
+      
+      /* Highly rounded, soft edges */
+      --radius-sm: 0.5rem;
+      --radius-md: 1rem;
+      --radius-lg: 1.5rem;
+      --radius-xl: 2rem;
+      
+      /* Editorial Serif feel */
+      --font-body: 'Instrument Serif', serif;
+    }
+
+    /* Utility Overrides for Theming */
+    .rounded-sm { border-radius: var(--radius-sm) !important; }
+    .rounded-md { border-radius: var(--radius-md) !important; }
+    .rounded-lg { border-radius: var(--radius-lg) !important; }
+    .rounded-xl { border-radius: var(--radius-xl) !important; }
+    
+    /* This allows the theme to swap the entire app's font personality */
+    .font-sans { font-family: var(--font-body) !important; }
+
+    body {
+      font-family: var(--font-body);
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      overflow: hidden;
+      touch-action: manipulation;
+      transition: background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease;
+    }
+    .serif {
+      font-family: 'Instrument Serif', serif;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    .glass {
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-main);
+    }
+    ::selection {
+      background: var(--text-tertiary);
+      color: var(--text-main);
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
