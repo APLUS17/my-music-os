@@ -1,13 +1,12 @@
 
 import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { ArrowRight, Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
-import { SandboxLine, VoiceTake } from '@/types';
+import { LyricSection, VoiceTake } from '@/types';
 
 interface SandboxViewProps {
-  lines: SandboxLine[];
+  sections: LyricSection[];
   takes: VoiceTake[];
-  onChange: (lines: SandboxLine[]) => void;
-  onPromote: (text: string) => void;
+  onUpdateSections: (sections: LyricSection[]) => void;
   onRecordStart: (lineId: string) => void;
   onPlayTake: (takeId: string) => void;
   currentlyPlayingTakeId: string | null;
@@ -54,7 +53,7 @@ const AutoResizeTextarea = ({
       onKeyDown={onKeyDown}
       onFocus={onFocus}
       rows={1}
-      className="w-full bg-transparent border-none focus:outline-none text-[var(--text-main)] text-base leading-relaxed font-sans placeholder:text-[var(--text-tertiary)] resize-none overflow-hidden py-1 whitespace-pre-wrap break-words"
+      className="w-full bg-transparent border-none focus:outline-none text-[var(--text-main)] text-base leading-relaxed font-sans placeholder:text-[var(--text-tertiary)] resize-none overflow-hidden py-0 whitespace-pre-wrap break-words block"
       placeholder={placeholder}
       spellCheck={false}
     />
@@ -62,10 +61,9 @@ const AutoResizeTextarea = ({
 };
 
 export const SandboxView: React.FC<SandboxViewProps> = ({
-  lines,
+  sections,
   takes,
-  onChange,
-  onPromote,
+  onUpdateSections,
   onRecordStart,
   onPlayTake,
   currentlyPlayingTakeId
@@ -74,24 +72,121 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   const [draggedTakeId, setDraggedTakeId] = useState<string | null>(null);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
 
-  const handleLineChange = (id: string, newText: string) => {
-    onChange(lines.map(l => l.id === id ? { ...l, text: newText } : l));
+  // Flatten sections into editable lines for Flow mode
+  type FlowLine = { id: string; text: string; sectionId: string; takeId?: string };
+  const lines: FlowLine[] = sections.flatMap(section =>
+    section.text.split('\n').map((lineText, idx) => ({
+      id: `${section.id}-line-${idx}`,
+      text: lineText,
+      sectionId: section.id,
+      takeId: section.pinnedTakeId
+    }))
+  );
+
+  // Ensure at least one line exists
+  if (lines.length === 0) {
+    lines.push({ id: 'initial', text: '', sectionId: sections[0]?.id || 'default' });
+  }
+
+  const handleLineChange = (lineId: string, newText: string) => {
+    const lineIndex = lines.findIndex(l => l.id === lineId);
+    if (lineIndex === -1) return;
+
+    const updatedLines = [...lines];
+    updatedLines[lineIndex] = { ...updatedLines[lineIndex], text: newText };
+
+    // Convert lines back to sections
+    const sectionMap = new Map<string, string>();
+    updatedLines.forEach(line => {
+      const existing = sectionMap.get(line.sectionId) || '';
+      sectionMap.set(line.sectionId, existing ? `${existing}\n${line.text}` : line.text);
+    });
+
+    const updatedSections = sections.map(section => ({
+      ...section,
+      text: sectionMap.get(section.id) || ''
+    }));
+
+    onUpdateSections(updatedSections);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, id: string) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const newLineId = Math.random().toString(36).substr(2, 9);
-      const newLine = { id: newLineId, text: '' };
-      const newLines = [...lines];
-      newLines.splice(index + 1, 0, newLine);
-      onChange(newLines);
-      setFocusedLineId(newLineId);
+      const currentLine = lines[index];
+      const currentSection = sections.find(s => s.id === currentLine.sectionId);
+      if (!currentSection) return;
+
+      // Double Enter detection: If current line is empty, creating a new section break
+      if (currentLine.text.trim() === '') {
+        // We are splitting the section or creating a new one
+        const sectionLines = currentSection.text.split('\n');
+        // Find the index of this line within the section's lines
+        // We need robust index finding since multiple lines might have same text
+        // relying on the ID format `${section.id}-line-${idx}` we constructed
+        const lineIdxStr = currentLine.id.split('-line-').pop();
+        const lineIdx = lineIdxStr ? parseInt(lineIdxStr) : -1;
+
+        if (lineIdx !== -1) {
+          const textBefore = sectionLines.slice(0, lineIdx).join('\n');
+          const textAfter = sectionLines.slice(lineIdx + 1).join('\n'); // lines after the empty one
+
+          // 1. Update current section with textBefore
+          const updatedCurrentSection = { ...currentSection, text: textBefore };
+
+          // 2. Create new section with textAfter (or empty)
+          const newSection: LyricSection = {
+            id: Math.random().toString(36).substr(2, 9),
+            type: 'verse', // Default to verse, can be changed in write mode
+            repeats: 1,
+            text: textAfter
+          };
+
+          const currentSectionIndex = sections.findIndex(s => s.id === currentSection.id);
+          const newSections = [...sections];
+          newSections[currentSectionIndex] = updatedCurrentSection;
+          newSections.splice(currentSectionIndex + 1, 0, newSection);
+
+          onUpdateSections(newSections);
+
+          // Focus the first line of the new section
+          setTimeout(() => {
+            setFocusedLineId(`${newSection.id}-line-0`);
+          }, 0);
+          return;
+        }
+      }
+
+      // Normal Enter: Add new line to current section
+      const updatedText = currentSection.text + '\n';
+      const updatedSections = sections.map(s =>
+        s.id === currentSection.id ? { ...s, text: updatedText } : s
+      );
+      onUpdateSections(updatedSections);
+
+      // Focus the new line
+      setTimeout(() => {
+        const newLineId = `${currentSection.id}-line-${currentSection.text.split('\n').length}`;
+        setFocusedLineId(newLineId);
+      }, 0);
     } else if (e.key === 'Backspace' && lines[index].text === '' && lines.length > 1) {
       e.preventDefault();
       const prevLineId = lines[index - 1]?.id;
-      const newLines = lines.filter(l => l.id !== id);
-      onChange(newLines);
+
+      // Remove empty line by updating section text
+      const updatedLines = lines.filter(l => l.id !== id);
+      const sectionMap = new Map<string, string>();
+      updatedLines.forEach(line => {
+        const existing = sectionMap.get(line.sectionId) || '';
+        sectionMap.set(line.sectionId, existing ? `${existing}\n${line.text}` : line.text);
+      });
+
+      const updatedSections = sections.map(section => ({
+        ...section,
+        text: sectionMap.get(section.id) || ''
+      }));
+      onUpdateSections(updatedSections);
+
       if (prevLineId) {
         setTimeout(() => {
           document.getElementById(`line-${prevLineId}`)?.focus();
@@ -126,12 +221,26 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       if (line.takeId === takeId) return { ...line, takeId: undefined };
       return line;
     });
-    onChange(newLines);
+
+    // Convert back to sections (simplified - just update the pinned take on the section)
+    const targetLine = lines.find(l => l.id === targetLineId);
+    if (targetLine) {
+      const updatedSections = sections.map(s =>
+        s.id === targetLine.sectionId ? { ...s, pinnedTakeId: takeId } : s
+      );
+      onUpdateSections(updatedSections);
+    }
     setDraggedTakeId(null);
   };
 
   const removeTakeFromLine = (lineId: string) => {
-    onChange(lines.map(l => l.id === lineId ? { ...l, takeId: undefined } : l));
+    const targetLine = lines.find(l => l.id === lineId);
+    if (targetLine) {
+      const updatedSections = sections.map(s =>
+        s.id === targetLine.sectionId ? { ...s, pinnedTakeId: undefined } : s
+      );
+      onUpdateSections(updatedSections);
+    }
   };
 
   return (
@@ -146,19 +255,29 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
         const take = line.takeId ? takes.find(t => t.id === line.takeId) : null;
         const isPlaying = take && currentlyPlayingTakeId === take.id;
 
+        const isLastLineOfSection = lines[index + 1]?.sectionId !== line.sectionId;
+        // Negative margin to pull lines together and eliminate browser rendering gaps
+        const marginBottom = isLastLineOfSection ? 'mb-12' : '-mb-1';
+
         return (
           <div
             key={line.id}
-            className="group flex items-start mb-2 relative pl-3 border-l-2 border-transparent hover:border-[var(--border-main)] transition-colors min-h-[32px]"
+            className={`group flex items-start ${marginBottom} relative pl-3 border-l-2 border-transparent hover:border-[var(--border-main)] transition-all`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDrop(e, line.id)}
           >
+            {/* Section Divider Indicator (Visual only) */}
+            {isLastLineOfSection && index !== lines.length - 1 && (
+              <div className="absolute -bottom-8 left-0 right-0 h-4 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="h-[1px] w-full bg-[var(--border-main)] opacity-50"></div>
+              </div>
+            )}
             {/* Controls - Absolute Positioned to left of content */}
-            <div className="absolute -left-8 top-1 w-6 flex justify-center opacity-20 group-hover:opacity-100 transition-all duration-300 z-10">
+            <div className="absolute -left-8 top-0 w-6 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
               {!take ? (
                 <button
                   onClick={() => onRecordStart(line.id)}
-                  className="text-[var(--text-tertiary)] hover:text-red-500 transition-all hover:scale-125 p-1"
+                  className="text-[var(--text-tertiary)] hover:text-red-500 transition-all hover:scale-125 p-1 active:scale-90"
                   title="Record Take"
                 >
                   <Mic size={14} />
@@ -188,19 +307,28 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
                 placeholder={index === 0 && lines.length === 1 ? "Start writing..." : ""}
                 autoFocus={focusedLineId === line.id}
               />
-              {/* Underline effect */}
-              <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-[var(--border-main)] opacity-10 group-hover:opacity-40 pointer-events-none transition-opacity" />
 
               {/* Delete X for Line */}
               <button
                 onClick={() => {
                   if (lines.length > 1) {
-                    onChange(lines.filter(l => l.id !== line.id));
+                    // Remove this line by updating section text
+                    const updatedLines = lines.filter(l => l.id !== line.id);
+                    const sectionMap = new Map<string, string>();
+                    updatedLines.forEach(l => {
+                      const existing = sectionMap.get(l.sectionId) || '';
+                      sectionMap.set(l.sectionId, existing ? `${existing}\n${l.text}` : l.text);
+                    });
+                    const updatedSections = sections.map(section => ({
+                      ...section,
+                      text: sectionMap.get(section.id) || ''
+                    }));
+                    onUpdateSections(updatedSections);
                   } else {
                     handleLineChange(line.id, "");
                   }
                 }}
-                className="absolute -right-6 top-1.5 text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 hover:opacity-100 hover:text-red-500 transition-all duration-300"
+                className="absolute -right-6 top-1 text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 hover:opacity-100 hover:text-red-500 transition-all duration-300 active:scale-90"
               >
                 <X size={12} />
               </button>
@@ -226,17 +354,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
         );
       })}
 
-      {/* Promotion Button */}
-      {lines.some(l => l.text.length > 5) && (
-        <div className="fixed bottom-28 right-6 z-20 animate-in slide-in-from-right duration-500">
-          <button
-            onClick={() => onPromote(lines.map(l => l.text).join('\n'))}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full text-[10px] mono uppercase tracking-wider hover:opacity-90 shadow-lg"
-          >
-            Promote All <ArrowRight size={12} />
-          </button>
-        </div>
-      )}
+
     </div>
   );
 };

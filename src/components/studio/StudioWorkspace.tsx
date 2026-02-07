@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, VoiceTake, SectionType, SandboxLine, Beat, SavedProject } from '../../types';
+import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } from '../../types';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
 import { SandboxView } from './SandboxView';
@@ -222,7 +222,7 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
 const StudioWorkspace: React.FC = () => {
     const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
-    const [studioMode, setStudioMode] = useState<StudioMode>('arrange');
+    const [studioMode, setStudioMode] = useState<StudioMode>('flow');
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
     const [showRecorder, setShowRecorder] = useState(false);
@@ -246,7 +246,7 @@ const StudioWorkspace: React.FC = () => {
     ]);
     const [scraps, setScraps] = useState<LyricScrap[]>([]);
 
-    const [sandboxLines, setSandboxLines] = useState<SandboxLine[]>([{ id: 'init', text: '' }]);
+
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
 
     const [takes, setTakes] = useState<VoiceTake[]>([]);
@@ -271,7 +271,7 @@ const StudioWorkspace: React.FC = () => {
                         setSections([{ id: 'init-verse', type: 'verse', repeats: 1, text: '' }]);
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
-                    if (parsed.sandboxLines) setSandboxLines(parsed.sandboxLines);
+
                     if (parsed.savedProjects) setSavedProjects(parsed.savedProjects);
                     if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
@@ -316,13 +316,13 @@ const StudioWorkspace: React.FC = () => {
         const takesToSave = takes.map(({ audioUrl, base64, ...rest }) => rest);
         const beatsToSave = beats.map(({ audioUrl, base64, ...rest }) => rest);
         const dataToSave = {
-            sections, scraps, sandboxLines, savedProjects,
+            sections, scraps, savedProjects,
             projectTitle, projectBpm, projectKey,
             takes: takesToSave, beats: beatsToSave
         };
         try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
         catch (e) { console.error("Storage full or error", e); }
-    }, [sections, scraps, sandboxLines, savedProjects, projectTitle, projectBpm, projectKey, takes, beats]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, takes, beats]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -348,9 +348,8 @@ const StudioWorkspace: React.FC = () => {
         setTakes(prev => [newTake, ...prev]);
 
         if (recordingTargetLineId) {
-            setSandboxLines(prev => prev.map(line =>
-                line.id === recordingTargetLineId ? { ...line, takeId: id } : line
-            ));
+            // Recording was targeted to a specific line - this is handled in Flow mode
+            // The take is attached to the section via drag-drop or manual pin
             setRecordingTargetLineId(null);
         }
     };
@@ -388,7 +387,7 @@ const StudioWorkspace: React.FC = () => {
     };
 
     const archiveCurrentProject = () => {
-        if (sections.length === 0 && scraps.length === 0 && sandboxLines.length <= 1) return;
+        if (sections.length === 0 && scraps.length === 0) return;
         const newProject: SavedProject = {
             id: Math.random().toString(36).substr(2, 9),
             name: projectTitle || "Untitled Project",
@@ -429,7 +428,6 @@ const StudioWorkspace: React.FC = () => {
             archiveCurrentProject();
             setSections([{ id: Math.random().toString(36).substr(2, 9), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
-            setSandboxLines([{ id: 'init', text: '' }]);
             setProjectTitle("");
             setUploadedBeat(null);
             setViewMode('studio');
@@ -452,7 +450,6 @@ const StudioWorkspace: React.FC = () => {
         archiveCurrentProject();
         setSections([{ id: Math.random().toString(36).substr(2, 9), type: 'verse', repeats: 1, text: "" }]);
         setScraps([]);
-        setSandboxLines([{ id: 'init', text: '' }]);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setStudioMode('arrange');
@@ -640,15 +637,25 @@ const StudioWorkspace: React.FC = () => {
 
                                 {/* Bottom Row: Toggle and Audio Controls */}
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1 bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)]">
+                                    <div className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
+                                        {/* Sliding Pill */}
+                                        <div
+                                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--bg-main)] shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${studioMode === 'flow' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
+                                        />
+
+                                        {/* Buttons */}
                                         <button
                                             onClick={() => setStudioMode('flow')}
-                                            className={`px-4 py-1.5 text-[10px] mono uppercase tracking-wider rounded-lg transition-all ${studioMode === 'flow' ? 'bg-[var(--bg-main)] text-[var(--text-main)] shadow-sm' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >Flow</button>
+                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'flow' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+                                        >
+                                            Flow
+                                        </button>
                                         <button
                                             onClick={() => setStudioMode('arrange')}
-                                            className={`px-4 py-1.5 text-[10px] mono uppercase tracking-wider rounded-lg transition-all ${studioMode === 'arrange' ? 'bg-[var(--bg-main)] text-[var(--text-main)] shadow-sm' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >Write</button>
+                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'arrange' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+                                        >
+                                            Write
+                                        </button>
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -672,8 +679,9 @@ const StudioWorkspace: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide">
-                            {studioMode === 'arrange' ? (
+                        <div className="flex-1 relative overflow-hidden">
+                            {/* Arrange Mode (Write) */}
+                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <div className="max-w-2xl mx-auto space-y-12">
                                     {sections.map((section, idx) => (
                                         <LyricCard
@@ -688,24 +696,26 @@ const StudioWorkspace: React.FC = () => {
                                     ))}
                                     <button
                                         onClick={addSection}
-                                        className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all group relative"
+                                        className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
                                     >
                                         <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                         <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
                                         <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                     </button>
                                 </div>
-                            ) : (
+                            </div>
+
+                            {/* Flow Mode (Sandbox) */}
+                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'flow' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <SandboxView
-                                    lines={sandboxLines}
+                                    sections={sections}
                                     takes={takes}
-                                    onChange={setSandboxLines}
-                                    onPromote={promoteToSection}
+                                    onUpdateSections={setSections}
                                     onRecordStart={handleRecordStart}
                                     onPlayTake={handlePlayTake}
                                     currentlyPlayingTakeId={playingTakeId}
                                 />
-                            )}
+                            </div>
                         </div>
                     </div>
                 );
@@ -747,7 +757,6 @@ const StudioWorkspace: React.FC = () => {
                 text: text
             };
             setSections(prev => [...prev, newSection]);
-            setSandboxLines([{ id: Math.random().toString(36).substr(2, 9), text: '' }]);
             setStudioMode('arrange');
         }
     };

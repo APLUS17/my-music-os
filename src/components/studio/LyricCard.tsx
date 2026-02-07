@@ -112,17 +112,17 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
 
         <div className="flex items-center gap-2">
           <div className="flex items-center mr-1 opacity-30 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110"><ChevronUp size={14} /></button>
-            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110"><ChevronDown size={14} /></button>
+            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
+            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
           </div>
           <button
             onClick={() => setIsPinSelectorOpen(!isPinSelectorOpen)}
-            className={`p-1 rounded transition-all duration-300 ${section.pinnedTakeId ? 'text-[var(--accent)] bg-[var(--bg-secondary)] opacity-100' : 'text-[var(--text-tertiary)] hover:text-[var(--text-main)] opacity-30 group-hover:opacity-100'}`}
+            className={`p-1 rounded transition-all duration-300 active:scale-90 ${section.pinnedTakeId ? 'text-[var(--accent)] bg-[var(--bg-secondary)] opacity-100' : 'text-[var(--text-tertiary)] hover:text-[var(--text-main)] opacity-30 group-hover:opacity-100'}`}
             title="Attach Recording"
           >
             <Paperclip size={12} className={section.pinnedTakeId ? "animate-pulse" : ""} />
           </button>
-          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110">
+          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110 active:scale-90">
             <X size={14} />
           </button>
         </div>
