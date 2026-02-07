@@ -8,7 +8,7 @@ import { SandboxView } from './SandboxView';
 import { PuzzleView } from './PuzzleView';
 import { VoiceMemoView } from './VoiceMemoView';
 import { BeatUploader } from './BeatUploader';
-import { MuseDrawer } from './MuseDrawer';
+import { FeedbackModal } from './FeedbackModal';
 import {
     LayoutGrid,
     Mic,
@@ -32,7 +32,8 @@ import {
     Play,
     Pause,
     ArrowRight,
-    Trash2
+    Trash2,
+    MessageSquare
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -240,7 +241,7 @@ const StudioWorkspace: React.FC = () => {
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
-    const [showMuse, setShowMuse] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -578,7 +579,10 @@ const StudioWorkspace: React.FC = () => {
                                     <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-[11px] mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
                                 </div>
                             </div>
-                            <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--accent)] bg-[var(--bg-secondary)] border border-[var(--border-main)] transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></button>
+                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
                             {libraryTab === 'beats' && (
@@ -659,14 +663,9 @@ const StudioWorkspace: React.FC = () => {
                                             className="bg-transparent border-none text-2xl font-medium text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)]"
                                             placeholder="Untitled Project"
                                         />
-                                        <div className="flex items-center gap-3 mt-1 text-[10px] mono text-[var(--text-tertiary)] uppercase tracking-widest">
-                                            <span>{projectBpm} BPM</span>
-                                            <div className="w-1 h-1 rounded-full bg-[var(--border-main)]" />
-                                            <span>{projectKey}</span>
-                                        </div>
                                     </div>
-                                    <button className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)]">
-                                        <Share size={18} />
+                                    <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95">
+                                        <MessageSquare size={16} fill="currentColor" />
                                     </button>
                                 </div>
 
@@ -703,12 +702,6 @@ const StudioWorkspace: React.FC = () => {
                                             }}
                                             onClear={() => setUploadedBeat(null)}
                                         />
-                                        <button
-                                            onClick={() => setShowMuse(true)}
-                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)]"
-                                        >
-                                            <Zap size={18} fill="currentColor" />
-                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -836,7 +829,7 @@ const StudioWorkspace: React.FC = () => {
                 />
             )}
 
-            {showMuse && <MuseDrawer onClose={() => setShowMuse(false)} contextText={sections.map(s => s.text).join('\n')} />}
+            {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
             {showSearch && (
                 <div className="fixed inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
