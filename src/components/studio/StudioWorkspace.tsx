@@ -79,6 +79,18 @@ const getAudioData = async (id: string): Promise<string | undefined> => {
     });
 };
 
+const deleteAudioData = async (id: string) => {
+    if (typeof window === 'undefined') return;
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
 type ViewMode = 'collection' | 'studio' | 'board' | 'settings';
 type StudioMode = 'flow' | 'arrange';
 type LibraryTab = 'songs' | 'beats';
@@ -367,6 +379,29 @@ const StudioWorkspace: React.FC = () => {
             audio.play().catch(console.error);
             globalAudioRef.current = audio;
             setPlayingTakeId(takeId);
+        }
+    };
+
+    const handleDeleteTake = async (takeId: string) => {
+        if (!confirm("Permanently delete this recording?")) return;
+
+        // Stop playback if deleting current
+        if (playingTakeId === takeId) {
+            globalAudioRef.current?.pause();
+            setPlayingTakeId(null);
+        }
+
+        // Remove from sections that have it pinned
+        setSections(prev => prev.map(s => s.pinnedTakeId === takeId ? { ...s, pinnedTakeId: undefined } : s));
+
+        // Remove from takes list
+        setTakes(prev => prev.filter(t => t.id !== takeId));
+
+        // Delete from DB
+        try {
+            await deleteAudioData(takeId);
+        } catch (e) {
+            console.error("Failed to delete audio data", e);
         }
     };
 
@@ -692,6 +727,7 @@ const StudioWorkspace: React.FC = () => {
                                             onMove={moveSection}
                                             availableTakes={takes}
                                             beatAudioRef={beatAudioRef}
+                                            onDeleteTake={handleDeleteTake}
                                         />
                                     ))}
                                     <button

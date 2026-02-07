@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { LyricSection, SECTION_TYPES, VoiceTake } from '@/types';
-import { Minus, Plus, Play, Pause, X, Pin, ChevronUp, ChevronDown, Paperclip, Layers, Volume2 } from 'lucide-react';
+import { Minus, Plus, Play, Pause, X, Pin, ChevronUp, ChevronDown, Paperclip, Layers, Volume2, Trash2 } from 'lucide-react';
 
 interface LyricCardProps {
   section: LyricSection;
@@ -10,9 +10,10 @@ interface LyricCardProps {
   onMove: (id: string, direction: 'up' | 'down') => void;
   availableTakes: VoiceTake[];
   beatAudioRef?: React.RefObject<HTMLAudioElement | null>;
+  onDeleteTake?: (takeId: string) => void;
 }
 
-export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelete, onMove, availableTakes, beatAudioRef }) => {
+export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelete, onMove, availableTakes, beatAudioRef, onDeleteTake }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isPinSelectorOpen, setIsPinSelectorOpen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -213,17 +214,33 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
               <p className="text-[9px] mono text-center py-6 text-[var(--text-tertiary)]">No recordings found</p>
             ) : (
               availableTakes.map((take) => (
-                <button
+                <div
                   key={take.id}
-                  onClick={() => { onUpdate(section.id, { pinnedTakeId: take.id }); setIsPinSelectorOpen(false); }}
-                  className={`w-full text-left px-3 py-2.5 text-[10px] mono flex justify-between items-center rounded-md hover:bg-[var(--bg-hover)] border mb-1 ${section.pinnedTakeId === take.id ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)]'}`}
+                  className={`group w-full flex items-center justify-between rounded-md hover:bg-[var(--bg-hover)] border mb-1 transition-colors ${section.pinnedTakeId === take.id ? 'border-[var(--accent)]' : 'border-transparent'}`}
                 >
-                  <div className="flex flex-col">
-                    <span className="font-medium">Take {take.id}</span>
-                    <span className="text-[8px] opacity-60">{take.timestamp}</span>
-                  </div>
-                  <span className="opacity-50">{take.duration}</span>
-                </button>
+                  <button
+                    onClick={() => { onUpdate(section.id, { pinnedTakeId: take.id }); setIsPinSelectorOpen(false); }}
+                    className={`flex-1 text-left pl-3 py-2.5 text-[10px] mono flex justify-between items-center ${section.pinnedTakeId === take.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">Take {take.id}</span>
+                      <span className="text-[8px] opacity-60">{take.timestamp}</span>
+                    </div>
+                    <span className="opacity-50 pr-2">{take.duration}</span>
+                  </button>
+                  {onDeleteTake && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTake(take.id);
+                      }}
+                      className="px-2 py-3 text-[var(--text-tertiary)] hover:text-red-500 transition-all active:scale-90"
+                      title="Delete Take"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
