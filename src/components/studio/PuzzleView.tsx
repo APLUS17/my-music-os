@@ -1,81 +1,108 @@
-"use client";
 
 import React, { useState } from 'react';
-import { LyricScrap, SectionType } from '@/types/studio';
-import { Plus, Check, X } from 'lucide-react';
+import { LyricScrap, SectionType } from '@/types';
+import { Plus, GripVertical, Hash, FilePlus2 } from 'lucide-react';
 
 interface PuzzleViewProps {
-    scraps: LyricScrap[];
-    onAdd: (text: string, type: SectionType) => void;
-    onUpdateType: (id: string, type: SectionType) => void;
+  scraps: LyricScrap[];
+  onAdd: (text: string, type: SectionType) => void;
+  onUpdateType: (id: string, type: SectionType) => void;
+  onStartProject: (text: string, type: SectionType) => void;
 }
 
-export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateType }) => {
-    const [isCreating, setIsCreating] = useState(false);
-    const [newText, setNewText] = useState("");
+export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateType, onStartProject }) => {
+  const [newText, setNewText] = useState("");
+  const [selectedType, setSelectedType] = useState<SectionType>('idea');
 
-    const handleCreate = () => {
-        if (newText.trim()) {
-            onAdd(newText, 'idea');
-        }
-        setNewText("");
-        setIsCreating(false);
-    };
+  const getCardStyle = (type: SectionType) => {
+    switch(type) {
+      case 'chorus': return 'border-[var(--accent)] shadow-[0_0_15px_rgba(0,0,0,0.3)]';
+      case 'verse': return 'border-[var(--border-main)]';
+      case 'bridge': return 'border-[var(--text-secondary)]';
+      default: return 'border-dashed border-[var(--text-tertiary)] opacity-80';
+    }
+  };
 
-    return (
-        <div className="h-full flex flex-col pt-12 animate-in fade-in duration-500">
-            <div className="px-6 mb-8 flex items-end justify-between">
-                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-primary)]">Board</h1>
-                <span className="text-[10px] mono text-[var(--text-muted)] mb-1">{scraps.length} ITEMS</span>
-            </div>
+  return (
+    <div className="h-full flex flex-col pt-4 pb-36 px-4 overflow-y-auto scrollbar-hide">
+      
+      {/* Header */}
+      <div className="mb-6 px-2 flex items-end justify-between">
+        <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">Muse</h1>
+        <span className="text-[10px] mono text-[var(--text-secondary)] mb-1">{scraps.length} ITEMS</span>
+      </div>
 
-            <div className="flex-1 overflow-y-auto px-6 scrollbar-hide pb-44">
-                <div className="columns-2 gap-4 space-y-4">
-                    {/* Creation Card */}
-                    {isCreating ? (
-                        <div className="break-inside-avoid bg-[var(--bg-elevated)] border border-[var(--accent-primary)] rounded-lg p-4 shadow-xl mb-4">
-                            <textarea
-                                autoFocus
-                                className="w-full bg-transparent text-sm font-sans text-[var(--text-primary)] resize-none focus:outline-none placeholder:text-[var(--text-muted)] min-h-[80px]"
-                                placeholder="Capture an idea..."
-                                value={newText}
-                                onChange={(e) => setNewText(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleCreate();
-                                    }
-                                    if (e.key === 'Escape') setIsCreating(false);
-                                }}
-                            />
-                            <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
-                                <button onClick={() => setIsCreating(false)} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"><X size={14} /></button>
-                                <button onClick={handleCreate} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--accent-primary)] hover:text-[var(--text-primary)] transition-colors"><Check size={14} /></button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div
-                            onClick={() => setIsCreating(true)}
-                            className="break-inside-avoid border border-dashed border-[var(--border-subtle)] rounded-lg p-6 flex flex-col items-center justify-center opacity-40 hover:opacity-100 transition-all cursor-pointer hover:border-[var(--text-muted)] hover:bg-[var(--bg-elevated)] min-h-[120px] mb-4"
-                        >
-                            <Plus size={16} className="text-[var(--text-muted)] mb-2" />
-                            <span className="text-[9px] mono uppercase text-[var(--text-muted)]">New Scrap</span>
-                        </div>
-                    )}
-
-                    {scraps.map((s) => (
-                        <div key={s.id} className="break-inside-avoid bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg p-4 transition-all hover:border-[var(--text-muted)] group cursor-pointer hover:shadow-lg mb-4">
-                            <div className="flex items-center justify-between mb-3 border-b border-[var(--border-subtle)] pb-2">
-                                <span className="text-[9px] mono uppercase tracking-widest text-[var(--text-muted)] group-hover:text-[var(--text-primary)]">
-                                    {s.type}
-                                </span>
-                                <div className="w-1 h-1 rounded-full bg-[var(--text-muted)] group-hover:bg-[var(--accent-primary)]" />
-                            </div>
-                            <p className="text-sm font-sans text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap">{s.text}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+      {/* Dynamic Input Area */}
+      <div className="mb-8 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-[1.5rem] p-4 shadow-xl z-10 relative">
+        <textarea 
+          value={newText}
+          onChange={(e) => setNewText(e.target.value)}
+          placeholder="Capture an idea..."
+          className="w-full bg-transparent p-2 text-sm font-sans text-[var(--text-main)] focus:outline-none min-h-[60px] resize-none placeholder:text-[var(--text-tertiary)]"
+        />
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-main)]">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+            {['idea', 'verse', 'chorus', 'bridge'].map((t) => (
+              <button
+                key={t}
+                onClick={() => setSelectedType(t as SectionType)}
+                className={`px-3 py-1 rounded-full text-[9px] mono uppercase tracking-widest transition-all ${
+                  selectedType === t 
+                    ? 'bg-[var(--text-main)] text-[var(--bg-main)]' 
+                    : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          <button 
+            onClick={() => { if(newText.trim()) { onAdd(newText, selectedType); setNewText(""); } }}
+            disabled={!newText.trim()}
+            className="w-10 h-10 bg-[var(--accent)] text-[var(--bg-main)] rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50 disabled:shadow-none"
+          >
+            <Plus size={18} strokeWidth={3} />
+          </button>
         </div>
-    );
+      </div>
+
+      {/* The Spatial Board */}
+      <div className="columns-2 gap-4 space-y-4 pb-20">
+        {scraps.map((scrap, idx) => (
+          <div 
+            key={scrap.id} 
+            className={`break-inside-avoid relative p-4 rounded-xl bg-[var(--bg-card)] border transition-all hover:-translate-y-1 group ${getCardStyle(scrap.type)}`}
+          >
+            <div className="flex items-center justify-between mb-3">
+               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[8px] mono uppercase tracking-widest text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors cursor-pointer">
+                 <Hash size={8} /> {scrap.type}
+               </div>
+               <GripVertical size={12} className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]" />
+            </div>
+            
+            <p className="text-sm font-sans text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
+              {scrap.text}
+            </p>
+
+            {scrap.type !== 'idea' && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
+                className="absolute bottom-3 right-3 p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all shadow-sm opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+                title="Start Project with this section"
+              >
+                <FilePlus2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+        
+        {scraps.length === 0 && (
+            <div className="break-inside-avoid flex flex-col items-center justify-center opacity-20 py-10 col-span-2">
+                <Hash size={48} strokeWidth={1} />
+                <p className="mt-4 text-[10px] mono uppercase tracking-widest">Board Empty</p>
+            </div>
+        )}
+      </div>
+    </div>
+  );
 };

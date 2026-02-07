@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@google/genai": "^1.40.0",
     "@supabase/supabase-js": "^2.91.0",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",

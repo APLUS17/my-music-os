@@ -1,259 +1,234 @@
-"use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { LyricSection, SECTION_TYPES, VoiceTake } from "@/types/studio";
-import { Minus, Plus, Play, Pause, X, Pin, ChevronUp, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useRef, useEffect } from 'react';
+import { LyricSection, SECTION_TYPES, VoiceTake } from '@/types';
+import { Minus, Plus, Play, Pause, X, Pin, ChevronUp, ChevronDown, Paperclip, Layers, Volume2 } from 'lucide-react';
 
 interface LyricCardProps {
-    section: LyricSection;
-    onUpdate: (id: string, updates: Partial<LyricSection>) => void;
-    onDelete: (id: string) => void;
-    onMove: (id: string, direction: "up" | "down") => void;
-    availableTakes: VoiceTake[];
+  section: LyricSection;
+  onUpdate: (id: string, updates: Partial<LyricSection>) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, direction: 'up' | 'down') => void;
+  availableTakes: VoiceTake[];
+  beatAudioRef?: React.RefObject<HTMLAudioElement | null>;
 }
 
-/**
- * LyricCard - A structured lyric section with type, repeats, and pinned recording
- */
-export function LyricCard({
-    section,
-    onUpdate,
-    onDelete,
-    onMove,
-    availableTakes
-}: LyricCardProps) {
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isPinSelectorOpen, setIsPinSelectorOpen] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelete, onMove, availableTakes, beatAudioRef }) => {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isPinSelectorOpen, setIsPinSelectorOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [mixEnabled, setMixEnabled] = useState(true);
+  const [showVolume, setShowVolume] = useState(false);
+  const [vocalVolume, setVocalVolume] = useState(1);
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    const pinnedTake = availableTakes.find(t => t.id === section.pinnedTakeId);
+  const pinnedTake = availableTakes.find(t => t.id === section.pinnedTakeId);
 
-    // Auto-resize textarea
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [section.text]);
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [section.text]);
 
-    // Setup audio for pinned take
-    useEffect(() => {
-        if (pinnedTake?.audioUrl) {
-            const audio = new Audio(pinnedTake.audioUrl);
-            audio.onended = () => setIsPlaying(false);
-            audioRef.current = audio;
-        } else {
-            audioRef.current = null;
-        }
-        return () => {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current = null;
-            }
-        };
-    }, [pinnedTake]);
-
-    const togglePlayback = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!audioRef.current) return;
-        if (isPlaying) {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        } else {
-            audioRef.current.play().catch(err => {
-                console.error("Playback failed", err);
-                setIsPlaying(false);
-            });
-            setIsPlaying(true);
-        }
+  useEffect(() => {
+    if (pinnedTake?.audioUrl) {
+      const audio = new Audio(pinnedTake.audioUrl);
+      audio.onended = () => {
+         setIsPlaying(false);
+         if (beatAudioRef?.current && mixEnabled) {
+            beatAudioRef.current.pause();
+         }
+      };
+      audioRef.current = audio;
+    } else {
+      audioRef.current = null;
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
+  }, [pinnedTake, beatAudioRef, mixEnabled]);
 
-    return (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 group relative pl-3 border-l-2 border-[var(--border-subtle)] hover:border-[var(--text-muted)] transition-colors">
-            {/* Header: Type selector + Repeat count + Actions */}
-            <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-3">
-                    {/* Section type dropdown trigger */}
-                    <button
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors font-medium cursor-pointer"
-                    >
-                        {section.type}
-                        <ChevronDown size={10} className="opacity-50" />
-                    </button>
+  useEffect(() => {
+     if (audioRef.current) {
+        audioRef.current.volume = vocalVolume;
+     }
+  }, [vocalVolume]);
 
-                    {/* Repeat count */}
-                    <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-mono text-[var(--text-muted)] tabular-nums opacity-50">
-                            x{section.repeats}
-                        </span>
-                        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={() => onUpdate(section.id, { repeats: section.repeats + 1 })}
-                                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                            >
-                                <Plus size={10} />
-                            </button>
-                            <button
-                                onClick={() => onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) })}
-                                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                            >
-                                <Minus size={10} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
+  const togglePlayback = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      if (beatAudioRef?.current) beatAudioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      if (mixEnabled && beatAudioRef?.current && pinnedTake?.beatOffset !== undefined) {
+         // Sync beat
+         beatAudioRef.current.currentTime = pinnedTake.beatOffset;
+         beatAudioRef.current.play().catch(console.error);
+      }
+      
+      audioRef.current.play().catch(e => {
+        console.error("Playback failed", e);
+        setIsPlaying(false);
+      });
+      setIsPlaying(true);
+    }
+  };
 
-                {/* Actions: Move, Pin, Delete */}
-                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex items-center mr-1">
-                        <button
-                            onClick={() => onMove(section.id, "up")}
-                            className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                        >
-                            <ChevronUp size={14} />
-                        </button>
-                        <button
-                            onClick={() => onMove(section.id, "down")}
-                            className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
-                        >
-                            <ChevronDown size={14} />
-                        </button>
-                    </div>
-                    <button
-                        onClick={() => setIsPinSelectorOpen(!isPinSelectorOpen)}
-                        className={cn(
-                            "p-1 rounded transition-colors cursor-pointer",
-                            section.pinnedTakeId
-                                ? "text-[var(--accent-primary)] bg-[var(--bg-elevated)]"
-                                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        )}
-                        title="Attach Recording"
-                    >
-                        <Pin size={14} />
-                    </button>
-                    <button
-                        onClick={() => onDelete(section.id)}
-                        className="text-[var(--text-muted)] hover:text-[var(--accent-destructive)] transition-colors ml-1 cursor-pointer"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-            </div>
+  const toggleMix = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setMixEnabled(!mixEnabled);
+      // If currently playing, we might want to start/stop beat immediately, 
+      // but simpler to let next play handle it or require restart.
+  };
 
-            {/* Lyrics textarea */}
-            <div className="relative transition-all">
-                <textarea
-                    ref={textareaRef}
-                    value={section.text}
-                    onChange={(e) => onUpdate(section.id, { text: e.target.value })}
-                    className="w-full bg-transparent text-[var(--text-primary)] text-base leading-relaxed font-sans focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
-                    placeholder="Lyrics..."
-                    spellCheck={false}
-                />
-
-                {/* Pinned take player */}
-                {pinnedTake && (
-                    <div className="mt-2 mb-1 animate-in fade-in slide-in-from-top-1 duration-300">
-                        <div className="flex items-center justify-between bg-[var(--bg-elevated)] rounded-md p-2 border border-[var(--border-subtle)] max-w-xs">
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={togglePlayback}
-                                    className={cn(
-                                        "w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer",
-                                        isPlaying
-                                            ? "bg-[var(--accent-primary)] text-[var(--bg-main)]"
-                                            : "bg-[var(--text-primary)] text-[var(--bg-main)]"
-                                    )}
-                                >
-                                    {isPlaying
-                                        ? <Pause size={12} fill="currentColor" />
-                                        : <Play size={12} fill="currentColor" className="ml-0.5" />
-                                    }
-                                </button>
-                                <div className="flex flex-col">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-mono uppercase text-[var(--text-primary)] tracking-wider">
-                                            Take {pinnedTake.id}
-                                        </span>
-                                        {isPlaying && (
-                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)] animate-pulse" />
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => onUpdate(section.id, { pinnedTakeId: undefined })}
-                                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-destructive)] rounded cursor-pointer"
-                            >
-                                <X size={12} />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Section type dropdown */}
-            {isDropdownOpen && (
-                <div className="absolute z-50 top-6 left-0 p-1 bg-[var(--bg-card)] border border-[var(--border-default)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-32">
-                    {SECTION_TYPES.map((type) => (
-                        <button
-                            key={type}
-                            onClick={() => {
-                                onUpdate(section.id, { type });
-                                setIsDropdownOpen(false);
-                            }}
-                            className={cn(
-                                "w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider rounded-md hover:bg-[var(--bg-elevated)] cursor-pointer",
-                                section.type === type
-                                    ? "text-[var(--text-primary)]"
-                                    : "text-[var(--text-secondary)]"
-                            )}
-                        >
-                            {type}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* Pin recording selector dropdown */}
-            {isPinSelectorOpen && (
-                <div className="absolute z-50 top-6 right-0 p-2 bg-[var(--bg-card)] border border-[var(--border-default)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-56 max-h-64 overflow-y-auto scrollbar-hide">
-                    <p className="text-[9px] font-mono uppercase text-[var(--text-muted)] p-2 border-b border-[var(--border-subtle)] mb-1">
-                        Select Recording
-                    </p>
-                    {availableTakes.length === 0 ? (
-                        <p className="text-[9px] font-mono text-center py-6 text-[var(--text-muted)]">
-                            No recordings found
-                        </p>
-                    ) : (
-                        availableTakes.map((take) => (
-                            <button
-                                key={take.id}
-                                onClick={() => {
-                                    onUpdate(section.id, { pinnedTakeId: take.id });
-                                    setIsPinSelectorOpen(false);
-                                }}
-                                className={cn(
-                                    "w-full text-left px-3 py-2.5 text-[10px] font-mono flex justify-between items-center rounded-md hover:bg-[var(--bg-elevated)] border mb-1 cursor-pointer",
-                                    section.pinnedTakeId === take.id
-                                        ? "border-[var(--accent-primary)] text-[var(--accent-primary)]"
-                                        : "border-transparent text-[var(--text-secondary)]"
-                                )}
-                            >
-                                <div className="flex flex-col">
-                                    <span className="font-medium">Take {take.id}</span>
-                                    <span className="text-[8px] opacity-60">{take.timestamp}</span>
-                                </div>
-                                <span className="opacity-50">{take.duration}</span>
-                            </button>
-                        ))
-                    )}
-                </div>
-            )}
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 group relative pl-3 border-l-2 border-[var(--border-main)] hover:border-[var(--text-tertiary)] transition-colors">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-2 text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors font-medium"
+          >
+            {section.type}
+            <ChevronDown size={10} className="opacity-50" />
+          </button>
+          
+          <div className="flex items-center gap-1">
+             <span className="text-[10px] mono text-[var(--text-tertiary)] tabular-nums opacity-50">x{section.repeats}</span>
+             <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => onUpdate(section.id, { repeats: section.repeats + 1 })} className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"><Plus size={10} /></button>
+                <button onClick={() => onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) })} className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"><Minus size={10} /></button>
+             </div>
+          </div>
         </div>
-    );
-}
+        
+        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center mr-1">
+             <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"><ChevronUp size={14} /></button>
+             <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"><ChevronDown size={14} /></button>
+          </div>
+          <button 
+            onClick={() => setIsPinSelectorOpen(!isPinSelectorOpen)}
+            className={`p-1 rounded transition-colors ${section.pinnedTakeId ? 'text-[var(--accent)] bg-[var(--bg-secondary)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-main)]'}`}
+            title="Attach Recording"
+          >
+            <Paperclip size={12} />
+          </button>
+          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors ml-1">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div className={`relative transition-all`}>
+        <textarea
+          ref={textareaRef}
+          value={section.text}
+          onChange={(e) => onUpdate(section.id, { text: e.target.value })}
+          className="w-full bg-transparent text-[var(--text-main)] text-base leading-relaxed font-sans focus:outline-none placeholder:text-[var(--text-tertiary)] placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
+          placeholder="Lyrics..."
+          spellCheck={false}
+        />
+
+        {pinnedTake && (
+          <div className="mt-1 animate-in fade-in zoom-in-95 duration-200 flex items-center gap-2">
+             <div 
+               className={`inline-flex items-center gap-2 px-2 py-1 rounded-full border select-none transition-all ${isPlaying ? 'bg-[var(--bg-secondary)] border-[var(--accent)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] hover:border-[var(--text-tertiary)]'}`}
+               onMouseEnter={() => setShowVolume(true)}
+               onMouseLeave={() => setShowVolume(false)}
+             >
+                <div onClick={togglePlayback} className="cursor-pointer flex items-center gap-2">
+                    {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+                    <span className="text-[9px] mono font-medium">Take {pinnedTake.id}</span>
+                </div>
+                
+                {/* Mix Toggle */}
+                <div className="h-3 w-[1px] bg-[var(--border-main)] mx-1" />
+                <button 
+                   onClick={toggleMix}
+                   className={`p-0.5 rounded transition-colors ${mixEnabled ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+                   title={mixEnabled ? "Mix Active (Vocal + Beat)" : "Solo Vocal"}
+                >
+                   <Layers size={10} />
+                </button>
+
+                {showVolume && (
+                   <div className="flex items-center gap-1 animate-in slide-in-from-left-2 fade-in duration-200">
+                      <div className="h-3 w-[1px] bg-[var(--border-main)] mx-1" />
+                      <Volume2 size={10} className="text-[var(--text-tertiary)]" />
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.1" 
+                        value={vocalVolume} 
+                        onChange={(e) => setVocalVolume(parseFloat(e.target.value))}
+                        className="w-12 h-1 accent-[var(--accent)] bg-[var(--border-main)] rounded-full appearance-none cursor-pointer"
+                      />
+                   </div>
+                )}
+                
+                {!showVolume && <span className="text-[9px] opacity-60 tabular-nums ml-1">{pinnedTake.duration}</span>}
+
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { pinnedTakeId: undefined }); }}
+                  className={`ml-2 rounded-full p-0.5 hover:bg-black/20 text-[var(--text-tertiary)] hover:text-[var(--text-main)]`}
+                >
+                   <X size={10} />
+                </button>
+             </div>
+          </div>
+        )}
+      </div>
+
+      {isDropdownOpen && (
+        <>
+          <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsDropdownOpen(false)} />
+          <div className="absolute z-50 top-6 left-0 p-1 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-32">
+            {SECTION_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => { onUpdate(section.id, { type }); setIsDropdownOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-[10px] mono uppercase tracking-wider rounded-md hover:bg-[var(--bg-hover)] ${section.type === type ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)]'}`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {isPinSelectorOpen && (
+        <>
+          <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsPinSelectorOpen(false)} />
+          <div className="absolute z-50 top-6 right-0 p-2 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-56 max-h-64 overflow-y-auto scrollbar-hide">
+            <p className="text-[9px] mono uppercase text-[var(--text-tertiary)] p-2 border-b border-[var(--border-main)] mb-1">Select Recording</p>
+            {availableTakes.length === 0 ? (
+              <p className="text-[9px] mono text-center py-6 text-[var(--text-tertiary)]">No recordings found</p>
+            ) : (
+              availableTakes.map((take) => (
+                <button
+                  key={take.id}
+                  onClick={() => { onUpdate(section.id, { pinnedTakeId: take.id }); setIsPinSelectorOpen(false); }}
+                  className={`w-full text-left px-3 py-2.5 text-[10px] mono flex justify-between items-center rounded-md hover:bg-[var(--bg-hover)] border mb-1 ${section.pinnedTakeId === take.id ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-secondary)]'}`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">Take {take.id}</span>
+                    <span className="text-[8px] opacity-60">{take.timestamp}</span>
+                  </div>
+                  <span className="opacity-50">{take.duration}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

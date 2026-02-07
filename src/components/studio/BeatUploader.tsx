@@ -1,316 +1,318 @@
-"use client";
 
-import React, { useRef, useState, useEffect } from "react";
-import { Play, Pause, X, Music, Repeat, Activity } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useRef, useState, useEffect } from 'react';
+import { Play, Pause, X, RotateCcw, Repeat, Flag, Trash2, ChevronDown, Music, Settings2, Volume2 } from 'lucide-react';
 
 interface BeatUploaderProps {
-    audioSrc: string | null;
-    onUpload: (file: File) => void;
-    onClear: () => void;
+  audioSrc: string | null;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  onUpload: (file: File) => void;
+  onClear: () => void;
 }
 
-/**
- * BeatUploader - Embedded beat player with loop controls
- */
-export function BeatUploader({ audioSrc, onUpload, onClear }: BeatUploaderProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const audioRef = useRef<HTMLAudioElement>(null);
-    const progressRef = useRef<HTMLDivElement>(null);
+export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, onUpload, onClear }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
+  
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [volume, setVolume] = useState(1);
+  
+  const [loopStart, setLoopStart] = useState<number | null>(null);
+  const [loopEnd, setLoopEnd] = useState<number | null>(null);
+  const [isLooping, setIsLooping] = useState(false);
+  
+  const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | null>(null);
 
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [isCollapsed, setIsCollapsed] = useState(true);
-    const [duration, setDuration] = useState(0);
-    const [currentTime, setCurrentTime] = useState(0);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    // Loop state
-    const [isLooping, setIsLooping] = useState(true);
-    const [loopStart, setLoopStart] = useState<number | null>(null);
-    const [loopEnd, setLoopEnd] = useState<number | null>(null);
-    const [draggingMarker, setDraggingMarker] = useState<"start" | "end" | null>(null);
-
-    useEffect(() => {
-        if (audioRef.current) {
-            if (isPlaying) {
-                audioRef.current.play().catch((err) => {
-                    console.log("Playback prevented:", err);
-                    setIsPlaying(false);
-                });
-            } else {
-                audioRef.current.pause();
-            }
-        }
-    }, [isPlaying]);
-
-    // Handle loop logic during playback
-    const handleTimeUpdate = () => {
-        if (audioRef.current && !draggingMarker) {
-            const curr = audioRef.current.currentTime;
-            setCurrentTime(curr);
-
-            if (isLooping && loopStart !== null && loopEnd !== null) {
-                if (curr >= loopEnd || curr < loopStart) {
-                    audioRef.current.currentTime = loopStart;
-                }
-            }
-        }
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    
+    return () => {
+        audio.removeEventListener('play', onPlay);
+        audio.removeEventListener('pause', onPause);
     };
+  }, [audioRef.current]);
 
-    const handleLoadedMetadata = () => {
-        if (audioRef.current) {
-            const dur = audioRef.current.duration;
-            setDuration(dur);
-            setIsPlaying(true);
-            // Default loop to full song
-            setLoopStart(0);
-            setLoopEnd(dur);
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        if (audioRef.current.paused) {
+            audioRef.current.play().catch(() => setIsPlaying(false));
         }
-    };
-
-    // Dragging logic for loop markers
-    useEffect(() => {
-        const handleMove = (clientX: number) => {
-            if (!progressRef.current || duration === 0) return;
-            const rect = progressRef.current.getBoundingClientRect();
-            const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-            const time = percent * duration;
-
-            if (draggingMarker === "start") {
-                const endLimit = loopEnd ?? duration;
-                // Enforce min loop size of 1s
-                const newStart = Math.min(time, endLimit - 1);
-                setLoopStart(Math.max(0, newStart));
-            } else if (draggingMarker === "end") {
-                const startLimit = loopStart ?? 0;
-                const newEnd = Math.max(time, startLimit + 1);
-                setLoopEnd(Math.min(newEnd, duration));
-            }
-        };
-
-        const onMouseMove = (e: MouseEvent) => {
-            if (draggingMarker) {
-                e.preventDefault();
-                handleMove(e.clientX);
-            }
-        };
-
-        const onMouseUp = () => setDraggingMarker(null);
-
-        if (draggingMarker) {
-            window.addEventListener("mousemove", onMouseMove);
-            window.addEventListener("mouseup", onMouseUp);
+      } else {
+        if (!audioRef.current.paused) {
+            audioRef.current.pause();
         }
+      }
+    }
+  }, [isPlaying]);
 
-        return () => {
-            window.removeEventListener("mousemove", onMouseMove);
-            window.removeEventListener("mouseup", onMouseUp);
-        };
-    }, [draggingMarker, duration, loopEnd, loopStart]);
+  useEffect(() => {
+      if(audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
 
-
-    const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (draggingMarker) return;
-        if (!audioRef.current || !progressRef.current || duration === 0) return;
+  // Marker Dragging Logic
+  useEffect(() => {
+    const handleMove = (clientX: number) => {
+        if (!progressRef.current || duration === 0) return;
         const rect = progressRef.current.getBoundingClientRect();
-        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        audioRef.current.currentTime = percent * duration;
-        setCurrentTime(percent * duration);
-    };
+        const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const time = percent * duration;
 
-    const formatTime = (t: number) => {
-        if (!t && t !== 0) return "0:00";
-        const mins = Math.floor(t / 60);
-        const secs = Math.floor(t % 60);
-        return `${mins}:${secs.toString().padStart(2, "0")}`;
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            onUpload(file);
+        if (draggingMarker === 'start') {
+            const endLimit = loopEnd ?? duration;
+            const newStart = Math.max(0, Math.min(time, endLimit - 0.5)); 
+            setLoopStart(newStart);
+        } else if (draggingMarker === 'end') {
+            const startLimit = loopStart ?? 0;
+            const newEnd = Math.max(startLimit + 0.5, Math.min(time, duration));
+            setLoopEnd(newEnd);
         }
     };
 
-    // Empty state
-    if (!audioSrc) {
-        return (
-            <div className="w-full flex justify-start animate-in fade-in">
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                />
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg p-2.5 flex items-center gap-3 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--text-muted)] transition-all group cursor-pointer"
-                >
-                    <div className="w-8 h-8 rounded bg-[var(--bg-card)] flex items-center justify-center border border-[var(--border-subtle)]">
-                        <Music size={14} />
-                    </div>
-                    <div className="flex flex-col items-start gap-0.5">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-primary)]">Track 1</span>
-                        <span className="text-[9px] text-[var(--text-secondary)]">Empty • Tap to load beat</span>
-                    </div>
-                </button>
-            </div>
-        );
+    const onMouseMove = (e: MouseEvent) => {
+        if (draggingMarker) {
+            e.preventDefault();
+            handleMove(e.clientX);
+        }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+        if (draggingMarker) {
+            e.preventDefault();
+            handleMove(e.touches[0].clientX);
+        }
+    };
+
+    const onUp = () => setDraggingMarker(null);
+
+    if (draggingMarker) {
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('touchmove', onTouchMove, { passive: false });
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
     }
 
-    const loopStartPercent = loopStart !== null ? (loopStart / duration) * 100 : 0;
-    const loopWidthPercent = loopStart !== null && loopEnd !== null ? ((loopEnd - loopStart) / duration) * 100 : 100;
+    return () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('touchmove', onTouchMove);
+        window.removeEventListener('mouseup', onUp);
+        window.removeEventListener('touchend', onUp);
+    };
+  }, [draggingMarker, duration, loopEnd, loopStart]);
 
-    // Loaded state
+  const handleTimeUpdate = () => {
+    if (audioRef.current && !draggingMarker) {
+      const curr = audioRef.current.currentTime;
+      setCurrentTime(curr);
+
+      if (isLooping) {
+        const start = loopStart ?? 0;
+        const end = loopEnd ?? duration;
+        if (curr >= end && end > 0) {
+           audioRef.current.currentTime = start;
+        }
+      }
+    }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (draggingMarker) return;
+    if (!audioRef.current || !progressRef.current || duration === 0) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = percent * duration;
+    setCurrentTime(percent * duration);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        setLoopStart(null);
+        setLoopEnd(null);
+        setIsLooping(true);
+        onUpload(file);
+    }
+  };
+
+  const formatTime = (t: number) => {
+    if (!t) return "0:00";
+    const mins = Math.floor(t / 60);
+    const secs = Math.floor(t % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // --- EMPTY STATE ---
+  if (!audioSrc) {
     return (
-        <div className={cn(
-            "w-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg flex flex-col animate-in fade-in slide-in-from-top-1 transition-all duration-300 overflow-hidden",
-            isCollapsed ? "p-0" : "p-3 gap-3"
-        )}>
-            <audio
-                ref={audioRef}
-                src={audioSrc}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-                onEnded={() => setIsPlaying(false)}
-                loop={isLooping}
-            />
-
-            {/* Header */}
-            <div className={cn("flex items-center justify-between select-none", isCollapsed && "p-2")}>
-                <div
-                    className="flex items-center gap-3 cursor-pointer group flex-1 min-w-0"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                >
-                    <div
-                        onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-                        className={cn(
-                            "w-9 h-9 rounded flex items-center justify-center transition-all shrink-0 cursor-pointer",
-                            isPlaying
-                                ? "bg-[var(--accent-primary)] text-[var(--bg-main)] shadow-[0_0_10px_var(--accent-primary)]"
-                                : "bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--text-primary)]"
-                        )}
-                    >
-                        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-                    </div>
-
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-medium text-[var(--text-primary)] truncate">Reference Track</span>
-                            <span className="text-[9px] font-mono text-[var(--text-muted)] tabular-nums">
-                                {formatTime(currentTime)} / {formatTime(duration)}
-                            </span>
-                        </div>
-                        {isCollapsed && (
-                            <div className="w-full h-0.5 bg-[var(--bg-card)] mt-1.5 rounded-full overflow-hidden relative max-w-[120px]">
-                                <div
-                                    className="absolute top-0 bottom-0 left-0 bg-[var(--text-secondary)]"
-                                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                                />
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                    <button
-                        onClick={() => setIsLooping(!isLooping)}
-                        className={cn(
-                            "p-1.5 rounded transition-colors cursor-pointer",
-                            isLooping
-                                ? "text-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
-                                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        )}
-                        title={isLooping ? "Loop On" : "Loop Off"}
-                    >
-                        <Repeat size={14} />
-                    </button>
-                    <button
-                        onClick={onClear}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-destructive)] rounded transition-colors cursor-pointer"
-                    >
-                        <X size={14} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Expanded Controls */}
-            {!isCollapsed && (
-                <div className="relative pt-4 pb-2 select-none">
-                    <div
-                        ref={progressRef}
-                        onClick={handleSeek}
-                        className="w-full h-12 bg-[var(--bg-card)] rounded-md cursor-pointer relative group overflow-hidden border border-[var(--border-subtle)]"
-                    >
-                        {/* Waveform Visualization (Simulated) */}
-                        <div className="absolute inset-0 flex items-center justify-around px-1 opacity-20 pointer-events-none">
-                            {Array.from({ length: 50 }).map((_, i) => (
-                                <div
-                                    key={i}
-                                    className="w-0.5 bg-[var(--text-primary)] rounded-full"
-                                    style={{
-                                        height: `${20 + Math.sin(i * 0.3) * 40 + Math.random() * 20}%`
-                                    }}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Loop Region Highlight */}
-                        {isLooping && (
-                            <div
-                                className="absolute top-0 bottom-0 bg-[var(--accent-primary)]/10 border-x border-[var(--accent-primary)]/30"
-                                style={{
-                                    left: `${loopStartPercent}%`,
-                                    width: `${loopWidthPercent}%`
-                                }}
-                            />
-                        )}
-
-                        {/* Progress Fill */}
-                        <div
-                            className="absolute top-0 bottom-0 left-0 bg-[var(--text-secondary)]/10 pointer-events-none"
-                            style={{ width: `${(currentTime / duration) * 100}%` }}
-                        />
-
-                        {/* Playhead */}
-                        <div
-                            className="absolute top-0 bottom-0 w-0.5 bg-[var(--text-primary)] z-10 pointer-events-none"
-                            style={{ left: `${(currentTime / duration) * 100}%` }}
-                        />
-                    </div>
-
-                    {/* Loop Handles */}
-                    {isLooping && (
-                        <>
-                            {/* Start Handle */}
-                            <div
-                                className="absolute top-1 bottom-1 w-4 -ml-2 flex flex-col items-center justify-center group cursor-ew-resize z-20"
-                                style={{ left: `${loopStartPercent}%` }}
-                                onMouseDown={() => setDraggingMarker("start")}
-                            >
-                                <div className="h-full w-0.5 bg-[var(--accent-primary)] group-hover:bg-[var(--accent-cta)]" />
-                                <div className="absolute top-0 w-2 h-2 rounded-full bg-[var(--accent-primary)] group-hover:scale-125 transition-transform" />
-                                <div className="absolute -top-4 text-[9px] font-mono text-[var(--accent-primary)] opacity-0 group-hover:opacity-100 bg-[var(--bg-card)] px-1 rounded border border-[var(--border-subtle)]">
-                                    {formatTime(loopStart || 0)}
-                                </div>
-                            </div>
-
-                            {/* End Handle */}
-                            <div
-                                className="absolute top-1 bottom-1 w-4 -ml-2 flex flex-col items-center justify-center group cursor-ew-resize z-20"
-                                style={{ left: `${(loopStartPercent + loopWidthPercent)}%` }}
-                                onMouseDown={() => setDraggingMarker("end")}
-                            >
-                                <div className="h-full w-0.5 bg-[var(--accent-primary)] group-hover:bg-[var(--accent-cta)]" />
-                                <div className="absolute bottom-0 w-2 h-2 rounded-full bg-[var(--accent-primary)] group-hover:scale-125 transition-transform" />
-                                <div className="absolute -bottom-4 text-[9px] font-mono text-[var(--accent-primary)] opacity-0 group-hover:opacity-100 bg-[var(--bg-card)] px-1 rounded border border-[var(--border-subtle)]">
-                                    {formatTime(loopEnd || duration)}
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-        </div>
+      <>
+        <input 
+          ref={fileInputRef} 
+          type="file" 
+          accept="audio/*, .mp3, .wav, .m4a, .aac" 
+          className="absolute opacity-0 w-0 h-0 pointer-events-none" 
+          onChange={handleFileChange}
+        />
+        <button 
+          onClick={() => fileInputRef.current?.click()}
+          className="h-8 px-3 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center gap-2 text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)] transition-all"
+          title="Load Reference Track"
+        >
+          <Music size={12} />
+          <span className="text-[10px] mono uppercase tracking-wider hidden sm:inline">Load Beat</span>
+        </button>
+      </>
     );
-}
+  }
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // --- LOADED STATE (PILL) ---
+  return (
+    <div className="relative z-30">
+      <audio 
+        ref={audioRef} 
+        src={audioSrc} 
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
+        onEnded={() => isLooping ? (audioRef.current!.currentTime = loopStart ?? 0, audioRef.current!.play()) : setIsPlaying(false)}
+      />
+
+      {/* Split Action Pill */}
+      <div className="group relative h-8 rounded-md border border-[var(--border-main)] bg-[var(--bg-secondary)] flex items-center overflow-hidden hover:border-[var(--text-tertiary)] transition-colors">
+        
+        {/* Progress Background Fill (Underneath everything) */}
+        <div 
+            className="absolute inset-0 bg-[var(--text-main)] opacity-10 pointer-events-none transition-all duration-200 ease-linear origin-left"
+            style={{ transform: `scaleX(${progressPercent / 100})` }}
+        />
+
+        {/* Action 1: Play/Pause Toggle */}
+        <button 
+           onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+           className="relative z-20 h-full pl-2 pr-2 flex items-center justify-center hover:bg-[var(--bg-hover)] active:scale-95 transition-all text-[var(--text-main)]"
+           title={isPlaying ? "Pause" : "Play"}
+        >
+            {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
+        </button>
+
+        {/* Divider (Optional visual separation) */}
+        <div className="w-[1px] h-3 bg-[var(--border-main)] relative z-10 opacity-50" />
+
+        {/* Action 2: Open Controls */}
+        <button 
+           onClick={() => setShowControls(!showControls)}
+           className="relative z-10 h-full pl-2 pr-3 flex items-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"
+           title="Open Controls"
+        >
+            <span className="text-[10px] mono uppercase font-medium text-[var(--text-main)]">Ref Track</span>
+        </button>
+      </div>
+
+      {/* --- CONTROLS POPOVER --- */}
+      {showControls && (
+        <div className="absolute top-full right-0 mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] p-3 animate-in fade-in zoom-in-95 origin-top-right z-50">
+           
+           {/* Header */}
+           <div className="flex items-center justify-between mb-3 px-1">
+              <span className="text-[10px] mono uppercase text-[var(--text-tertiary)]">Playback Control</span>
+              <button onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors">
+                  <Trash2 size={12} />
+              </button>
+           </div>
+
+           {/* Scrubber */}
+           <div className="relative w-full h-8 bg-[var(--bg-secondary)] rounded-md cursor-pointer overflow-hidden select-none touch-none border border-[var(--border-main)] mb-3"
+                ref={progressRef}
+                onMouseDown={handleSeek}
+           >
+              {/* Loop Region */}
+              {isLooping && loopStart !== null && loopEnd !== null && (
+                  <div 
+                      className="absolute top-0 bottom-0 bg-[var(--accent)] opacity-10 pointer-events-none"
+                      style={{
+                          left: `${(loopStart / duration) * 100}%`,
+                          width: `${((loopEnd - loopStart) / duration) * 100}%`
+                      }}
+                  />
+              )}
+              {/* Progress */}
+              <div 
+                  className="absolute top-0 bottom-0 bg-[var(--text-secondary)] opacity-30 pointer-events-none"
+                  style={{ width: `${progressPercent}%` }}
+              />
+              {/* Markers */}
+              {isLooping && loopStart !== null && (
+                  <div 
+                    className="absolute top-0 bottom-0 w-4 -ml-2 z-30 cursor-col-resize flex flex-col items-center justify-center group" 
+                    style={{ left: `${(loopStart / duration) * 100}%` }}
+                    onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
+                    onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
+                  >
+                     <div className="w-[1px] h-full bg-[var(--accent)]" />
+                  </div>
+              )}
+              {isLooping && loopEnd !== null && (
+                  <div 
+                    className="absolute top-0 bottom-0 w-4 -ml-2 z-30 cursor-col-resize flex flex-col items-center justify-center group" 
+                    style={{ left: `${(loopEnd / duration) * 100}%` }}
+                    onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
+                    onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
+                  >
+                     <div className="w-[1px] h-full bg-[var(--accent)]" />
+                  </div>
+              )}
+           </div>
+
+           {/* Controls Row */}
+           <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] mono tabular-nums text-[var(--text-main)]">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+
+              <div className="flex items-center gap-2">
+                 <button onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)]">
+                    <RotateCcw size={14} />
+                 </button>
+                 <button 
+                    onClick={() => setIsLooping(!isLooping)} 
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] mono uppercase border transition-all ${isLooping ? 'bg-[var(--bg-hover)] border-[var(--accent)] text-[var(--text-main)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                 >
+                    <Repeat size={10} /> Loop
+                 </button>
+              </div>
+           </div>
+
+           {/* Loop Points Details (only if looping) */}
+           {isLooping && (
+             <div className="flex gap-2 mb-3">
+                 <button onClick={() => setLoopStart(currentTime)} className="flex-1 py-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded text-[9px] mono uppercase text-[var(--text-secondary)] hover:text-[var(--text-main)]">Set Start</button>
+                 <button onClick={() => setLoopEnd(currentTime)} className="flex-1 py-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded text-[9px] mono uppercase text-[var(--text-secondary)] hover:text-[var(--text-main)]">Set End</button>
+             </div>
+           )}
+
+           {/* Volume */}
+           <div className="pt-3 border-t border-[var(--border-main)] flex items-center gap-2">
+              <Volume2 size={12} className="text-[var(--text-tertiary)]" />
+              <input 
+                 type="range" 
+                 min="0" max="1" step="0.1" 
+                 value={volume}
+                 onChange={(e) => setVolume(parseFloat(e.target.value))}
+                 className="flex-1 h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-secondary)] hover:[&::-webkit-slider-thumb]:bg-[var(--text-main)]"
+              />
+           </div>
+
+        </div>
+      )}
+    </div>
+  );
+};

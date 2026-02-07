@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { VoiceTake } from '../types';
+import { VoiceTake } from '@/types';
 import { Play, Pause, MoreHorizontal, Download, Zap, Loader2, Edit3 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 

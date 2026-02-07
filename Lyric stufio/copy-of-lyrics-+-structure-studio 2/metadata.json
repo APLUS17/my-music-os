@@ -1,7 +1,0 @@
-{
-  "name": "Copy of Lyrics + Structure Studio",
-  "description": "A refined songwriting and recording tool featuring lyric structure management and a high-fidelity scrubbable audio recorder interface.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
