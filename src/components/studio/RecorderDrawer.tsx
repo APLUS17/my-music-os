@@ -42,7 +42,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const [duration, setDuration] = useState(0);
 
   // UI States
-  const [activeTakeTab, setActiveTakeTab] = useState('T1');
   const [metronomeActive, setMetronomeActive] = useState(false);
   const [showFx, setShowFx] = useState(false);
   const [fxSettings, setFxSettings] = useState<FXSettings>({ space: 25, echo: 0, punch: 50 });
@@ -68,7 +67,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
 
-  const takes = ['T1', 'T2', 'T3', 'T4'];
+  visualizerProgressRef.current = progress;
 
   useEffect(() => {
     return () => {
@@ -193,9 +192,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         }
 
       } else {
-        // IDLE
+        // IDLE - "Alive" line
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
         ctx.moveTo(0, centerY);
         ctx.lineTo(width, centerY);
         ctx.stroke();
@@ -440,7 +440,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   // --- RENDER ---
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       {isMinimized ? (
         /* --- MINIMIZED: FLOATING CAPSULE --- */
         <motion.div
@@ -448,6 +448,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           initial={{ y: 100, opacity: 0, x: '-50%' }}
           animate={{ y: 0, opacity: 1, x: '-50%' }}
           exit={{ y: 100, opacity: 0, x: '-50%' }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
           className="fixed bottom-28 left-1/2 z-[70] w-full max-w-[90%] sm:max-w-md pointer-events-auto"
         >
           <div className="w-full glass rounded-full p-2 pl-3 shadow-2xl flex items-center justify-between gap-3 border border-white/10">
@@ -512,14 +513,25 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex flex-col justify-end"
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-[2px] flex flex-col justify-end"
+          onClick={onClose}
         >
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="w-full max-w-lg mx-auto bg-[var(--bg-card)] rounded-t-[2.5rem] border-t border-white/10 p-6 pb-12 text-[var(--text-main)] shadow-[0_-20px_60px_rgba(0,0,0,0.8)] flex flex-col items-center relative overflow-hidden"
+            transition={{
+              type: 'spring',
+              damping: 30,
+              stiffness: 300,
+              duration: 0.3
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-lg mx-auto bg-[var(--bg-card)] rounded-t-[2rem] border-t p-4 pb-8 text-[var(--text-main)] flex flex-col items-center relative overflow-hidden transition-all duration-700 ${isRecording
+                ? 'shadow-[0_0_50px_rgba(220,38,38,0.4)] border-red-500/30'
+                : 'shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-white/10'
+              }`}
           >
             {showFx && (
               <FXPanel
@@ -533,42 +545,29 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
             <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleImportFile} />
 
             {/* Drag Handle */}
-            <div className="w-12 h-1 bg-white/10 rounded-full mb-6 cursor-pointer" onClick={onMinimizeToggle} />
+            <div className="w-12 h-1 bg-white/10 rounded-full mb-4 cursor-pointer" onClick={onClose} />
 
             {/* --- Top Bar --- */}
-            <div className="w-full flex items-center justify-between mb-8">
+            <div className="w-full flex items-center justify-between mb-4">
               <button
                 onClick={onMinimizeToggle}
-                className="p-2 hover:bg-white/5 rounded-full text-[var(--text-secondary)] transition-colors"
+                className="p-1.5 hover:bg-white/5 rounded-full text-[var(--text-secondary)] transition-colors"
               >
-                <ChevronDown size={20} />
+                <ChevronDown size={18} />
               </button>
 
-              <div className="flex bg-white/5 p-1 rounded-full border border-white/5">
-                {takes.map(take => (
-                  <button
-                    key={take}
-                    onClick={() => setActiveTakeTab(take)}
-                    className={`px-4 py-1.5 rounded-full text-[10px] mono font-bold transition-all ${activeTakeTab === take
-                      ? 'bg-[var(--text-main)] text-[var(--bg-main)] shadow-sm'
-                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                      }`}
-                  >
-                    {take}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={handleDiscard}
-                className={`p-2 rounded-full transition-colors ${recordedBlob ? 'text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10' : 'text-white/10'}`}
-              >
-                <Trash2 size={18} />
-              </button>
+              {(recordedBlob || isRecording) && (
+                <button
+                  onClick={handleDiscard}
+                  className="p-1.5 rounded-full transition-colors text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
             </div>
 
             {/* --- Waveform --- */}
-            <div className="w-full mb-10 px-2 h-24 bg-black/20 rounded-2xl border border-white/5 relative overflow-hidden shadow-inner">
+            <div className="w-full mb-6 px-2 h-16 bg-black/20 rounded-xl border border-white/5 relative overflow-hidden shadow-inner">
               <canvas
                 ref={canvasRef}
                 className="w-full h-full cursor-pointer touch-none"
@@ -593,13 +592,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
             </div>
 
             {/* --- Grid Controls --- */}
-            <div className="w-full grid grid-cols-3 items-center mb-10 px-2">
+            <div className="w-full grid grid-cols-3 items-center mb-6 px-2">
               <button
                 disabled={isRecording}
                 onClick={() => fileInputRef.current?.click()}
-                className="justify-self-start flex items-center gap-2 px-5 py-3 bg-white/5 rounded-2xl text-[10px] mono uppercase tracking-widest border border-white/5 hover:border-white/10 transition-all text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                className="justify-self-start flex items-center gap-2 px-3 py-2 bg-white/5 rounded-xl text-[10px] mono uppercase tracking-widest border border-white/5 hover:border-white/10 transition-all text-[var(--text-secondary)] hover:text-[var(--text-main)]"
               >
-                <Timer size={14} />
+                <Timer size={12} />
                 <span>In</span>
               </button>
 
@@ -609,16 +608,16 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 )}
                 <button
                   onClick={handleToggleRecord}
-                  className={`w-20 h-20 rounded-full border-2 flex items-center justify-center transition-all shadow-2xl relative z-10 ${isRecording
+                  className={`w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all shadow-2xl relative z-10 ${isRecording
                     ? 'border-red-500/50 bg-red-500/10'
                     : 'border-white/10 bg-white/5 hover:scale-105'
                     }`}
                 >
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-inner transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-[var(--bg-main)]'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-inner transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-[var(--bg-main)]'}`}>
                     {isRecording ? (
-                      <div className="w-6 h-6 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)]" />
+                      <div className="w-5 h-5 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)]" />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]" />
+                      <div className="w-5 h-5 rounded-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]" />
                     )}
                   </div>
                 </button>
@@ -626,67 +625,71 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
               <button
                 onClick={() => setMetronomeActive(!metronomeActive)}
-                className={`justify-self-end flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] mono uppercase tracking-widest border transition-all ${metronomeActive
+                className={`justify-self-end flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] mono uppercase tracking-widest border transition-all ${metronomeActive
                   ? 'bg-[var(--accent)] text-[var(--bg-main)] border-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]'
                   : 'bg-white/5 border-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-white/10'
                   }`}
               >
-                <Clock size={14} />
+                <Clock size={12} />
                 <span>Click</span>
               </button>
             </div>
 
             {/* --- Bottom Row --- */}
-            <div className="w-full flex items-center justify-between px-2">
-              <button
-                onClick={onClose}
-                className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all border border-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-              >
-                <X size={20} />
-              </button>
+            <div className="w-full grid grid-cols-3 items-center px-2">
+              <div className="justify-self-start">
+                {(recordedBlob) && (
+                  <button
+                    onClick={onClose}
+                    className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all border border-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
 
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex items-center gap-8">
+              <div className="justify-self-center flex flex-col items-center gap-2">
+                <div className="flex items-center gap-6">
                   <button
                     onClick={() => setShowFx(true)}
-                    className={`p-2 transition-colors ${showFx ? 'text-[var(--accent)]' : 'text-white/20 hover:text-white/60'}`}
+                    className={`p-1.5 transition-colors ${showFx ? 'text-[var(--accent)]' : 'text-white/20 hover:text-white/60'}`}
                   >
-                    <Settings2 size={22} strokeWidth={1.5} />
+                    <Settings2 size={18} strokeWidth={1.5} />
                   </button>
 
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
                     disabled={!recordedBlob || isRecording}
-                    className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center hover:bg-[var(--text-main)] hover:text-[var(--bg-main)] disabled:opacity-20 transition-all border border-white/5 shadow-xl"
+                    className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center hover:bg-[var(--text-main)] hover:text-[var(--bg-main)] disabled:opacity-20 transition-all border border-white/5 shadow-xl"
                   >
                     {isPlaying ?
-                      <Pause size={28} fill="currentColor" strokeWidth={0} /> :
-                      <Play size={28} fill="currentColor" strokeWidth={0} className="ml-1" />
+                      <Pause size={22} fill="currentColor" strokeWidth={0} /> :
+                      <Play size={22} fill="currentColor" strokeWidth={0} className="ml-0.5" />
                     }
                   </button>
-
-                  <div className={`p-2 transition-opacity ${backingTrackSrc ? 'text-[var(--accent)]' : 'text-white/5'}`}>
-                    <Music size={22} strokeWidth={1.5} />
-                  </div>
                 </div>
 
                 <div className="flex items-baseline font-mono tracking-tight">
-                  <span className="text-base font-bold text-[var(--text-main)]">
+                  <span className="text-sm font-bold text-[var(--text-main)]">
                     {formatTime(progress * duration)}
                   </span>
-                  <span className="text-[11px] text-[var(--text-tertiary)] ml-1.5 opacity-60">
+                  <span className="text-[10px] text-[var(--text-tertiary)] ml-1 opacity-60">
                     / {formatTime(duration)}
                   </span>
                 </div>
               </div>
 
-              <button
-                onClick={handleSave}
-                disabled={!recordedBlob}
-                className="w-12 h-12 rounded-2xl bg-[var(--text-main)] text-[var(--bg-main)] flex items-center justify-center hover:opacity-90 disabled:opacity-20 transition-all shadow-xl"
-              >
-                <Check size={20} strokeWidth={3} />
-              </button>
+              <div className="justify-self-end">
+                {recordedBlob && (
+                  <button
+                    onClick={handleSave}
+                    disabled={!recordedBlob}
+                    className="w-10 h-10 rounded-xl bg-[var(--text-main)] text-[var(--bg-main)] flex items-center justify-center hover:opacity-90 disabled:opacity-20 transition-all shadow-xl"
+                  >
+                    <Check size={18} strokeWidth={3} />
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         </motion.div>

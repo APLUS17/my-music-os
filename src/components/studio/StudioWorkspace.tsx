@@ -688,11 +688,11 @@ const StudioWorkspace: React.FC = () => {
                                     ))}
                                     <button
                                         onClick={addSection}
-                                        className="w-full py-4 flex items-center justify-center gap-3 text-[10px] mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-all group"
+                                        className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all group relative"
                                     >
-                                        <div className="h-[1px] flex-1 bg-[var(--border-main)] opacity-20 group-hover:opacity-40 transition-opacity" />
-                                        <span className="px-2 group-hover:scale-110 transition-transform">+ Add Section</span>
-                                        <div className="h-[1px] flex-1 bg-[var(--border-main)] opacity-20 group-hover:opacity-40 transition-opacity" />
+                                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                        <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
+                                        <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                     </button>
                                 </div>
                             ) : (
@@ -706,15 +706,6 @@ const StudioWorkspace: React.FC = () => {
                                     currentlyPlayingTakeId={playingTakeId}
                                 />
                             )}
-                        </div>
-
-                        <div className="absolute right-6 bottom-28 flex flex-col gap-3 group">
-                            <button
-                                onClick={() => setShowMuse(true)}
-                                className="w-12 h-12 rounded-full bg-[var(--bg-card)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] shadow-xl hover:scale-110 active:scale-95 transition-all"
-                            >
-                                <Zap size={20} fill="currentColor" />
-                            </button>
                         </div>
                     </div>
                 );
