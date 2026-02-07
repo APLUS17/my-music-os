@@ -95,7 +95,7 @@ const deleteAudioData = async (id: string) => {
 type ViewMode = 'collection' | 'studio' | 'board' | 'settings';
 type StudioMode = 'flow' | 'arrange';
 type LibraryTab = 'songs' | 'beats';
-type Theme = 'dark' | 'light' | 'midnight' | 'cassette' | 'ethereal';
+type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'takes' | 'beats';
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -553,7 +553,7 @@ const StudioWorkspace: React.FC = () => {
                             <section>
                                 <h2 className="text-[10px] mono uppercase tracking-widest text-[var(--text-secondary)] mb-4">Appearance</h2>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {['dark', 'light', 'midnight', 'cassette', 'ethereal'].map((t) => (
+                                    {['dark', 'light', 'midnight', 'matrix', 'sonar'].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => setTheme(t as Theme)}

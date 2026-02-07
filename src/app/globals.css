@@ -101,77 +101,68 @@
     --font-body: var(--font-inter), sans-serif;
 }
 
-/* Cassette (Warm Notebook) */
-[data-theme="cassette"] {
-    --bg-main: #120f10;
-    /* Deep ink background */
-    --bg-card: #1c1413;
-    /* Card panels */
-    --bg-hover: #271917;
-    /* Hover states */
-    --bg-secondary: #241817;
-    /* Secondary surfaces */
+/* Matrix (Hacker) */
+[data-theme="matrix"] {
+    --bg-main: #050505;
+    --bg-card: #0A0F0A;
+    --bg-hover: #0F1A0F;
+    --bg-secondary: #0D1117;
 
-    --border-main: #3b2724;
-    /* Subtle warm borders */
-    --border-focus: #f4c7a2;
-    /* Focus ring accent */
+    --border-main: #1F6E29;
+    /* Dark green border */
+    --border-focus: #2EA043;
 
-    --text-main: #f8e8d0;
-    /* Cream ink */
-    --text-secondary: #e3c3a4;
-    /* Softer cream */
-    --text-tertiary: #b58a6a;
-    /* Muted notes */
+    --text-main: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #484F58;
 
-    --accent: #c06c55;
-    /* Primary accent (buttons, pills) */
-    --accent-dim: rgba(192, 108, 85, 0.24);
+    --accent: #238636;
+    /* GitHub Green */
+    --accent-dim: rgba(35, 134, 54, 0.2);
 
-    --glass: rgba(12, 8, 8, 0.86);
-    /* For blur / glass panels */
+    --glass: rgba(5, 5, 5, 0.9);
 
-    /* Softer rounded shapes */
-    --radius-sm: 8px;
-    --radius-md: 16px;
-    --radius-lg: 22px;
-    --radius-xl: 32px;
+    /* Sharp, technical edges */
+    --radius-sm: 0px;
+    --radius-md: 0px;
+    --radius-lg: 2px;
+    --radius-xl: 4px;
 
-    --font-body: var(--font-inter), sans-serif;
+    --font-body: var(--font-jetbrains-mono), monospace;
 }
 
-/* Ethereal (Soft) */
-[data-theme="ethereal"] {
-    --bg-main: #FFF1F2;
-    /* Rose 50 */
-    --bg-card: #FFFFFF;
-    --bg-hover: #FFE4E6;
-    --bg-secondary: #FFE4E6;
-    /* Rose 100 */
+/* Sonar (Tech / Teal) */
+[data-theme="sonar"] {
+    --bg-main: #041315;
+    /* Deep Teal Black */
+    --bg-card: #081F22;
+    --bg-hover: #0E2E32;
+    --bg-secondary: #081F22;
 
-    --border-main: rgba(244, 63, 94, 0.1);
-    /* Rose 500 low opacity */
-    --border-focus: rgba(244, 63, 94, 0.3);
+    --border-main: #134E48;
+    /* Teal 800 */
+    --border-focus: #2DD4BF;
+    /* Teal 400 */
 
-    --text-main: #881337;
-    /* Rose 900 */
-    --text-secondary: #BE123C;
-    /* Rose 700 */
-    --text-tertiary: #E11D48;
-    /* Rose 600 */
+    --text-main: #CCFBF1;
+    /* Teal 50 */
+    --text-secondary: #5EEAD4;
+    /* Teal 300 (Dimmed) */
+    --text-tertiary: #115E59;
+    /* Teal 800 */
 
-    --accent: #E11D48;
-    --accent-dim: rgba(225, 29, 72, 0.1);
+    --accent: #14B8A6;
+    /* Teal 500 */
+    --accent-dim: rgba(20, 184, 166, 0.2);
 
-    --glass: rgba(255, 255, 255, 0.6);
+    --glass: rgba(4, 19, 21, 0.85);
 
-    /* Highly rounded, soft edges */
-    --radius-sm: 0.5rem;
-    --radius-md: 1rem;
-    --radius-lg: 1.5rem;
-    --radius-xl: 2rem;
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
 
-    --font-body: var(--font-instrument-serif), serif;
+    --font-body: var(--font-jetbrains-mono), monospace;
 }
 
 /* Utility Overrides for Theming */
