@@ -403,17 +403,30 @@ const StudioWorkspace: React.FC = () => {
                 try {
                     const parsed = JSON.parse(savedData);
 
-                    if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
+                    // Migration: clear old mock text from mission project
+                    if (parsed.sections && parsed.sections.some((s: LyricSection) =>
+                        s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
+                    )) {
+                        // Old mock text detected, reset to empty
+                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
+                        setProjectTitle('');
+                    } else if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
                         setSections(parsed.sections);
                         if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     } else {
-                        // Default to Mission Setup if no content found
+                        // Default to empty project
                         setSections(MISSION_PROJECT.sections);
-                        setProjectTitle(MISSION_PROJECT.name);
+                        setProjectTitle('');
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
+                    // Also clean mission project from saved list if it has old mock text
+                    loadedProjects = loadedProjects.filter((p: SavedProject) =>
+                        !(p.id === 'mission-001' && p.sections?.some(s =>
+                            s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
+                        ))
+                    );
                     if (!loadedProjects.find((p: SavedProject) => p.id === MISSION_PROJECT.id)) {
                         loadedProjects = [MISSION_PROJECT, ...loadedProjects];
                     }
