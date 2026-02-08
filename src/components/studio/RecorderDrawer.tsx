@@ -387,7 +387,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false,
+        },
+      });
 
       const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
@@ -447,7 +453,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       // Start Backing Track
       if (backingAudioRef?.current && backingTrackSrc) {
         recordingStartOffsetRef.current = backingAudioRef.current.currentTime;
-        backingAudioRef.current.volume = 0.6;
+        backingAudioRef.current.volume = 1.0;
         backingAudioRef.current.play();
       } else {
         recordingStartOffsetRef.current = 0;
