@@ -214,7 +214,7 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
                 </button>
             </div>
             <div
-                className="relative z-10 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 flex items-center justify-between transition-transform duration-200 ease-out active:bg-[var(--bg-hover)] touch-pan-y"
+                className="relative z-10 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y"
                 style={{ transform: `translateX(${offset}px)` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -227,6 +227,98 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
                     <p className="text-[10px] mono text-[var(--text-tertiary)]">{project.lastModified}</p>
                 </div>
                 <ChevronRight size={14} className="text-[var(--text-tertiary)]" />
+            </div>
+        </div>
+    );
+};
+
+interface SwipeableBeatCardProps {
+    beat: Beat;
+    isPlaying: boolean;
+    onPlay: () => void;
+    onWrite: () => void;
+    onDelete: () => void;
+}
+
+const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: SwipeableBeatCardProps) => {
+    const [offset, setOffset] = useState(0);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const startX = useRef<number | null>(null);
+    const startOffset = useRef<number>(0);
+    const hasMoved = useRef(false);
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (e.button !== 0) return;
+        // Don't start swipe if clicking buttons
+        if ((e.target as HTMLElement).closest('button')) return;
+        startX.current = e.clientX;
+        startOffset.current = offset;
+        hasMoved.current = false;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (startX.current === null) return;
+        const diff = e.clientX - startX.current;
+        if (Math.abs(diff) > 5) hasMoved.current = true;
+        const proposed = Math.min(0, Math.max(-140, startOffset.current + diff));
+        setOffset(proposed);
+        if (confirmDelete && Math.abs(diff) > 5) {
+            setConfirmDelete(false);
+        }
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (startX.current === null) return;
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+        startX.current = null;
+        if (offset < -60) {
+            setOffset(-100);
+        } else {
+            setOffset(0);
+            setConfirmDelete(false);
+        }
+    };
+
+    return (
+        <div className="relative mb-2 select-none overflow-hidden rounded-lg">
+            <div className="absolute inset-0 flex items-center justify-end bg-red-500/10 rounded-lg pr-4 z-0">
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirmDelete) {
+                            onDelete();
+                        } else {
+                            setConfirmDelete(true);
+                        }
+                    }}
+                    className={`flex items-center justify-center rounded-full shadow-sm border transition-all duration-200 cursor-pointer ${confirmDelete
+                        ? 'w-20 h-10 bg-red-500 text-[var(--bg-main)] border-red-600'
+                        : 'w-10 h-10 bg-[var(--bg-card)] text-red-500 border-red-500/20 active:scale-95 hover:bg-red-50'
+                        }`}
+                >
+                    {confirmDelete ? <span className="text-xs font-bold">Confirm</span> : <Trash2 size={18} />}
+                </button>
+            </div>
+            <div
+                className={`relative z-10 bg-[var(--bg-card)] border ${isPlaying ? 'border-[var(--accent)]' : 'border-[var(--border-main)]'} rounded-lg p-3 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y`}
+                style={{ transform: `translateX(${offset}px)` }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+            >
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <button onClick={(e) => { e.stopPropagation(); onPlay(); }} className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all">
+                        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                    </button>
+                    <div className="min-w-0 pointer-events-none">
+                        <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{beat.name}</h4>
+                        <p className="text-[10px] mono text-[var(--text-tertiary)]">{beat.duration}</p>
+                    </div>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); onWrite(); }} className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-all">Write</button>
             </div>
         </div>
     );
@@ -281,7 +373,12 @@ const StudioWorkspace: React.FC = () => {
                     if (parsed.sections && parsed.sections.length > 0) {
                         setSections(parsed.sections);
                     } else {
-                        setSections([{ id: 'init-verse', type: 'verse', repeats: 1, text: '' }]);
+                        // Default to Mission Setup if no sections found
+                        setSections([
+                            { id: 'mission-v1', type: 'verse', repeats: 1, text: "Hit play on the beat (mock) and start typing here...\nDon't think, just flow." },
+                            { id: 'mission-c1', type: 'chorus', repeats: 1, text: "Then switch to 'Studio' mode to organize these lines." }
+                        ]);
+                        setProjectTitle("Mission: Flow to Write");
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
 
@@ -419,6 +516,23 @@ const StudioWorkspace: React.FC = () => {
             audio.play().catch(console.error);
             globalAudioRef.current = audio;
             setPlayingBeatId(beatId);
+        }
+    };
+
+    const handleDeleteBeat = async (beatId: string) => {
+        if (!confirm("Permanently delete this beat?")) return;
+
+        if (playingBeatId === beatId) {
+            globalAudioRef.current?.pause();
+            setPlayingBeatId(null);
+        }
+
+        setBeats(prev => prev.filter(b => b.id !== beatId));
+
+        try {
+            await deleteAudioData(beatId);
+        } catch (e) {
+            console.error("Failed to delete beat data", e);
         }
     };
 
@@ -587,23 +701,16 @@ const StudioWorkspace: React.FC = () => {
                         <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
                             {libraryTab === 'beats' && (
                                 <div className="space-y-4">
-                                    {beats.map(beat => {
-                                        const isPlaying = playingBeatId === beat.id;
-                                        return (
-                                            <div key={beat.id} className={`bg-[var(--bg-card)] border ${isPlaying ? 'border-[var(--accent)]' : 'border-[var(--border-main)]'} rounded-lg p-3 flex items-center justify-between transition-all`}>
-                                                <div className="flex items-center gap-4 min-w-0 flex-1">
-                                                    <button onClick={() => handlePlayBeat(beat.id)} className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
-                                                        {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-                                                    </button>
-                                                    <div className="min-w-0">
-                                                        <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{beat.name}</h4>
-                                                        <p className="text-[10px] mono text-[var(--text-tertiary)]">{beat.duration}</p>
-                                                    </div>
-                                                </div>
-                                                <button onClick={() => handleStartProjectFromBeat(beat)} className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)]">Write</button>
-                                            </div>
-                                        );
-                                    })}
+                                    {beats.map(beat => (
+                                        <SwipeableBeatCard
+                                            key={beat.id}
+                                            beat={beat}
+                                            isPlaying={playingBeatId === beat.id}
+                                            onPlay={() => handlePlayBeat(beat.id)}
+                                            onWrite={() => handleStartProjectFromBeat(beat)}
+                                            onDelete={() => handleDeleteBeat(beat.id)}
+                                        />
+                                    ))}
                                 </div>
                             )}
                             {libraryTab === 'songs' && (
@@ -617,19 +724,17 @@ const StudioWorkspace: React.FC = () => {
 
                         <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
                             <div className="pointer-events-auto flex flex-col items-end gap-3">
-                                {fabOpen && (
-                                    <div className="flex flex-col items-end gap-3 animate-in slide-in-from-bottom-4 fade-in duration-200">
-                                        <button onClick={handleNewProject} className="flex items-center gap-3 group">
-                                            <span className="bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg">New Project</span>
-                                            <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)]"><FilePlus size={16} /></div>
-                                        </button>
-                                        <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
-                                            <span className="bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg">Import Beat</span>
-                                            <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)]"><Music size={16} /></div>
-                                            <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
-                                        </button>
-                                    </div>
-                                )}
+                                <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-out origin-bottom-right ${fabOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}>
+                                    <button onClick={handleNewProject} className="flex items-center gap-3 group">
+                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
+                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
+                                    </button>
+                                    <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
+                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
+                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
+                                        <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
+                                    </button>
+                                </div>
                                 <button
                                     onClick={() => setFabOpen(!fabOpen)}
                                     className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
@@ -638,7 +743,7 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </div >
                 );
             case 'board':
                 return (
