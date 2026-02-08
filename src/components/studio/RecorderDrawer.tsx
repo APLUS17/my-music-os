@@ -114,7 +114,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (isRecording) {
         // LIVE VISUALIZATION
         if (analyserRef.current && dataArrayRef.current) {
-          analyserRef.current.getByteTimeDomainData(dataArrayRef.current as any);
+          analyserRef.current.getByteTimeDomainData(dataArrayRef.current as Uint8Array<ArrayBuffer>);
 
           ctx.beginPath();
           ctx.strokeStyle = recordingColor;
@@ -154,7 +154,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         ctx.fillStyle = accentColor;
 
         for (let i = 0; i < totalBars; i++) {
-          let peakIndex = i * step;
+          const peakIndex = i * step;
           if (peakIndex >= peaks.length) break;
 
           let val = 0;
@@ -389,7 +389,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 2048;

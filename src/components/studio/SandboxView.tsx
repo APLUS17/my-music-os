@@ -1,7 +1,8 @@
 
 import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
-import { ArrowRight, Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
+import { Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
 import { LyricSection, VoiceTake } from '@/types';
+import { randomId } from '@/lib/utils/id';
 
 interface SandboxViewProps {
   sections: LyricSection[];
@@ -136,7 +137,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
 
           // 2. Create new section with textAfter (or empty)
           const newSection: LyricSection = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: randomId(),
             type: 'verse', // Default to verse, can be changed in write mode
             repeats: 1,
             text: textAfter

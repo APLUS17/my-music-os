@@ -10,7 +10,8 @@ export class AIService {
         return "Real AI response placeholder";
     }
 
-    private getMockResponse(prompt: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    private getMockResponse(_prompt: string): string {
         const responses = [
             "Try a I-VI-IV-V progression in the key of F# Minor.",
             "Concept: A song about the feeling of waking up before the alarm.",

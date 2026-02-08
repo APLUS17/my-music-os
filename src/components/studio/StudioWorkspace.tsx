@@ -2,37 +2,28 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } from '../../types';
+import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
 import { SandboxView } from './SandboxView';
 import { PuzzleView } from './PuzzleView';
-import { VoiceMemoView } from './VoiceMemoView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import {
     LayoutGrid,
-    Mic,
     PenTool,
     Library,
     Search,
-    Zap,
     X,
     ChevronRight,
     Settings,
     Check,
     Plus,
     Music,
-    Upload,
     FilePlus,
-    Share,
-    Hash,
-    Lightbulb,
-    Disc,
-    FileText,
     Play,
     Pause,
-    ArrowRight,
     Trash2,
     MessageSquare
 } from 'lucide-react';
@@ -471,8 +462,10 @@ const StudioWorkspace: React.FC = () => {
     // Persistence Save
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const takesToSave = takes.map(({ audioUrl, base64, ...rest }) => rest);
-        const beatsToSave = beats.map(({ audioUrl, base64, ...rest }) => rest);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const takesToSave = takes.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
         const dataToSave = {
             sections, scraps, savedProjects,
             projectTitle, projectBpm, projectKey,
@@ -491,7 +484,7 @@ const StudioWorkspace: React.FC = () => {
     const handleSaveTake = async (blob: Blob, duration: number, beatOffset?: number) => {
         const url = URL.createObjectURL(blob);
         const base64 = await blobToBase64(blob);
-        const id = Math.random().toString(36).substr(2, 6).toUpperCase();
+        const id = randomId().substring(0, 6).toUpperCase();
         await saveAudioData(id, base64);
 
         const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -587,7 +580,7 @@ const StudioWorkspace: React.FC = () => {
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
         const newProject: SavedProject = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
             sections, scraps, takes: [], beats: []
@@ -605,7 +598,7 @@ const StudioWorkspace: React.FC = () => {
         }
 
         setSections([{
-            id: Math.random().toString(36).substr(2, 9),
+            id: randomId(),
             type: type,
             repeats: 1,
             text: text
@@ -624,7 +617,7 @@ const StudioWorkspace: React.FC = () => {
     const handleNewProject = () => {
         if (confirm("Start a clean project? Current work will be archived.")) {
             archiveCurrentProject();
-            setSections([{ id: Math.random().toString(36).substr(2, 9), type: 'verse', repeats: 1, text: "" }]);
+            setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
             setProjectTitle("");
             setUploadedBeat(null);
@@ -646,7 +639,7 @@ const StudioWorkspace: React.FC = () => {
         if (globalAudioRef.current) globalAudioRef.current.pause();
         setPlayingBeatId(null);
         archiveCurrentProject();
-        setSections([{ id: Math.random().toString(36).substr(2, 9), type: 'verse', repeats: 1, text: "" }]);
+        setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
         setScraps([]);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
@@ -660,7 +653,7 @@ const StudioWorkspace: React.FC = () => {
 
         const url = URL.createObjectURL(file);
         const base64 = await blobToBase64(file);
-        const id = Math.random().toString(36).substr(2, 9);
+        const id = randomId();
 
         const audio = new Audio(url);
         audio.onloadedmetadata = () => {
@@ -686,10 +679,19 @@ const StudioWorkspace: React.FC = () => {
     };
 
 
-    const searchResults = useMemo(() => {
+    interface SearchResult {
+        id: string;
+        type: string;
+        title: string;
+        desc: string;
+        date: string;
+        raw: SavedProject;
+    }
+
+    const searchResults = useMemo((): SearchResult[] => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase();
-        const results: any[] = [];
+        const results: SearchResult[] = [];
         if (searchFilter === 'all' || searchFilter === 'songs') {
             savedProjects.forEach(p => {
                 if (p.name.toLowerCase().includes(q)) {
@@ -940,7 +942,7 @@ const StudioWorkspace: React.FC = () => {
 
     const addSection = () => {
         setSections(prev => [...prev, {
-            id: Math.random().toString(36).substr(2, 9),
+            id: randomId(),
             type: 'verse',
             repeats: 1,
             text: ""
@@ -950,7 +952,7 @@ const StudioWorkspace: React.FC = () => {
     const promoteToSection = (text: string) => {
         if (text.trim()) {
             const newSection: LyricSection = {
-                id: Math.random().toString(36).substr(2, 9),
+                id: randomId(),
                 type: 'verse',
                 repeats: 1,
                 text: text
@@ -1030,7 +1032,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-6 pb-20 space-y-2">
-                            {searchResults.map((res: any) => (
+                            {searchResults.map((res) => (
                                 <button
                                     key={`${res.type}-${res.id}`}
                                     onClick={() => {

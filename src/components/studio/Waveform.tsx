@@ -8,10 +8,17 @@ interface WaveformProps {
 export const Waveform: React.FC<WaveformProps> = ({ progress, onScrub }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  
-  const barCount = 45; 
+
+  const barCount = 45;
+  // Generate stable bar heights using a seeded approach
   const bars = React.useMemo(() => {
-    return Array.from({ length: barCount }).map(() => Math.random() * 24 + 10);
+    // Use a simple seeded random to ensure stable heights
+    const seed = 12345;
+    const seededRandom = (i: number) => {
+      const x = Math.sin(seed + i * 9999) * 10000;
+      return x - Math.floor(x);
+    };
+    return Array.from({ length: barCount }).map((_, i) => seededRandom(i) * 24 + 10);
   }, []);
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
@@ -47,7 +54,7 @@ export const Waveform: React.FC<WaveformProps> = ({ progress, onScrub }) => {
   }, [isDragging, onScrub]);
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative w-full h-16 flex items-center justify-center cursor-pointer select-none group"
       onMouseDown={onMouseDown}
@@ -61,9 +68,9 @@ export const Waveform: React.FC<WaveformProps> = ({ progress, onScrub }) => {
           const barProgress = i / barCount;
           const isPlayed = barProgress < progress;
           return (
-            <div 
+            <div
               key={i}
-              style={{ 
+              style={{
                 height: `${height}px`,
                 backgroundColor: isPlayed ? 'var(--accent)' : 'var(--bg-secondary)',
                 transition: 'background-color 0.2s ease, height 0.3s ease'
@@ -73,11 +80,11 @@ export const Waveform: React.FC<WaveformProps> = ({ progress, onScrub }) => {
           );
         })}
       </div>
-      
+
       {/* Playhead */}
-      <div 
+      <div
         className="absolute top-0 bottom-0 w-[2.5px] bg-[var(--text-main)] rounded-full z-10 pointer-events-none"
-        style={{ 
+        style={{
           left: `${progress * 100}%`,
           transform: 'translateX(-50%)',
           boxShadow: '0 0 10px var(--accent-dim)'
