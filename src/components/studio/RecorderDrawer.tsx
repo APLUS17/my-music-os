@@ -452,9 +452,17 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
       // Start Backing Track
       if (backingAudioRef?.current && backingTrackSrc) {
-        recordingStartOffsetRef.current = backingAudioRef.current.currentTime;
-        backingAudioRef.current.volume = 1.0;
-        backingAudioRef.current.play();
+        const backingAudio = backingAudioRef.current;
+        recordingStartOffsetRef.current = backingAudio.currentTime;
+        backingAudio.volume = 1.0;
+
+        if (backingAudio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          backingAudio.play().catch(console.error);
+        } else {
+          backingAudio.addEventListener('canplay', () => {
+            backingAudio.play().catch(console.error);
+          }, { once: true });
+        }
       } else {
         recordingStartOffsetRef.current = 0;
       }
