@@ -9,6 +9,7 @@ import { PuzzleView } from './PuzzleView';
 import { VoiceMemoView } from './VoiceMemoView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
+import { OnboardingTour } from './OnboardingTour';
 import {
     LayoutGrid,
     Mic,
@@ -119,10 +120,12 @@ interface NavBtnProps {
     onClick: () => void;
     icon: React.ReactNode;
     label: string;
+    id?: string;
 }
 
-const NavBtn = ({ active, onClick, icon, label }: NavBtnProps) => (
+const NavBtn = ({ active, onClick, icon, label, id }: NavBtnProps) => (
     <button
+        id={id}
         onClick={onClick}
         title={label}
         className={`flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${active
@@ -324,6 +327,19 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
     );
 };
 
+const MISSION_PROJECT: SavedProject = {
+    id: 'mission-001',
+    name: 'Mission: Flow to Write',
+    lastModified: new Date().toLocaleDateString(),
+    sections: [
+        { id: 'mission-v1', type: 'verse', repeats: 1, text: "Hit play on the beat (mock) and start typing here...\nDon't think, just flow." },
+        { id: 'mission-c1', type: 'chorus', repeats: 1, text: "Then switch to 'Studio' mode to organize these lines." }
+    ],
+    scraps: [],
+    takes: [],
+    beats: []
+};
+
 const StudioWorkspace: React.FC = () => {
     const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
@@ -361,6 +377,19 @@ const StudioWorkspace: React.FC = () => {
     const [playingBeatId, setPlayingBeatId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
 
+    const [showTour, setShowTour] = useState(false);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
+            setShowTour(true);
+        }
+    }, []);
+
+    const handleTourComplete = () => {
+        localStorage.setItem('lyriq-tour-completed', 'true');
+        setShowTour(false);
+    };
+
     // Persistence Load
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -370,20 +399,22 @@ const StudioWorkspace: React.FC = () => {
                 try {
                     const parsed = JSON.parse(savedData);
 
-                    if (parsed.sections && parsed.sections.length > 0) {
+                    if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
                         setSections(parsed.sections);
+                        if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     } else {
-                        // Default to Mission Setup if no sections found
-                        setSections([
-                            { id: 'mission-v1', type: 'verse', repeats: 1, text: "Hit play on the beat (mock) and start typing here...\nDon't think, just flow." },
-                            { id: 'mission-c1', type: 'chorus', repeats: 1, text: "Then switch to 'Studio' mode to organize these lines." }
-                        ]);
-                        setProjectTitle("Mission: Flow to Write");
+                        // Default to Mission Setup if no content found
+                        setSections(MISSION_PROJECT.sections);
+                        setProjectTitle(MISSION_PROJECT.name);
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
 
-                    if (parsed.savedProjects) setSavedProjects(parsed.savedProjects);
-                    if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
+                    let loadedProjects: SavedProject[] = parsed.savedProjects || [];
+                    if (!loadedProjects.find((p: SavedProject) => p.id === MISSION_PROJECT.id)) {
+                        loadedProjects = [MISSION_PROJECT, ...loadedProjects];
+                    }
+                    setSavedProjects(loadedProjects);
+
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
 
@@ -776,7 +807,7 @@ const StudioWorkspace: React.FC = () => {
 
                                 {/* Bottom Row: Toggle and Audio Controls */}
                                 <div className="flex items-center justify-between">
-                                    <div className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
+                                    <div id="tour-mode-toggle" className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
                                         {/* Sliding Pill */}
                                         <div
                                             className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--bg-main)] shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${studioMode === 'flow' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
@@ -797,7 +828,7 @@ const StudioWorkspace: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div id="tour-audio-controls" className="flex items-center gap-2">
                                         <BeatUploader
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
@@ -812,21 +843,22 @@ const StudioWorkspace: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 relative overflow-hidden">
+                        <div id="tour-workspace" className="flex-1 relative overflow-hidden">
                             {/* Arrange Mode (Write) */}
                             <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <div className="max-w-2xl mx-auto space-y-12">
                                     {sections.map((section, idx) => (
-                                        <LyricCard
-                                            key={section.id}
-                                            section={section}
-                                            onUpdate={updateSection}
-                                            onDelete={deleteSection}
-                                            onMove={moveSection}
-                                            availableTakes={takes}
-                                            beatAudioRef={beatAudioRef}
-                                            onDeleteTake={handleDeleteTake}
-                                        />
+                                        <div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined}>
+                                            <LyricCard
+                                                section={section}
+                                                onUpdate={updateSection}
+                                                onDelete={deleteSection}
+                                                onMove={moveSection}
+                                                availableTakes={takes}
+                                                beatAudioRef={beatAudioRef}
+                                                onDeleteTake={handleDeleteTake}
+                                            />
+                                        </div>
                                     ))}
                                     <button
                                         onClick={addSection}
@@ -904,10 +936,11 @@ const StudioWorkspace: React.FC = () => {
 
                 <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
                     <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
-                        <NavBtn active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
-                        <NavBtn active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
+                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
+                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
                         <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
                         <button
+                            id="tour-nav-record"
                             onClick={() => {
                                 setShowRecorder(true);
                                 setRecorderMinimized(true);
@@ -917,7 +950,7 @@ const StudioWorkspace: React.FC = () => {
                             <div className="w-3 h-3 rounded-full bg-current" />
                         </button>
                         <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <NavBtn active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid size={20} />} label="Board" />
+                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid size={20} />} label="Board" />
                         <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search size={20} />} label="Search" />
                     </div>
                 </nav>
@@ -990,6 +1023,18 @@ const StudioWorkspace: React.FC = () => {
             )}
 
             <audio ref={beatAudioRef} src={uploadedBeat || undefined} loop />
+
+            {showTour && (
+                <OnboardingTour
+                    onComplete={handleTourComplete}
+                    setViewMode={setViewMode}
+                    setStudioMode={setStudioMode}
+                    setShowRecorder={setShowRecorder}
+                    setRecorderMinimized={setRecorderMinimized}
+                    viewMode={viewMode}
+                    studioMode={studioMode}
+                />
+            )}
         </div>
     );
 };
