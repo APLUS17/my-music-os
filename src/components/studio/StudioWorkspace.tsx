@@ -332,8 +332,7 @@ const MISSION_PROJECT: SavedProject = {
     name: 'Mission: Flow to Write',
     lastModified: new Date().toLocaleDateString(),
     sections: [
-        { id: 'mission-v1', type: 'verse', repeats: 1, text: "Hit play on the beat (mock) and start typing here...\nDon't think, just flow." },
-        { id: 'mission-c1', type: 'chorus', repeats: 1, text: "Then switch to 'Studio' mode to organize these lines." }
+        { id: 'mission-v1', type: 'verse', repeats: 1, text: "" }
     ],
     scraps: [],
     takes: [],
@@ -388,6 +387,11 @@ const StudioWorkspace: React.FC = () => {
     const handleTourComplete = () => {
         localStorage.setItem('lyriq-tour-completed', 'true');
         setShowTour(false);
+        // Take user to Flow mode with a fresh blank canvas
+        setViewMode('studio');
+        setStudioMode('flow');
+        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
+        setProjectTitle('');
     };
 
     // Persistence Load
@@ -708,6 +712,22 @@ const StudioWorkspace: React.FC = () => {
                                             {theme === t && <Check size={16} className="text-[var(--accent)]" />}
                                         </button>
                                     ))}
+                                </div>
+                            </section>
+                            <section className="pt-4">
+                                <h2 className="text-[10px] mono uppercase tracking-widest text-[var(--text-secondary)] mb-4">Help</h2>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <button
+                                        onClick={() => {
+                                            localStorage.removeItem('lyriq-tour-completed');
+                                            setShowTour(true);
+                                            setViewMode('collection');
+                                        }}
+                                        className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
+                                    >
+                                        <span className="text-sm font-medium text-[var(--text-main)]">Restart Tour</span>
+                                        <ChevronRight size={16} className="text-[var(--text-secondary)]" />
+                                    </button>
                                 </div>
                             </section>
                         </div>

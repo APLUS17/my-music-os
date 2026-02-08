@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronRight, Check } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 interface Step {
     targetId: string;
@@ -41,53 +41,68 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         {
             targetId: 'tour-nav-library',
             title: 'Library',
-            content: 'Your vault. All your projects, beats, and recordings live here. Start here to find your sound.',
+            content: 'Your vault. All your songs and beats live here. Start here to find your sound or create something new.',
             position: 'top',
             action: () => setViewMode('collection')
         },
         {
             targetId: 'tour-nav-studio',
             title: 'The Studio',
-            content: 'Your creative canvas. This is where the magic happens—writing, recording, and arranging.',
+            content: 'Your creative canvas. This is where the magic happens—writing, recording, and arranging your music.',
             position: 'top',
             action: () => setViewMode('studio')
         },
         {
             targetId: 'tour-audio-controls',
-            title: 'Beat Upload & Loop Controls',
+            title: 'Beat Upload',
             content: 'Upload a beat or loop here. The vibe starts with the instrumental—everything else follows.',
             position: 'bottom',
             action: () => setViewMode('studio')
         },
         {
             targetId: 'tour-mode-toggle',
-            title: 'Flow & Write',
-            content: 'Flow Mode: pure stream-of-consciousness. Write Mode: structured verses and hooks. Switch anytime—they stay in sync.',
-            position: 'bottom'
-        },
-        {
-            targetId: 'tour-nav-record',
-            title: 'Capture & Pin',
-            content: 'Hit this to record. Lay down bars, punch in takes, then pin your best take directly to any lyric section.',
-            position: 'top',
+            title: 'Flow Mode',
+            content: 'Pure stream-of-consciousness writing. No structure, just vibes. Let your ideas flow freely without interruption.',
+            position: 'bottom',
             action: () => {
-                setShowRecorder(true);
-                setRecorderMinimized(true);
+                setViewMode('studio');
+                setStudioMode('flow');
             }
         },
         {
-            targetId: 'tour-lyric-card',
-            title: 'Lyric Cards',
-            content: 'Each section is a card with built-in recording. Record directly into verses, attach takes, and organize your song.',
+            targetId: 'tour-mode-toggle',
+            title: 'Write Mode',
+            content: 'Structured verses, hooks, and bridges. Organize your lyrics into sections. Each section becomes a Lyric Card you can arrange and attach recordings to.',
             position: 'bottom',
             action: () => {
                 setViewMode('studio');
                 setStudioMode('arrange');
             }
+        },
+        {
+            targetId: 'tour-lyric-card',
+            title: 'Lyric Cards',
+            content: 'Each section is its own card. Add verses, hooks, or bridges. Attach takes directly to any section and pin your favorites.',
+            position: 'bottom',
+            action: () => {
+                setViewMode('studio');
+                setStudioMode('arrange');
+            }
+        },
+        {
+            targetId: 'tour-nav-record',
+            title: 'Capture & Pin',
+            content: 'Hit this to open the recording drawer. Lay down bars, punch in takes, then pin your best take directly to any lyric section.',
+            position: 'top'
         }
     ];
 
     const params = STEPS[currentStep];
+
+    // Navigate to library when tour starts
+    useEffect(() => {
+        setViewMode('collection');
+    }, []);
 
     useEffect(() => {
         // Execute action associated with the step
@@ -142,6 +157,12 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         }
     };
 
+    const handleBack = () => {
+        if (currentStep > 0) {
+            setCurrentStep(currentStep - 1);
+        }
+    };
+
     if (!rect && params.targetId !== 'welcome-step') return null;
 
     const isWelcome = params.targetId === 'welcome-step';
@@ -167,7 +188,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
             {/* The Tooltip/Card */}
             <div
-                className="absolute flex flex-col p-8 rounded-3xl bg-[#121212] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[320px]"
+                className="absolute flex flex-col p-8 rounded-3xl bg-[#121212] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
                 style={{
                     top: isWelcome
                         ? '50%'
@@ -193,18 +214,28 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                         {STEPS.map((_, idx) => (
                             <div
                                 key={idx}
-                                className={`h-1 rounded-full transition-all duration-500 ${idx === currentStep ? 'w-8 bg-[var(--accent)]' : 'w-1 bg-[var(--border-main)]'}`}
+                                className={`h-1 rounded-full transition-all duration-500 ${idx === currentStep ? 'w-6 bg-[var(--accent)]' : idx < currentStep ? 'w-1.5 bg-[var(--accent)]/50' : 'w-1 bg-[var(--border-main)]'}`}
                             />
                         ))}
                     </div>
 
-                    <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 bg-white text-black px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
-                    >
-                        {currentStep === STEPS.length - 1 ? 'Start Flow' : 'Next'}
-                        {currentStep === STEPS.length - 1 ? <Check size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {currentStep > 0 && (
+                            <button
+                                onClick={handleBack}
+                                className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-hover)] transition-all"
+                            >
+                                <ChevronLeft size={18} strokeWidth={2.5} />
+                            </button>
+                        )}
+                        <button
+                            onClick={handleNext}
+                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
+                        >
+                            {currentStep === STEPS.length - 1 ? 'Start' : 'Next'}
+                            {currentStep === STEPS.length - 1 ? <Check size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}
+                        </button>
+                    </div>
                 </div>
 
                 <button
