@@ -1057,7 +1057,6 @@ const StudioWorkspace: React.FC = () => {
                 </div>
             )}
 
-            <audio ref={beatAudioRef} src={uploadedBeat || undefined} loop />
 
             {showTour && (
                 <OnboardingTour
