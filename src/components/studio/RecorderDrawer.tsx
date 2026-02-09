@@ -11,12 +11,10 @@ import {
   X,
   Timer,
   Clock,
-  Settings2,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FXPanel, FXSettings } from './FXPanel';
 
 interface RecorderDrawerProps {
   onClose: () => void;
@@ -43,8 +41,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   // UI States
   const [metronomeActive, setMetronomeActive] = useState(false);
-  const [showFx, setShowFx] = useState(false);
-  const [fxSettings, setFxSettings] = useState<FXSettings>({ space: 25, echo: 0, punch: 50 });
+  const [audioLevel, setAudioLevel] = useState(0);
 
   // Refs for logic
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -133,13 +130,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           }
           ctx.stroke();
 
-          // Collect peaks (only if not minimized for performance, or keep consistent)
+          // Collect peaks and update audio level for visual feedback
           let sum = 0;
           for (let i = 0; i < dataArrayRef.current.length; i++) {
             const v = (dataArrayRef.current[i] - 128) / 128;
             sum += v * v;
           }
           const rms = Math.sqrt(sum / dataArrayRef.current.length);
+          setAudioLevel(Math.min(1, rms * 3));
           if (Math.random() > 0.5) peaksRef.current.push(rms);
         }
 
@@ -536,7 +534,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const handleDiscard = () => {
     if (recordedBlob) {
-      if (confirm("Delete this take?")) {
+      if (confirm("Delete this recording?")) {
         setRecordedBlob(null);
         setDuration(0);
         setProgress(0);
@@ -571,10 +569,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Handle scrub end - resume playback if was playing
   const handleScrubEnd = () => {
     isDraggingRef.current = false;
-  };
-
-  const handleUpdateFx = (key: keyof FXSettings, value: number) => {
-    setFxSettings(prev => ({ ...prev, [key]: value }));
   };
 
   // --- RENDER ---
@@ -705,14 +699,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 : 'shadow-[0_-20px_60px_rgba(0,0,0,0.8)] border-white/10'
                 }`}
             >
-              {showFx && (
-                <FXPanel
-                  onClose={() => setShowFx(false)}
-                  settings={fxSettings}
-                  onUpdate={handleUpdateFx}
-                />
-              )}
-
               <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleImportFile} />
 
               {/* Drag Handle */}
@@ -838,14 +824,25 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 </div>
 
                 <div className="justify-self-center flex flex-col items-center gap-2">
-                  <div className="flex items-center gap-6">
-                    <button
-                      onClick={() => setShowFx(true)}
-                      className={`p-1.5 transition-colors ${showFx ? 'text-[var(--accent)]' : 'text-white/20 hover:text-white/60'}`}
-                    >
-                      <Settings2 size={18} strokeWidth={1.5} />
-                    </button>
+                  {/* Audio Level Indicator - shows during recording */}
+                  {isRecording && (
+                    <div className="flex items-center gap-1 mb-1">
+                      {[0.15, 0.3, 0.45, 0.6, 0.75, 0.9].map((threshold, i) => (
+                        <div
+                          key={i}
+                          className={`w-1 rounded-full transition-all duration-75 ${
+                            audioLevel >= threshold
+                              ? (threshold > 0.75 ? 'bg-red-500' : threshold > 0.5 ? 'bg-yellow-400' : 'bg-green-400')
+                              : 'bg-white/10'
+                          }`}
+                          style={{ height: `${8 + i * 3}px` }}
+                        />
+                      ))}
+                      <span className="text-[9px] mono text-red-400 ml-2 animate-pulse">REC</span>
+                    </div>
+                  )}
 
+                  <div className="flex items-center gap-6">
                     <button
                       onClick={() => setIsPlaying(!isPlaying)}
                       disabled={!recordedBlob || isRecording}

@@ -1,17 +1,21 @@
 
 import React, { useState } from 'react';
 import { LyricScrap, SectionType } from '@/types';
-import { Plus, GripVertical, Hash, FilePlus2 } from 'lucide-react';
+import { Plus, GripVertical, Hash, FilePlus2, Send, Tag } from 'lucide-react';
 
 interface PuzzleViewProps {
   scraps: LyricScrap[];
   onAdd: (text: string, type: SectionType) => void;
   onUpdateType: (id: string, type: SectionType) => void;
   onStartProject: (text: string, type: SectionType) => void;
+  onSendToStudio?: (text: string) => void;
+  onUpdateTags?: (id: string, tags: string[]) => void;
 }
 
-export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateType, onStartProject }) => {
+export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateType, onStartProject, onSendToStudio, onUpdateTags }) => {
   const [newText, setNewText] = useState("");
+  const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState("");
   const [selectedType, setSelectedType] = useState<SectionType>('idea');
 
   const getCardStyle = (type: SectionType) => {
@@ -84,15 +88,64 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
               {scrap.text}
             </p>
 
-            {scrap.type !== 'idea' && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
-                className="absolute bottom-3 right-3 p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all shadow-sm opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
-                title="Start Project with this section"
-              >
-                <FilePlus2 size={14} />
-              </button>
+            {/* Tags */}
+            {scrap.tags && scrap.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {scrap.tags.map((tag, i) => (
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[8px] mono">#{tag}</span>
+                ))}
+              </div>
             )}
+
+            {/* Tag editor */}
+            {editingTagsId === scrap.id && (
+              <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <input
+                  autoFocus
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && tagInput.trim()) {
+                      const existing = scrap.tags || [];
+                      onUpdateTags?.(scrap.id, [...existing, tagInput.trim()]);
+                      setTagInput("");
+                    }
+                    if (e.key === 'Escape') { setEditingTagsId(null); setTagInput(""); }
+                  }}
+                  placeholder="Add tag..."
+                  className="flex-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded px-2 py-1 text-[9px] text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
+              <button
+                onClick={(e) => { e.stopPropagation(); setEditingTagsId(editingTagsId === scrap.id ? null : scrap.id); setTagInput(""); }}
+                className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all shadow-sm"
+                title="Add Tag"
+              >
+                <Tag size={12} />
+              </button>
+              {onSendToStudio && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSendToStudio(scrap.text); }}
+                  className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all shadow-sm"
+                  title="Send to Studio"
+                >
+                  <Send size={12} />
+                </button>
+              )}
+              {scrap.type !== 'idea' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
+                  className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all shadow-sm"
+                  title="Start New Project"
+                >
+                  <FilePlus2 size={12} />
+                </button>
+              )}
+            </div>
           </div>
         ))}
         

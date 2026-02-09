@@ -25,7 +25,9 @@ import {
     Play,
     Pause,
     Trash2,
-    MessageSquare
+    MessageSquare,
+    Save,
+    Send
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -88,7 +90,7 @@ type ViewMode = 'collection' | 'studio' | 'board' | 'settings';
 type StudioMode = 'flow' | 'arrange';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
-type SearchFilter = 'all' | 'songs' | 'sections' | 'takes' | 'beats';
+type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -343,6 +345,9 @@ const StudioWorkspace: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
+    const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const [fabOpen, setFabOpen] = useState(false);
     const fabInputRef = useRef<HTMLInputElement>(null);
@@ -459,9 +464,11 @@ const StudioWorkspace: React.FC = () => {
         loadState();
     }, []);
 
-    // Persistence Save
+    // Persistence Save with indicator
+    const saveTimeoutRef = useRef<number | null>(null);
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        setSaveIndicator('saving');
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const takesToSave = takes.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -473,6 +480,8 @@ const StudioWorkspace: React.FC = () => {
         };
         try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
         catch (e) { console.error("Storage full or error", e); }
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
     }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, takes, beats]);
 
     const handleRecordStart = (lineId?: string) => {
@@ -499,10 +508,12 @@ const StudioWorkspace: React.FC = () => {
         setTakes(prev => [newTake, ...prev]);
 
         if (recordingTargetLineId) {
-            // Recording was targeted to a specific line - this is handled in Flow mode
-            // The take is attached to the section via drag-drop or manual pin
             setRecordingTargetLineId(null);
         }
+
+        // Show confirmation toast
+        setToastMessage(`Recording saved (${durationStr}). Attach it to any section with the clip icon.`);
+        setTimeout(() => setToastMessage(null), 4000);
     };
 
     const handlePlayTake = (takeId: string) => {
@@ -643,6 +654,7 @@ const StudioWorkspace: React.FC = () => {
         setScraps([]);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
+        setUploadedBeatName(beat.name);
         setStudioMode('arrange');
         setViewMode('studio');
     };
@@ -692,15 +704,63 @@ const StudioWorkspace: React.FC = () => {
         if (!searchQuery.trim()) return [];
         const q = searchQuery.toLowerCase();
         const results: SearchResult[] = [];
+
         if (searchFilter === 'all' || searchFilter === 'songs') {
             savedProjects.forEach(p => {
-                if (p.name.toLowerCase().includes(q)) {
-                    results.push({ id: p.id, type: 'song', title: p.name, desc: `${p.sections.length} sections`, date: p.lastModified, raw: p });
+                const nameMatch = p.name.toLowerCase().includes(q);
+                const lyricsMatch = p.sections.some(s => s.text.toLowerCase().includes(q));
+                if (nameMatch || lyricsMatch) {
+                    const matchedLine = lyricsMatch && !nameMatch
+                        ? p.sections.find(s => s.text.toLowerCase().includes(q))?.text.split('\n').find(l => l.toLowerCase().includes(q))
+                        : undefined;
+                    results.push({
+                        id: p.id, type: 'song', title: p.name,
+                        desc: matchedLine ? `"...${matchedLine.trim().substring(0, 50)}..."` : `${p.sections.length} sections`,
+                        date: p.lastModified, raw: p
+                    });
                 }
             });
         }
+
+        if (searchFilter === 'all' || searchFilter === 'sections') {
+            sections.forEach(s => {
+                if (s.text.toLowerCase().includes(q)) {
+                    const matchedLine = s.text.split('\n').find(l => l.toLowerCase().includes(q)) || '';
+                    results.push({
+                        id: s.id, type: 'section', title: `${s.type} (current project)`,
+                        desc: `"...${matchedLine.trim().substring(0, 50)}..."`,
+                        date: '', raw: { id: 'current', name: projectTitle || 'Current Project', lastModified: '', sections, scraps, takes: [], beats: [] }
+                    });
+                }
+            });
+        }
+
+        if (searchFilter === 'all' || searchFilter === 'takes') {
+            takes.forEach(t => {
+                if (t.id.toLowerCase().includes(q) || t.timestamp.toLowerCase().includes(q)) {
+                    results.push({
+                        id: t.id, type: 'recording', title: `Recording ${t.id}`,
+                        desc: `${t.duration} - ${t.timestamp}`,
+                        date: t.timestamp, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], takes: [], beats: [] }
+                    });
+                }
+            });
+        }
+
+        if (searchFilter === 'all' || searchFilter === 'beats') {
+            beats.forEach(b => {
+                if (b.name.toLowerCase().includes(q)) {
+                    results.push({
+                        id: b.id, type: 'beat', title: b.name,
+                        desc: b.duration,
+                        date: b.date, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], takes: [], beats: [] }
+                    });
+                }
+            });
+        }
+
         return results;
-    }, [searchQuery, searchFilter, savedProjects]);
+    }, [searchQuery, searchFilter, savedProjects, sections, takes, beats, scraps, projectTitle]);
 
     const getActiveView = () => {
         switch (viewMode) {
@@ -818,6 +878,14 @@ const StudioWorkspace: React.FC = () => {
                         onAdd={(text, type) => setScraps([{ id: String(Date.now()), text, type }, ...scraps])}
                         onUpdateType={(id, type) => setScraps(prev => prev.map(s => s.id === id ? { ...s, type } : s))}
                         onStartProject={(text, type) => handleStartFromScrap(text, type)}
+                        onSendToStudio={(text) => {
+                            setSections(prev => [...prev, { id: randomId(), type: 'verse', repeats: 1, text }]);
+                            setViewMode('studio');
+                            setStudioMode('arrange');
+                            setToastMessage('Idea added to your current project.');
+                            setTimeout(() => setToastMessage(null), 3000);
+                        }}
+                        onUpdateTags={(id, tags) => setScraps(prev => prev.map(s => s.id === id ? { ...s, tags } : s))}
                     />
                 );
             case 'studio':
@@ -853,25 +921,53 @@ const StudioWorkspace: React.FC = () => {
                                             onClick={() => setStudioMode('flow')}
                                             className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'flow' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
                                         >
-                                            Flow
+                                            Freestyle
                                         </button>
                                         <button
                                             onClick={() => setStudioMode('arrange')}
                                             className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'arrange' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
                                         >
-                                            Write
+                                            Sections
                                         </button>
                                     </div>
 
                                     <div id="tour-audio-controls" className="flex items-center gap-2">
+                                        {saveIndicator === 'saved' && (
+                                            <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
+                                                <Save size={10} />
+                                                <span>Saved</span>
+                                            </div>
+                                        )}
                                         <BeatUploader
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
-                                            onUpload={(file) => {
+                                            beatName={uploadedBeatName}
+                                            onUpload={async (file) => {
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
+                                                const name = file.name.replace(/\.\w+$/, '');
+                                                setUploadedBeatName(name);
+
+                                                // Also add to Library beats
+                                                const base64 = await blobToBase64(file);
+                                                const id = randomId();
+                                                const audio = new Audio(url);
+                                                audio.onloadedmetadata = () => {
+                                                    const dur = audio.duration;
+                                                    const mins = Math.floor(dur / 60);
+                                                    const secs = Math.floor(dur % 60);
+                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                                    const newBeat: Beat = {
+                                                        id, name, duration: durationStr,
+                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                                    };
+                                                    setBeats(prev => {
+                                                        if (prev.some(b => b.name === name)) return prev;
+                                                        return [newBeat, ...prev];
+                                                    });
+                                                };
                                             }}
-                                            onClear={() => setUploadedBeat(null)}
+                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
                                         />
                                     </div>
                                 </div>
@@ -969,6 +1065,16 @@ const StudioWorkspace: React.FC = () => {
             >
                 {getActiveView()}
 
+                {/* Toast notification */}
+                {toastMessage && (
+                    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="bg-[var(--bg-card)] border border-[var(--accent)] rounded-xl px-4 py-3 shadow-2xl flex items-center gap-2 max-w-xs">
+                            <Check size={14} className="text-[var(--accent)] flex-shrink-0" />
+                            <span className="text-xs text-[var(--text-main)]">{toastMessage}</span>
+                        </div>
+                    </div>
+                )}
+
                 <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
                     <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
@@ -1014,7 +1120,7 @@ const StudioWorkspace: React.FC = () => {
                                     autoFocus
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search songs, lyrics, takes..."
+                                    placeholder="Search songs, lyrics, recordings, beats..."
                                     className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
                                 />
                             </div>
@@ -1022,7 +1128,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                            {['all', 'songs', 'sections', 'takes', 'beats'].map((f) => (
+                            {['all', 'songs', 'sections', 'recordings', 'beats'].map((f) => (
                                 <button
                                     key={f}
                                     onClick={() => setSearchFilter(f as SearchFilter)}
@@ -1037,7 +1143,9 @@ const StudioWorkspace: React.FC = () => {
                                     key={`${res.type}-${res.id}`}
                                     onClick={() => {
                                         if (res.type === 'song') loadProject(res.raw);
-                                        if (res.type === 'take') handlePlayTake(res.id);
+                                        if (res.type === 'recording') handlePlayTake(res.id);
+                                        if (res.type === 'beat') handlePlayBeat(res.id);
+                                        if (res.type === 'section') { setViewMode('studio'); setStudioMode('arrange'); }
                                         setShowSearch(false);
                                     }}
                                     className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"

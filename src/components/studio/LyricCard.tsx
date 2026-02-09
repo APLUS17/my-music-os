@@ -96,10 +96,10 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] transition-colors font-medium"
           >
             {section.type}
-            <ChevronDown size={10} className="opacity-50" />
+            <ChevronDown size={10} className="opacity-70" />
           </button>
 
           <div className="flex items-center gap-1">
@@ -112,9 +112,9 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center mr-1 opacity-30 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
-            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
+          <div className="flex items-center mr-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300">
+            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
+            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
           </div>
           <button
             onClick={() => setIsPinSelectorOpen(!isPinSelectorOpen)}
@@ -135,7 +135,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
           value={section.text}
           onChange={(e) => onUpdate(section.id, { text: e.target.value })}
           className="w-full bg-transparent text-[var(--text-main)] text-base leading-relaxed font-sans focus:outline-none placeholder:text-[var(--text-tertiary)] placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
-          placeholder="Lyrics..."
+          placeholder={section.text === '' ? "Write your lyrics here...\nTip: Try ending lines with similar sounds (rhyming)" : ""}
           spellCheck={false}
         />
 
@@ -148,7 +148,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
             >
               <div onClick={togglePlayback} className="cursor-pointer flex items-center gap-2">
                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
-                <span className="text-[9px] mono font-medium">Take {pinnedTake.id}</span>
+                <span className="text-[9px] mono font-medium">Rec {pinnedTake.id.slice(-4)}</span>
               </div>
 
               {/* Mix Toggle */}
@@ -209,9 +209,9 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
         <>
           <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsPinSelectorOpen(false)} />
           <div className="absolute z-50 top-6 right-0 p-2 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-56 max-h-64 overflow-y-auto scrollbar-hide">
-            <p className="text-[9px] mono uppercase text-[var(--text-tertiary)] p-2 border-b border-[var(--border-main)] mb-1">Select Recording</p>
+            <p className="text-[9px] mono uppercase text-[var(--text-tertiary)] p-2 border-b border-[var(--border-main)] mb-1">Attach a Recording</p>
             {availableTakes.length === 0 ? (
-              <p className="text-[9px] mono text-center py-6 text-[var(--text-tertiary)]">No recordings found</p>
+              <p className="text-[9px] mono text-center py-6 text-[var(--text-tertiary)]">No recordings yet. Hit the record button to create one.</p>
             ) : (
               availableTakes.map((take) => (
                 <div
@@ -223,7 +223,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
                     className={`flex-1 text-left pl-3 py-2.5 text-[10px] mono flex justify-between items-center ${section.pinnedTakeId === take.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
                   >
                     <div className="flex flex-col">
-                      <span className="font-medium">Take {take.id}</span>
+                      <span className="font-medium">Rec {take.id.slice(-4)}</span>
                       <span className="text-[8px] opacity-60">{take.timestamp}</span>
                     </div>
                     <span className="opacity-50 pr-2">{take.duration}</span>

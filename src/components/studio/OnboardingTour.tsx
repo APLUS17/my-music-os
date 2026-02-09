@@ -61,8 +61,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-mode-toggle',
-            title: 'Flow Mode',
-            content: 'Pure stream-of-consciousness writing. No structure, just vibes. Let your ideas flow freely without interruption.',
+            title: 'Freestyle Mode',
+            content: 'Just write. No structure, no rules. Let your ideas pour out line by line. Great for brainstorming and finding your flow.',
             position: 'bottom',
             action: () => {
                 setViewMode('studio');
@@ -71,8 +71,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-mode-toggle',
-            title: 'Write Mode',
-            content: 'Structured verses, hooks, and bridges. Organize your lyrics into sections. Each section becomes a Lyric Card you can arrange and attach recordings to.',
+            title: 'Sections Mode',
+            content: 'Organize your lyrics into verses, hooks, and bridges. Each section can have recordings attached. Move them around to build your song structure.',
             position: 'bottom',
             action: () => {
                 setViewMode('studio');
@@ -81,8 +81,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-lyric-card',
-            title: 'Lyric Cards',
-            content: 'Each section is its own card. Add verses, hooks, or bridges. Attach takes directly to any section and pin your favorites.',
+            title: 'Lyric Sections',
+            content: 'Each section holds your lyrics. Choose a type (verse, chorus, bridge), write your bars, and attach recordings to hear them back over the beat.',
             position: 'bottom',
             action: () => {
                 setViewMode('studio');
@@ -91,8 +91,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-nav-record',
-            title: 'Capture & Pin',
-            content: 'Hit this to open the recording drawer. Lay down bars, punch in takes, then pin your best take directly to any lyric section.',
+            title: 'Record',
+            content: 'Tap to open the recording panel. Record yourself over the beat, then attach your best recording to any section with the clip icon.',
             position: 'top'
         }
     ];

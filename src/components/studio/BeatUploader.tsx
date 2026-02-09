@@ -5,11 +5,12 @@ import { Play, Pause, X, RotateCcw, Repeat, Flag, Trash2, ChevronDown, Music, Se
 interface BeatUploaderProps {
   audioSrc: string | null;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  beatName?: string;
   onUpload: (file: File) => void;
   onClear: () => void;
 }
 
-export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, onUpload, onClear }) => {
+export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, beatName, onUpload, onClear }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   
@@ -21,9 +22,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
   
   const [loopStart, setLoopStart] = useState<number | null>(null);
   const [loopEnd, setLoopEnd] = useState<number | null>(null);
-  const [isLooping, setIsLooping] = useState(false);
+  const [isLooping, setIsLooping] = useState(true);
   
   const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | null>(null);
+  const [isDraggingScrub, setIsDraggingScrub] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -57,7 +59,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
 
   useEffect(() => {
       if(audioRef.current) audioRef.current.volume = volume;
-  }, [volume]);
+  }, [volume, audioSrc]);
 
   // Marker Dragging Logic
   useEffect(() => {
@@ -109,6 +111,49 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
     };
   }, [draggingMarker, duration, loopEnd, loopStart]);
 
+  // Drag-to-scrub logic
+  useEffect(() => {
+    const handleScrubMove = (clientX: number) => {
+      if (!progressRef.current || duration === 0) return;
+      const rect = progressRef.current.getBoundingClientRect();
+      const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      if (audioRef.current) {
+        audioRef.current.currentTime = percent * duration;
+        setCurrentTime(percent * duration);
+      }
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (isDraggingScrub && !draggingMarker) {
+        e.preventDefault();
+        handleScrubMove(e.clientX);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (isDraggingScrub && !draggingMarker) {
+        e.preventDefault();
+        handleScrubMove(e.touches[0].clientX);
+      }
+    };
+
+    const onUp = () => setIsDraggingScrub(false);
+
+    if (isDraggingScrub) {
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('touchmove', onTouchMove, { passive: false });
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchend', onUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [isDraggingScrub, draggingMarker, duration]);
+
   const handleTimeUpdate = () => {
     if (audioRef.current && !draggingMarker) {
       const curr = audioRef.current.currentTime;
@@ -131,6 +176,17 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audioRef.current.currentTime = percent * duration;
     setCurrentTime(percent * duration);
+    setIsDraggingScrub(true);
+  };
+
+  const handleTouchSeek = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (draggingMarker) return;
+    if (!audioRef.current || !progressRef.current || duration === 0) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const percent = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = percent * duration;
+    setCurrentTime(percent * duration);
+    setIsDraggingScrub(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +269,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
            className="relative z-10 h-full pl-2 pr-3 flex items-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"
            title="Open Controls"
         >
-            <span className="text-[10px] mono uppercase font-medium text-[var(--text-main)]">Ref Track</span>
+            <span className="text-[10px] mono uppercase font-medium text-[var(--text-main)] max-w-[80px] truncate">{beatName || 'Beat'}</span>
         </button>
       </div>
 
@@ -223,7 +279,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
            
            {/* Header */}
            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-[10px] mono uppercase text-[var(--text-tertiary)]">Playback Control</span>
+              <span className="text-[10px] mono uppercase text-[var(--text-tertiary)]">{beatName || 'Beat'}</span>
               <button onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors">
                   <Trash2 size={12} />
               </button>
@@ -233,6 +289,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
            <div className="relative w-full h-8 bg-[var(--bg-secondary)] rounded-md cursor-pointer overflow-hidden select-none touch-none border border-[var(--border-main)] mb-3"
                 ref={progressRef}
                 onMouseDown={handleSeek}
+                onTouchStart={handleTouchSeek}
            >
               {/* Loop Region */}
               {isLooping && loopStart !== null && loopEnd !== null && (

@@ -14,6 +14,7 @@ export interface LyricScrap {
     text: string;
     type: SectionType;
     color?: string;
+    tags?: string[];
 }
 
 export interface SandboxLine {
