@@ -26,8 +26,7 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-    Save,
-    Send
+    Save
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -735,7 +734,7 @@ const StudioWorkspace: React.FC = () => {
             });
         }
 
-        if (searchFilter === 'all' || searchFilter === 'takes') {
+        if (searchFilter === 'all' || searchFilter === 'recordings') {
             takes.forEach(t => {
                 if (t.id.toLowerCase().includes(q) || t.timestamp.toLowerCase().includes(q)) {
                     results.push({

@@ -155,7 +155,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
   }, [isDraggingScrub, draggingMarker, duration]);
 
   const handleTimeUpdate = () => {
-    if (audioRef.current && !draggingMarker) {
+    if (audioRef.current && !draggingMarker && !isDraggingScrub) {
       const curr = audioRef.current.currentTime;
       setCurrentTime(curr);
 
