@@ -369,6 +369,7 @@ const StudioWorkspace: React.FC = () => {
     const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
     const [playingTakeId, setPlayingTakeId] = useState<string | null>(null);
     const [playingBeatId, setPlayingBeatId] = useState<string | null>(null);
+    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
 
     const [showTour, setShowTour] = useState(false);
@@ -457,6 +458,7 @@ const StudioWorkspace: React.FC = () => {
                         }));
                         setBeats(loadedBeats);
                     }
+                    if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
                 } catch (e) { console.error("Failed to load saved state", e); }
             }
         };
@@ -475,13 +477,14 @@ const StudioWorkspace: React.FC = () => {
         const dataToSave = {
             sections, scraps, savedProjects,
             projectTitle, projectBpm, projectKey,
-            takes: takesToSave, beats: beatsToSave
+            takes: takesToSave, beats: beatsToSave,
+            activeProjectId
         };
         try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
         catch (e) { console.error("Storage full or error", e); }
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, takes, beats]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, takes, beats, activeProjectId]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -618,11 +621,22 @@ const StudioWorkspace: React.FC = () => {
         setProjectBpm("120");
         setProjectKey("C Min");
         setUploadedBeat(null);
+        setActiveProjectId(null);
         setStudioMode('arrange');
         setViewMode('studio');
     };
 
-    const deleteProject = (id: string) => setSavedProjects(prev => prev.filter(p => p.id !== id));
+    const deleteProject = (id: string) => {
+        setSavedProjects(prev => prev.filter(p => p.id !== id));
+        // If the project being deleted is the one currently loaded, reset the workspace
+        if (id === activeProjectId) {
+            setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
+            setScraps([]);
+            setProjectTitle("");
+            setUploadedBeat(null);
+            setActiveProjectId(null);
+        }
+    };
 
     const handleNewProject = () => {
         if (confirm("Start a clean project? Current work will be archived.")) {
@@ -631,15 +645,19 @@ const StudioWorkspace: React.FC = () => {
             setScraps([]);
             setProjectTitle("");
             setUploadedBeat(null);
+            setActiveProjectId(null);
             setViewMode('studio');
         }
     };
 
     const loadProject = (p: SavedProject) => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
-            setSections(p.sections);
-            setScraps(p.scraps);
+            setSections(p.sections || []);
+            setScraps(p.scraps || []);
             setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
+            setUploadedBeat(p.beats?.[0]?.audioUrl || null);
+            setUploadedBeatName(p.beats?.[0]?.name || "");
+            setActiveProjectId(p.id);
             setViewMode('studio');
             setShowSearch(false);
         }
@@ -654,6 +672,7 @@ const StudioWorkspace: React.FC = () => {
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
+        setActiveProjectId(null);
         setStudioMode('arrange');
         setViewMode('studio');
     };
