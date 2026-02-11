@@ -8,21 +8,29 @@ interface BeatUploaderProps {
   beatName?: string;
   onUpload: (file: File) => void;
   onClear: () => void;
+  // Lifted Props
+  isPlaying: boolean;
+  setIsPlaying: (playing: boolean) => void;
+  volume: number;
+  setVolume: (vol: number) => void;
+  loopStart: number | null;
+  setLoopStart: (val: number | null) => void;
+  loopEnd: number | null;
+  setLoopEnd: (val: number | null) => void;
+  isLooping: boolean;
+  setIsLooping: (val: boolean) => void;
 }
 
-export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, beatName, onUpload, onClear }) => {
+export const BeatUploader: React.FC<BeatUploaderProps> = ({
+  audioSrc, audioRef, beatName, onUpload, onClear,
+  isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [volume, setVolume] = useState(1);
-
-  const [loopStart, setLoopStart] = useState<number | null>(null);
-  const [loopEnd, setLoopEnd] = useState<number | null>(null);
-  const [isLooping, setIsLooping] = useState(true);
 
   const [draggingMarker, setDraggingMarker] = useState<'start' | 'end' | null>(null);
   const [isDraggingScrub, setIsDraggingScrub] = useState(false);
@@ -31,35 +39,25 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    if (audio.duration && audio.duration !== Infinity) setDuration(audio.duration);
+    setCurrentTime(audio.currentTime);
 
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
+    const onLoadedMetadata = () => {
+      if (audio.duration && audio.duration !== Infinity) setDuration(audio.duration);
+    };
+
+    const handleTimeSync = () => {
+      setCurrentTime(audio.currentTime);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeSync);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
 
     return () => {
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('timeupdate', handleTimeSync);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
     };
   }, [audioRef.current]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        if (audioRef.current.paused) {
-          audioRef.current.play().catch(() => setIsPlaying(false));
-        }
-      } else {
-        if (!audioRef.current.paused) {
-          audioRef.current.pause();
-        }
-      }
-    }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
-  }, [volume, audioSrc]);
 
   // Marker Dragging Logic
   useEffect(() => {
@@ -154,21 +152,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
     };
   }, [isDraggingScrub, draggingMarker, duration]);
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current && !draggingMarker && !isDraggingScrub) {
-      const curr = audioRef.current.currentTime;
-      setCurrentTime(curr);
-
-      if (isLooping) {
-        const start = loopStart ?? 0;
-        const end = loopEnd ?? duration;
-        if (curr >= end && end > 0) {
-          audioRef.current.currentTime = start;
-        }
-      }
-    }
-  };
-
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (draggingMarker) return;
     if (!audioRef.current || !progressRef.current || duration === 0) return;
@@ -234,13 +217,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({ audioSrc, audioRef, 
   // --- LOADED STATE (PILL) ---
   return (
     <div className="relative z-30">
-      <audio
-        ref={audioRef}
-        src={audioSrc}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-        onEnded={() => isLooping ? (audioRef.current!.currentTime = loopStart ?? 0, audioRef.current!.play()) : setIsPlaying(false)}
-      />
 
       {/* Split Action Pill */}
       <div className="group relative h-8 rounded-md border border-[var(--border-main)] bg-[var(--bg-secondary)] flex items-center overflow-hidden hover:border-[var(--text-tertiary)] transition-colors">

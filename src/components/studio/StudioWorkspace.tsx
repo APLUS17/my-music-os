@@ -372,6 +372,13 @@ const StudioWorkspace: React.FC = () => {
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
 
+    // Persistent Beat Playback State (Lifted from BeatUploader)
+    const [isBeatPlaying, setIsBeatPlaying] = useState(false);
+    const [beatVolume, setBeatVolume] = useState(1);
+    const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
+    const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
+    const [isBeatLooping, setIsBeatLooping] = useState(true);
+
     const [showTour, setShowTour] = useState(false);
 
     useEffect(() => {
@@ -589,6 +596,51 @@ const StudioWorkspace: React.FC = () => {
             console.error("Failed to delete beat data", e);
         }
     };
+
+    // Persistent Audio Logic for Studio Beat
+    useEffect(() => {
+        const audio = beatAudioRef.current;
+        if (!audio) return;
+
+        const handleTimeUpdate = () => {
+            if (!audio) return;
+            if (isBeatLooping) {
+                const start = beatLoopStart ?? 0;
+                const end = beatLoopEnd ?? audio.duration;
+                if (audio.currentTime >= end && end > 0) {
+                    audio.currentTime = start;
+                }
+            }
+        };
+
+        const onEnded = () => {
+            if (isBeatLooping) {
+                audio.currentTime = beatLoopStart ?? 0;
+                audio.play().catch(console.error);
+            } else {
+                setIsBeatPlaying(false);
+            }
+        };
+
+        audio.addEventListener('timeupdate', handleTimeUpdate);
+        audio.addEventListener('ended', onEnded);
+        audio.volume = beatVolume;
+
+        if (isBeatPlaying) {
+            if (audio.paused && audio.src) {
+                audio.play().catch(() => setIsBeatPlaying(false));
+            }
+        } else {
+            if (!audio.paused) {
+                audio.pause();
+            }
+        }
+
+        return () => {
+            audio.removeEventListener('timeupdate', handleTimeUpdate);
+            audio.removeEventListener('ended', onEnded);
+        };
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat]);
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
@@ -960,6 +1012,17 @@ const StudioWorkspace: React.FC = () => {
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
                                             beatName={uploadedBeatName}
+                                            // Lifted Props
+                                            isPlaying={isBeatPlaying}
+                                            setIsPlaying={setIsBeatPlaying}
+                                            volume={beatVolume}
+                                            setVolume={setBeatVolume}
+                                            loopStart={beatLoopStart}
+                                            setLoopStart={setBeatLoopStart}
+                                            loopEnd={beatLoopEnd}
+                                            setLoopEnd={setBeatLoopEnd}
+                                            isLooping={isBeatLooping}
+                                            setIsLooping={setIsBeatLooping}
                                             onUpload={async (file) => {
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
@@ -1081,6 +1144,9 @@ const StudioWorkspace: React.FC = () => {
             <main
                 className="w-full flex-1 max-w-lg relative bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out"
             >
+                {/* Persistent Studio Beat Audio */}
+                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" />
+
                 {getActiveView()}
 
                 {/* Toast notification */}
@@ -1093,7 +1159,64 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
+                {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+                {showSearch && (
+                    <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
+                        <div className="max-w-lg mx-auto h-full flex flex-col">
+                            <div className="px-6 pt-12 pb-6 flex items-center gap-4">
+                                <div className="flex-1 relative">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                                    <input
+                                        autoFocus
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="Search songs, lyrics, recordings, beats..."
+                                        className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                                    />
+                                </div>
+                                <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="text-[var(--text-secondary)]"><X size={20} /></button>
+                            </div>
+
+                            <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+                                {['all', 'songs', 'sections', 'recordings', 'beats'].map((f) => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setSearchFilter(f as SearchFilter)}
+                                        className={`px-4 py-1.5 rounded-full text-[10px] mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
+                                    >{f}</button>
+                                ))}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto px-6 pb-32 space-y-2">
+                                {searchResults.map((res) => (
+                                    <button
+                                        key={`${res.type}-${res.id}`}
+                                        onClick={() => {
+                                            if (res.type === 'song') loadProject(res.raw);
+                                            if (res.type === 'recording') handlePlayTake(res.id);
+                                            if (res.type === 'beat') handlePlayBeat(res.id);
+                                            if (res.type === 'section') { setViewMode('studio'); setStudioMode('arrange'); }
+                                            setShowSearch(false);
+                                        }}
+                                        className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-[9px] mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
+                                                <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>
+                                        </div>
+                                        <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
                     <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
