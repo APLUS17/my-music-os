@@ -78,7 +78,11 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
     setResults([]);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error('Google API key not configured');
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = buildPrompt(mode, query, secondQuery);
 
       const response = await ai.models.generateContent({
