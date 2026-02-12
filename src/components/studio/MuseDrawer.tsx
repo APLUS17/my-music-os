@@ -1,47 +1,68 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Dropdown } from 'semantic-ui-react';
 
-// Define mode types
-export interface Mode {
-    name: string;
-    description: string;
-    section: string;
-    requiresSecondInput?: boolean;
-}
+// Updated MuseMode type
+export type MuseMode = 'explode' | 'fuse' | 'scene' | 'acronym' | 'simile';
 
-export const MODES: Mode[] = [
-    // Word Tools
-    { name: 'explode', description: 'Explodes the letters of the word.', section: 'Word Tools' },
-    { name: 'fuse', description: 'Fuses two inputs.', section: 'Word Tools', requiresSecondInput: true },
-
-    // TextFX Creative
-    { name: 'scene', description: 'Creates scenes from text.', section: 'TextFX Creative' },
-    { name: 'acronym', description: 'Creates acronyms from words.', section: 'TextFX Creative' },
-    { name: 'simile', description: 'Creates similes based on user input.', section: 'TextFX Creative' },
-
-    // Lyric Tools
-    // Additional existing modes should be defined here
-    { name: 'existing-mode-1', description: 'Description of existing mode 1.', section: 'Lyric Tools' },
-    { name: 'existing-mode-2', description: 'Description of existing mode 2.', section: 'Lyric Tools' },
-    { name: 'existing-mode-3', description: 'Description of existing mode 3.', section: 'Lyric Tools' },
-];
-
-export const buildPrompt = (mode: string, additionalInput?: string): string => {
-    const modeDetail = MODES.find(m => m.name === mode);
-    if (!modeDetail) {
-        throw new Error('Mode not found!');
-    }
-    let prompt = `Using the ${modeDetail.name} mode: `;
-
-    if (modeDetail.requiresSecondInput && additionalInput) {
-        prompt += ` with the second input: ${additionalInput}`;
-    }
-
-    return prompt;
+// MODES array organized by sections
+const MODES = {
+    words: ['explode', 'fuse'],
+    textfx: ['scene', 'acronym', 'simile'],
+    lyric: []
 };
 
-const MuseDrawer: React.FC = () => {
-    // Render component
-    return <div>Muse Drawer Component</div>;
+const MuseDrawer = () => {
+    const [mode, setMode] = useState<MuseMode>('explode');
+    const [input1, setInput1] = useState('');
+    const [input2, setInput2] = useState('');
+    const [results, setResults] = useState([]);
+
+    const buildPrompt = () => {
+        switch(mode) {
+            case 'explode':
+                return `Explode this: ${input1}`;
+            case 'fuse':
+                return `Fuse these: ${input1} ${input2}`;
+            case 'scene':
+                return `Create a scene from: ${input1}`;
+            case 'acronym':
+                return `Generate an acronym for: ${input1}`;
+            case 'simile':
+                return `Create a simile for: ${input1}`;
+            default:
+                return '';
+        }
+    };
+
+    const handleSearch = () => {
+        const prompt = buildPrompt();
+        // Perform search with the generated prompt
+        // Mock results for demonstration
+        const mockResults = ['Result 1', 'Result 2', 'Result 3'];
+        setResults(mockResults);
+    };
+
+    return (
+        <div>
+            <Dropdown
+                onChange={(e, { value }) => setMode(value as MuseMode)}
+                options={Object.keys(MODES).flatMap(section => 
+                    MODES[section].map(mode => ({ key: mode, text: mode, value: mode }))
+                )}
+                value={mode}
+            />
+            {mode === 'fuse' && (
+                <input type='text' placeholder='Second input' value={input2} onChange={(e) => setInput2(e.target.value)} />
+            )}
+            <input type='text' placeholder='Input' value={input1} onChange={(e) => setInput1(e.target.value)} />
+            <button onClick={handleSearch}>Search</button>
+            <div className={mode === 'scene' || mode === 'acronym' || mode === 'simile' ? 'full-width' : 'grid'}>
+                {results.map((result, index) => (
+                    <div key={index}>{result}</div>
+                ))}
+            </div>
+        </div>
+    );
 };
 
 export default MuseDrawer;
