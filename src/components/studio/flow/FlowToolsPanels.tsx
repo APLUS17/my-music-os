@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { SuggestionsPanel } from './panels/SuggestionsPanel';
+import { RhymesPanel } from './panels/RhymesPanel';
 // Import other panels when they're created
-// import { RhymesPanel } from './panels/RhymesPanel';
 // import { WordsPanel } from './panels/WordsPanel';
 // import { FlowPanel } from './panels/FlowPanel';
 
@@ -16,7 +16,7 @@ export const FlowToolsPanels: React.FC = () => {
   return (
     <>
       <SuggestionsPanel />
-      {/* <RhymesPanel /> */}
+      <RhymesPanel />
       {/* <WordsPanel /> */}
       {/* <FlowPanel /> */}
     </>
