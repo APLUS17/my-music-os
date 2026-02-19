@@ -3,8 +3,8 @@
 import React from 'react';
 import { SuggestionsPanel } from './panels/SuggestionsPanel';
 import { RhymesPanel } from './panels/RhymesPanel';
+import { WordsPanel } from './panels/WordsPanel';
 // Import other panels when they're created
-// import { WordsPanel } from './panels/WordsPanel';
 // import { FlowPanel } from './panels/FlowPanel';
 
 /**
@@ -17,7 +17,7 @@ export const FlowToolsPanels: React.FC = () => {
     <>
       <SuggestionsPanel />
       <RhymesPanel />
-      {/* <WordsPanel /> */}
+      <WordsPanel />
       {/* <FlowPanel /> */}
     </>
   );
