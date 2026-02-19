@@ -69,3 +69,52 @@ export const COLORS = {
     wavePlayed: '#A58BFF',
     waveFuture: '#2D2D2D'
 };
+
+// FLOW AI Tools Types
+export type ToolType = 'suggestions' | 'rhymes' | 'words' | 'flow';
+export type Genre = 'hip-hop' | 'pop' | 'r&b' | 'country' | 'k-pop' | 'worship' | 'rock' | 'indie';
+
+export interface SuggestionResult {
+    text: string;
+    confidence?: number;
+}
+
+export interface RhymeLine {
+    index: number;
+    family: string;
+    endWord: string;
+}
+
+export interface RhymeScheme {
+    pattern: string;
+    lines: RhymeLine[];
+}
+
+export interface FlowContextState {
+    // Active Tool
+    activeTool: ToolType | null;
+
+    // Selection State
+    selectedText: string | null;
+    cursorPosition: number | null;
+    currentLineId: string | null;
+
+    // AI State
+    isLoading: boolean;
+    suggestions: SuggestionResult[];
+    error: string | null;
+
+    // Genre Context
+    genre: Genre;
+    mood: string | null;
+
+    // Previous Lines for Context
+    previousLines: string[];
+
+    // Actions
+    setActiveTool: (tool: ToolType | null) => void;
+    setSelection: (text: string, position: number, lineId: string) => void;
+    generateSuggestions: (type: ToolType) => Promise<void>;
+    insertText: (text: string, position: 'replace' | 'append') => void;
+    setGenre: (genre: Genre) => void;
+}

@@ -11,6 +11,9 @@ import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { MuseDrawer } from './MuseDrawer';
+import { FlowProvider } from './flow/FlowContext';
+import { FlowToolbar } from './flow/FlowToolbar';
+import { GenreSelector } from './flow/shared/GenreSelector';
 import {
     LayoutGrid,
     PenTool,
@@ -1012,6 +1015,9 @@ const StudioWorkspace: React.FC = () => {
                                                 <span>Saved</span>
                                             </div>
                                         )}
+                                        <FlowProvider>
+                                            <GenreSelector />
+                                        </FlowProvider>
                                         <button
                                             onClick={() => setShowMuse(true)}
                                             className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
@@ -1067,6 +1073,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden">
+                            <FlowProvider>
                             {/* Arrange Mode (Write) */}
                             <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <div className="max-w-2xl mx-auto space-y-12">
@@ -1105,7 +1112,11 @@ const StudioWorkspace: React.FC = () => {
                                     currentlyPlayingTakeId={playingTakeId}
                                 />
                             </div>
+
+                            {/* FLOW Toolbar - Only in Studio Mode */}
+                            {viewMode === 'studio' && <FlowToolbar />}
                         </div>
+                            </FlowProvider>
                     </div>
                 );
             default: return null;
