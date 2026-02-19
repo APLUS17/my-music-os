@@ -13,6 +13,7 @@ import { OnboardingTour } from './OnboardingTour';
 import { MuseDrawer } from './MuseDrawer';
 import { FlowProvider } from './flow/FlowContext';
 import { FlowToolbar } from './flow/FlowToolbar';
+import { FlowToolsPanels } from './flow/FlowToolsPanels';
 import { GenreSelector } from './flow/shared/GenreSelector';
 import {
     LayoutGrid,
@@ -1115,6 +1116,9 @@ const StudioWorkspace: React.FC = () => {
 
                             {/* FLOW Toolbar - Only in Studio Mode */}
                             {viewMode === 'studio' && <FlowToolbar />}
+
+                            {/* FLOW Tool Panels - Only in Studio Mode */}
+                            {viewMode === 'studio' && <FlowToolsPanels />}
                         </div>
                             </FlowProvider>
                     </div>

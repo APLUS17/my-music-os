@@ -5,6 +5,12 @@ import { FlowContextState, ToolType, Genre, SuggestionResult } from '@/types';
 
 const FlowContext = createContext<FlowContextState | undefined>(undefined);
 
+export interface FlowContextValue extends FlowContextState {
+  // Additional methods
+  setPreviousLines: (lines: string[]) => void;
+  setMood: (mood: string | null) => void;
+}
+
 export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeTool, setActiveTool] = useState<ToolType | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -14,7 +20,7 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [suggestions, setSuggestions] = useState<SuggestionResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [genre, setGenreState] = useState<Genre>('hip-hop');
-  const [mood, setMood] = useState<string | null>(null);
+  const [mood, setMoodState] = useState<string | null>(null);
   const [previousLines, setPreviousLines] = useState<string[]>([]);
 
   const setSelection = useCallback((text: string, position: number, lineId: string) => {
@@ -48,7 +54,7 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSuggestions([]);
   }, []);
 
-  const value: FlowContextState = {
+  const value: FlowContextValue = {
     activeTool,
     selectedText,
     cursorPosition,
@@ -64,9 +70,11 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     generateSuggestions,
     insertText,
     setGenre,
+    setPreviousLines,
+    setMood: setMoodState,
   };
 
-  return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
+  return <FlowContext.Provider value={value as any}>{children}</FlowContext.Provider>;
 };
 
 export const useFlow = () => {
@@ -74,5 +82,5 @@ export const useFlow = () => {
   if (!context) {
     throw new Error('useFlow must be used within a FlowProvider');
   }
-  return context;
+  return context as FlowContextValue;
 };
