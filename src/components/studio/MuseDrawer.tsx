@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ChevronDown, Copy, Sparkles, RefreshCw, ArrowRight } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 interface MuseDrawerProps {
   onClose: () => void;
@@ -8,6 +8,26 @@ interface MuseDrawerProps {
 }
 
 type MuseMode = 'rhyme' | 'synonym' | 'antonym' | 'related' | 'explode' | 'fuse' | 'scene' | 'acronym' | 'simile' | 'next_line' | 'rewrite';
+
+/** Extracts and parses a JSON array from API response; handles markdown-wrapped or trailing text. */
+function parseMuseResponse(text: string): string[] {
+  let raw = text.trim();
+  // Strip markdown code blocks
+  const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlock) raw = codeBlock[1].trim();
+  // Take only the first JSON value (in case of trailing text)
+  const firstBracket = raw.indexOf('[');
+  if (firstBracket === -1) return [];
+  let depth = 0;
+  let end = -1;
+  for (let i = firstBracket; i < raw.length; i++) {
+    if (raw[i] === '[') depth++;
+    else if (raw[i] === ']') { depth--; if (depth === 0) { end = i; break; } }
+  }
+  const jsonStr = end >= 0 ? raw.slice(firstBracket, end + 1) : raw;
+  const parsed = JSON.parse(jsonStr);
+  return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+}
 
 const MODES: { id: MuseMode; label: string; icon: string; placeholder: string; section?: string }[] = [
   { id: 'rhyme', label: 'Rhyme', icon: 'A-A', placeholder: 'Enter a word...', section: 'words' },
@@ -89,24 +109,27 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-          responseMimeType: "application/json"
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
         }
       });
 
       const text = response.text;
       if (text) {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          setResults(parsed);
-        } else if (Array.isArray(parsed.items)) {
-          setResults(parsed.items);
-        } else {
-          setResults(["No results format matched."]);
-        }
+        const items = parseMuseResponse(text);
+        setResults(items.length > 0 ? items : ["No results format matched."]);
       }
     } catch (err) {
-      console.error(err);
-      setError("The Muse is silent right now. Try again.");
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[MuseDrawer]', err);
+      setError(
+        process.env.NODE_ENV === 'development'
+          ? `Muse error: ${msg}`
+          : "The Muse is silent right now. Try again."
+      );
     } finally {
       setLoading(false);
     }
