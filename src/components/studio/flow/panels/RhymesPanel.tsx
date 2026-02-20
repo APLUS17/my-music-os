@@ -109,7 +109,7 @@ export const RhymesPanel: React.FC = () => {
               },
             });
 
-            const multi = parseJsonResponse(response.text).filter(
+            const multi = parseJsonResponse(response.text ?? '').filter(
               (r) => !perfect.includes(r) && !near.includes(r)
             );
             setMultiRhymes(multi);
@@ -190,11 +190,10 @@ export const RhymesPanel: React.FC = () => {
               <button
                 key={tab}
                 onClick={() => setCurrentTab(tab)}
-                className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${
-                  currentTab === tab
+                className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${currentTab === tab
                     ? 'border-[var(--accent)] text-[var(--accent)]'
                     : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                }`}
+                  }`}
               >
                 {tab === 'perfect' && `Perfect (${perfectRhymes.length})`}
                 {tab === 'near' && `Near (${nearRhymes.length})`}

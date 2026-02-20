@@ -11,10 +11,9 @@ import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { MuseDrawer } from './MuseDrawer';
-import { FlowProvider } from './flow/FlowContext';
-import { FlowToolbar } from './flow/FlowToolbar';
-import { FlowToolsPanels } from './flow/FlowToolsPanels';
-import { GenreSelector } from './flow/shared/GenreSelector';
+import { FlowProvider, useFlow } from './flow/FlowContext';
+import { UnifiedNavBar } from './UnifiedNavBar';
+import { StudioToolSheet } from './flow/StudioToolSheet';
 import {
     LayoutGrid,
     PenTool,
@@ -31,7 +30,7 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-    Save,
+
     Sparkles
 } from 'lucide-react';
 
@@ -338,6 +337,7 @@ const MISSION_PROJECT: SavedProject = {
 };
 
 const StudioWorkspace: React.FC = () => {
+    const { activeTool } = useFlow();
     const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
     const [studioMode, setStudioMode] = useState<StudioMode>('flow');
@@ -1010,15 +1010,7 @@ const StudioWorkspace: React.FC = () => {
                                     </div>
 
                                     <div id="tour-audio-controls" className="flex items-center gap-2">
-                                        {saveIndicator === 'saved' && (
-                                            <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
-                                                <Save size={10} />
-                                                <span>Saved</span>
-                                            </div>
-                                        )}
-                                        <FlowProvider>
-                                            <GenreSelector />
-                                        </FlowProvider>
+
                                         <button
                                             onClick={() => setShowMuse(true)}
                                             className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
@@ -1074,7 +1066,6 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden">
-                            <FlowProvider>
                             {/* Arrange Mode (Write) */}
                             <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <div className="max-w-2xl mx-auto space-y-12">
@@ -1114,13 +1105,10 @@ const StudioWorkspace: React.FC = () => {
                                 />
                             </div>
 
-                            {/* FLOW Toolbar - Only in Studio Mode */}
-                            {viewMode === 'studio' && <FlowToolbar />}
 
-                            {/* FLOW Tool Panels - Only in Studio Mode */}
-                            {viewMode === 'studio' && <FlowToolsPanels />}
+                            {/* Unified Tool Sheet - Only in Studio Mode */}
+                            {viewMode === 'studio' && <StudioToolSheet />}
                         </div>
-                            </FlowProvider>
                     </div>
                 );
             default: return null;
@@ -1242,26 +1230,18 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
-                    <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
-                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
-                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <button
-                            id="tour-nav-record"
-                            onClick={() => {
-                                setShowRecorder(true);
-                                setRecorderMinimized(true);
-                            }}
-                            className="w-12 h-12 bg-[var(--accent)] text-[var(--bg-main)] rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all mx-1"
-                        >
-                            <div className="w-3 h-3 rounded-full bg-current" />
-                        </button>
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid size={20} />} label="Board" />
-                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search size={20} />} label="Search" />
-                    </div>
-                </nav>
+                <UnifiedNavBar
+                    viewMode={viewMode as 'collection' | 'studio' | 'board'}
+                    setViewMode={setViewMode as (v: 'collection' | 'studio' | 'board') => void}
+                    showSearch={showSearch}
+                    setShowSearch={setShowSearch}
+                    showRecorder={showRecorder}
+                    recorderMinimized={recorderMinimized}
+                    onRecordPress={() => {
+                        setShowRecorder(true);
+                        setRecorderMinimized(true);
+                    }}
+                />
             </main>
 
             {showRecorder && (

@@ -6,9 +6,12 @@ import { FlowContextState, ToolType, Genre, SuggestionResult } from '@/types';
 const FlowContext = createContext<FlowContextState | undefined>(undefined);
 
 export interface FlowContextValue extends FlowContextState {
-  // Additional methods
   setPreviousLines: (lines: string[]) => void;
   setMood: (mood: string | null) => void;
+  setSelection: (text: string | null, position: number | null, lineId: string | null) => void;
+  handleInsert: (text: string) => void;
+  clearInsertion: () => void;
+  pendingInsertion: string | null;
 }
 
 export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -16,6 +19,8 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
   const [currentLineId, setCurrentLineId] = useState<string | null>(null);
+  const [pendingInsertion, setPendingInsertion] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SuggestionResult[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -23,17 +28,28 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [mood, setMoodState] = useState<string | null>(null);
   const [previousLines, setPreviousLines] = useState<string[]>([]);
 
-  const setSelection = useCallback((text: string, position: number, lineId: string) => {
-    setSelectedText(text);
-    setCursorPosition(position);
-    setCurrentLineId(lineId);
+  const setSelection = useCallback((text: string | null, position: number | null, lineId: string | null) => {
+    // Only update if we have a real selection or if we are explicitly clearing
+    // This allows "stuck" context when clicking into the tool panels
+    if (text !== null || lineId !== null) {
+      setSelectedText(text);
+      setCursorPosition(position);
+      setCurrentLineId(lineId);
+    }
+  }, []);
+
+  const handleInsert = useCallback((text: string) => {
+    setPendingInsertion(text);
+  }, []);
+
+  const clearInsertion = useCallback(() => {
+    setPendingInsertion(null);
   }, []);
 
   const generateSuggestions = useCallback(async (type: ToolType) => {
     setIsLoading(true);
     setError(null);
     try {
-      // Placeholder - will be implemented in each panel
       setSuggestions([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate suggestions');
@@ -42,15 +58,8 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const insertText = useCallback((text: string, position: 'replace' | 'append') => {
-    // This will be handled by the parent component
-    // Just setting suggestion for the parent to pick up
-    setSuggestions([{ text }]);
-  }, []);
-
   const setGenre = useCallback((newGenre: Genre) => {
     setGenreState(newGenre);
-    // Clear suggestions when genre changes
     setSuggestions([]);
   }, []);
 
@@ -59,6 +68,7 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     selectedText,
     cursorPosition,
     currentLineId,
+    pendingInsertion,
     isLoading,
     suggestions,
     error,
@@ -68,7 +78,9 @@ export const FlowProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setActiveTool,
     setSelection,
     generateSuggestions,
-    insertText,
+    handleInsert,
+    clearInsertion,
+    insertText: (text) => setPendingInsertion(text), // legacy support
     setGenre,
     setPreviousLines,
     setMood: setMoodState,

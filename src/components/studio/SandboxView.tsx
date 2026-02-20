@@ -3,6 +3,7 @@ import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
 import { LyricSection, VoiceTake } from '@/types';
 import { randomId } from '@/lib/utils/id';
+import { useFlow } from './flow/FlowContext';
 
 interface SandboxViewProps {
   sections: LyricSection[];
@@ -19,6 +20,8 @@ const AutoResizeTextarea = ({
   onChange,
   onKeyDown,
   onFocus,
+  onSelect,
+  onKeyUp,
   placeholder,
   autoFocus
 }: {
@@ -27,6 +30,8 @@ const AutoResizeTextarea = ({
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   onFocus: () => void;
+  onSelect: () => void;
+  onKeyUp: () => void;
   placeholder?: string;
   autoFocus?: boolean;
 }) => {
@@ -53,6 +58,8 @@ const AutoResizeTextarea = ({
       onChange={onChange}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
+      onSelect={onSelect}
+      onKeyUp={onKeyUp}
       rows={1}
       className="w-full bg-transparent border-none focus:outline-none text-[var(--text-main)] text-base leading-relaxed font-sans placeholder:text-[var(--text-tertiary)] resize-none overflow-hidden py-0 whitespace-pre-wrap break-words block"
       placeholder={placeholder}
@@ -69,6 +76,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   onPlayTake,
   currentlyPlayingTakeId
 }) => {
+  const { setSelection, pendingInsertion, clearInsertion, currentLineId } = useFlow();
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const [draggedTakeId, setDraggedTakeId] = useState<string | null>(null);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
@@ -88,6 +96,50 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   if (lines.length === 0) {
     lines.push({ id: 'initial', text: '', sectionId: sections[0]?.id || 'default' });
   }
+
+  // Handle AI tool text insertion
+  useEffect(() => {
+    if (pendingInsertion && currentLineId) {
+      // Find the specific line that matches the insertion target
+      const targetLine = lines.find(l => currentLineId === l.id);
+      if (!targetLine) return;
+
+      const textarea = document.getElementById(`line-${targetLine.id}`) as HTMLTextAreaElement;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      const newText = before + pendingInsertion + after;
+
+      handleLineChange(targetLine.id, newText);
+      clearInsertion();
+
+      setTimeout(() => {
+        textarea.focus();
+        const newCursor = start + pendingInsertion.length;
+        textarea.setSelectionRange(newCursor, newCursor);
+      }, 0);
+    }
+  }, [pendingInsertion, currentLineId, lines]);
+
+  const handleSelectionChange = (lineId: string) => {
+    const textarea = document.getElementById(`line-${lineId}`) as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = textarea.value;
+
+    let selected = value.substring(start, end);
+    if (!selected && start === end) {
+      selected = value.trim();
+    }
+
+    setSelection(selected || null, start, lineId);
+  };
 
   const handleLineChange = (lineId: string, newText: string) => {
     const lineIndex = lines.findIndex(l => l.id === lineId);
@@ -307,9 +359,17 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
               <AutoResizeTextarea
                 id={`line-${line.id}`}
                 value={line.text}
-                onChange={(e) => handleLineChange(line.id, e.target.value)}
+                onChange={(e) => {
+                  handleLineChange(line.id, e.target.value);
+                  handleSelectionChange(line.id);
+                }}
                 onKeyDown={(e) => handleKeyDown(e, index, line.id)}
-                onFocus={() => setActiveLineId(line.id)}
+                onFocus={() => {
+                  setActiveLineId(line.id);
+                  handleSelectionChange(line.id);
+                }}
+                onSelect={() => handleSelectionChange(line.id)}
+                onKeyUp={() => handleSelectionChange(line.id)}
                 placeholder={index === 0 && lines.length === 1 ? "Start writing..." : ""}
                 autoFocus={focusedLineId === line.id}
               />

@@ -4,21 +4,25 @@ import React from 'react';
 import { SuggestionsPanel } from './panels/SuggestionsPanel';
 import { RhymesPanel } from './panels/RhymesPanel';
 import { WordsPanel } from './panels/WordsPanel';
-// Import other panels when they're created
-// import { FlowPanel } from './panels/FlowPanel';
+import { FlowPanel } from './panels/FlowPanel';
+
+interface FlowToolsPanelsProps {
+  /** Current lyrics text — passed to FlowPanel for syllable counting */
+  lyrics?: string;
+}
 
 /**
  * FlowToolsPanels
- * Renders all FLOW AI tool panels as non-blocking overlays
- * Each panel manages its own open/close state via FlowContext
+ * Renders all FLOW AI tool panels as non-blocking bottom sheets.
+ * Each panel manages its own open/close state via FlowContext.
  */
-export const FlowToolsPanels: React.FC = () => {
+export const FlowToolsPanels: React.FC<FlowToolsPanelsProps> = ({ lyrics = '' }) => {
   return (
     <>
       <SuggestionsPanel />
       <RhymesPanel />
       <WordsPanel />
-      {/* <FlowPanel /> */}
+      <FlowPanel lyrics={lyrics} />
     </>
   );
 };

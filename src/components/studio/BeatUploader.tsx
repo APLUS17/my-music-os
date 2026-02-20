@@ -202,11 +202,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 px-3 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center gap-2 text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)] transition-all"
-          title="Load Reference Track"
+          className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-tertiary)] active:scale-95 transition-all"
+          title="Load Beat"
         >
-          <Music size={12} />
-          <span className="text-[10px] mono uppercase tracking-wider hidden sm:inline">Load Beat</span>
+          <Music size={16} />
         </button>
       </>
     );

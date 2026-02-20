@@ -98,7 +98,7 @@ export const SuggestionsPanel: React.FC = () => {
         },
       });
 
-      const results = parseJsonResponse(response.text).slice(0, 5);
+      const results = parseJsonResponse(response.text ?? '').slice(0, 5);
       setLocalSuggestions(results.length > 0 ? results : []);
 
       if (results.length === 0) {
