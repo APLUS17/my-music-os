@@ -4,16 +4,16 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
-import { RecorderDrawer } from './RecorderDrawer';
 import { SandboxView } from './SandboxView';
 import { PuzzleView } from './PuzzleView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
-import { MuseDrawer } from './MuseDrawer';
 import { FlowProvider, useFlow } from './flow/FlowContext';
-import { UnifiedNavBar } from './UnifiedNavBar';
 import { StudioToolSheet } from './flow/StudioToolSheet';
+import { IntegratedStudioDrawer } from './IntegratedStudioDrawer';
+import { RecorderDrawer } from './RecorderDrawer';
+import { ExportShareSheet } from './ExportShareSheet';
 import {
     LayoutGrid,
     PenTool,
@@ -30,8 +30,13 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-
-    Sparkles
+    Maximize2,
+    Minimize2,
+    ArrowLeft,
+    Mic,
+    MicOff,
+    Sparkles,
+    Share2
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -347,6 +352,7 @@ const StudioWorkspace: React.FC = () => {
     const [recorderMinimized, setRecorderMinimized] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [showExport, setShowExport] = useState(false);
     const [showMuse, setShowMuse] = useState(false);
     const [museContext, setMuseContext] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
@@ -355,6 +361,7 @@ const StudioWorkspace: React.FC = () => {
     const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
+    const [isFocusMode, setIsFocusMode] = useState(false);
 
     const [fabOpen, setFabOpen] = useState(false);
     const fabInputRef = useRef<HTMLInputElement>(null);
@@ -969,97 +976,119 @@ const StudioWorkspace: React.FC = () => {
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
-                            <div className="px-6 pt-12 pb-6 space-y-4">
+                        <div className={`glass z-20 sticky top-0 border-b border-[var(--border-main)] transition-all duration-300 ${isFocusMode ? 'py-2' : ''}`}>
+                            <div className={`px-6 transition-all duration-300 ${isFocusMode ? 'pt-2 pb-2' : 'pt-12 pb-6'} space-y-4`}>
                                 {/* Top Row: Title and Share */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                        <input
-                                            value={projectTitle}
-                                            onChange={(e) => setProjectTitle(e.target.value)}
-                                            className="bg-transparent border-none text-2xl font-medium text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="Untitled Project"
-                                        />
+                                <div className={`flex items-center justify-between transition-all duration-300 ${isFocusMode ? 'opacity-0 h-0 overflow-hidden mb-0' : 'opacity-100 mb-4'}`}>
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <button
+                                            onClick={() => setViewMode('collection')}
+                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all active:scale-95"
+                                        >
+                                            <ArrowLeft size={20} />
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <input
+                                                value={projectTitle}
+                                                onChange={(e) => setProjectTitle(e.target.value)}
+                                                className="bg-transparent border-none text-2xl font-medium text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)]"
+                                                placeholder="Untitled Project"
+                                            />
+                                        </div>
                                     </div>
+                                    <button id="tour-export-btn" onClick={() => setShowExport(true)} className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all shadow-sm active:scale-95" title="Export / Share">
+                                        <Share2 size={16} />
+                                    </button>
                                     <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95">
                                         <MessageSquare size={16} fill="currentColor" />
                                     </button>
                                 </div>
 
                                 {/* Bottom Row: Toggle and Audio Controls */}
-                                <div className="flex items-center justify-between">
-                                    <div id="tour-mode-toggle" className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
-                                        {/* Sliding Pill */}
-                                        <div
-                                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--bg-main)] shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${studioMode === 'flow' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
-                                        />
+                                <div className={`flex items-center justify-between transition-all duration-300 ${isFocusMode ? 'justify-end' : ''}`}>
+                                    {!isFocusMode && (
+                                        <div id="tour-mode-toggle" className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
+                                            {/* Sliding Pill */}
+                                            <div
+                                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--bg-main)] shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${studioMode === 'flow' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
+                                            />
 
-                                        {/* Buttons */}
-                                        <button
-                                            onClick={() => setStudioMode('flow')}
-                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'flow' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >
-                                            Freestyle
-                                        </button>
-                                        <button
-                                            onClick={() => setStudioMode('arrange')}
-                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'arrange' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >
-                                            Sections
-                                        </button>
-                                    </div>
+                                            {/* Buttons */}
+                                            <button
+                                                onClick={() => setStudioMode('flow')}
+                                                className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'flow' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+                                            >
+                                                Freestyle
+                                            </button>
+                                            <button
+                                                onClick={() => setStudioMode('arrange')}
+                                                className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'arrange' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+                                            >
+                                                Sections
+                                            </button>
+                                        </div>
+                                    )}
 
                                     <div id="tour-audio-controls" className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setShowRecorder(!showRecorder)}
+                                            className={`w-10 h-10 rounded-xl border transition-all shadow-sm active:scale-95 flex items-center justify-center ${showRecorder ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-red-500'}`}
+                                            title="Toggle Voice Recorder"
+                                        >
+                                            <Mic size={16} />
+                                        </button>
 
                                         <button
-                                            onClick={() => setShowMuse(true)}
-                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
-                                            title="Open Muse (AI Assistant)"
+                                            onClick={() => setIsFocusMode(!isFocusMode)}
+                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
+                                            title={isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode"}
                                         >
-                                            <Sparkles size={16} />
+                                            {isFocusMode ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                                         </button>
-                                        <BeatUploader
-                                            audioSrc={uploadedBeat}
-                                            audioRef={beatAudioRef}
-                                            beatName={uploadedBeatName}
-                                            // Lifted Props
-                                            isPlaying={isBeatPlaying}
-                                            setIsPlaying={setIsBeatPlaying}
-                                            volume={beatVolume}
-                                            setVolume={setBeatVolume}
-                                            loopStart={beatLoopStart}
-                                            setLoopStart={setBeatLoopStart}
-                                            loopEnd={beatLoopEnd}
-                                            setLoopEnd={setBeatLoopEnd}
-                                            isLooping={isBeatLooping}
-                                            setIsLooping={setIsBeatLooping}
-                                            onUpload={async (file) => {
-                                                const url = URL.createObjectURL(file);
-                                                setUploadedBeat(url);
-                                                const name = file.name.replace(/\.\w+$/, '');
-                                                setUploadedBeatName(name);
+                                        {!isFocusMode && (
+                                            <BeatUploader
+                                                audioSrc={uploadedBeat}
+                                                audioRef={beatAudioRef}
+                                                beatName={uploadedBeatName}
+                                                // Lifted Props
+                                                isPlaying={isBeatPlaying}
+                                                setIsPlaying={setIsBeatPlaying}
+                                                volume={beatVolume}
+                                                setVolume={setBeatVolume}
+                                                loopStart={beatLoopStart}
+                                                setLoopStart={setBeatLoopStart}
+                                                loopEnd={beatLoopEnd}
+                                                setLoopEnd={setBeatLoopEnd}
+                                                isLooping={isBeatLooping}
+                                                setIsLooping={setIsBeatLooping}
+                                                onUpload={async (file) => {
+                                                    const url = URL.createObjectURL(file);
+                                                    setUploadedBeat(url);
+                                                    const name = file.name.replace(/\.\w+$/, '');
+                                                    setUploadedBeatName(name);
 
-                                                // Also add to Library beats
-                                                const base64 = await blobToBase64(file);
-                                                const id = randomId();
-                                                const audio = new Audio(url);
-                                                audio.onloadedmetadata = () => {
-                                                    const dur = audio.duration;
-                                                    const mins = Math.floor(dur / 60);
-                                                    const secs = Math.floor(dur % 60);
-                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                    const newBeat: Beat = {
-                                                        id, name, duration: durationStr,
-                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                                    // Also add to Library beats
+                                                    const base64 = await blobToBase64(file);
+                                                    const id = randomId();
+                                                    const audio = new Audio(url);
+                                                    audio.onloadedmetadata = () => {
+                                                        const dur = audio.duration;
+                                                        const mins = Math.floor(dur / 60);
+                                                        const secs = Math.floor(dur % 60);
+                                                        const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                                        const newBeat: Beat = {
+                                                            id, name, duration: durationStr,
+                                                            audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                                        };
+                                                        setBeats(prev => {
+                                                            if (prev.some(b => b.name === name)) return prev;
+                                                            return [newBeat, ...prev];
+                                                        });
                                                     };
-                                                    setBeats(prev => {
-                                                        if (prev.some(b => b.name === name)) return prev;
-                                                        return [newBeat, ...prev];
-                                                    });
-                                                };
-                                            }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
-                                        />
+                                                }}
+                                                onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1067,7 +1096,7 @@ const StudioWorkspace: React.FC = () => {
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden">
                             {/* Arrange Mode (Write) */}
-                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 ${isFocusMode ? 'pb-20' : 'pb-40'} scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <div className="max-w-2xl mx-auto space-y-12">
                                     {sections.map((section, idx) => (
                                         <div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined}>
@@ -1094,7 +1123,7 @@ const StudioWorkspace: React.FC = () => {
                             </div>
 
                             {/* Flow Mode (Sandbox) */}
-                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'flow' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 ${isFocusMode ? 'pb-20' : 'pb-40'} scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'flow' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
                                 <SandboxView
                                     sections={sections}
                                     takes={takes}
@@ -1106,8 +1135,15 @@ const StudioWorkspace: React.FC = () => {
                             </div>
 
 
-                            {/* Unified Tool Sheet - Only in Studio Mode */}
-                            {viewMode === 'studio' && <StudioToolSheet />}
+                            {/* Integrated Drawer System - Bottom Navigation & Tools */}
+                            <IntegratedStudioDrawer
+                                viewMode={viewMode as 'collection' | 'studio' | 'board'}
+                                setViewMode={setViewMode as (v: 'collection' | 'studio' | 'board') => void}
+                                isFocusMode={isFocusMode}
+                                onRecordSave={handleSaveTake}
+                                backingTrackSrc={uploadedBeat}
+                                backingAudioRef={beatAudioRef}
+                            />
                         </div>
                     </div>
                 );
@@ -1174,6 +1210,7 @@ const StudioWorkspace: React.FC = () => {
                 )}
 
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+                {showExport && <ExportShareSheet sections={sections} projectTitle={projectTitle} onClose={() => setShowExport(false)} />}
 
                 {showSearch && (
                     <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
@@ -1230,107 +1267,30 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <UnifiedNavBar
-                    viewMode={viewMode as 'collection' | 'studio' | 'board'}
-                    setViewMode={setViewMode as (v: 'collection' | 'studio' | 'board') => void}
-                    showSearch={showSearch}
-                    setShowSearch={setShowSearch}
-                    showRecorder={showRecorder}
-                    recorderMinimized={recorderMinimized}
-                    onRecordPress={() => {
-                        setShowRecorder(true);
-                        setRecorderMinimized(true);
-                    }}
-                />
+                {showTour && (
+                    <OnboardingTour
+                        onComplete={handleTourComplete}
+                        setViewMode={setViewMode}
+                        setStudioMode={setStudioMode}
+                        setShowRecorder={setShowRecorder}
+                        setRecorderMinimized={setRecorderMinimized}
+                        viewMode={viewMode}
+                        studioMode={studioMode}
+                    />
+                )}
+
+                {/* Recorder Drawer - Triggered from Header */}
+                {showRecorder && (
+                    <RecorderDrawer
+                        onClose={() => setShowRecorder(false)}
+                        isMinimized={recorderMinimized}
+                        onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
+                        onSave={handleSaveTake}
+                        backingTrackSrc={uploadedBeat}
+                        backingAudioRef={beatAudioRef}
+                    />
+                )}
             </main>
-
-            {showRecorder && (
-                <RecorderDrawer
-                    onClose={() => setShowRecorder(false)}
-                    onSave={handleSaveTake}
-                    isMinimized={recorderMinimized}
-                    onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
-                    backingTrackSrc={uploadedBeat}
-                    backingAudioRef={beatAudioRef}
-                />
-            )}
-
-            {showMuse && (
-                <MuseDrawer
-                    onClose={() => setShowMuse(false)}
-                    contextText={museContext}
-                />
-            )}
-
-            {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
-            {showSearch && (
-                <div className="fixed inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
-                    <div className="max-w-lg mx-auto h-full flex flex-col">
-                        <div className="px-6 pt-12 pb-6 flex items-center gap-4">
-                            <div className="flex-1 relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
-                                <input
-                                    autoFocus
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search songs, lyrics, recordings, beats..."
-                                    className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                                />
-                            </div>
-                            <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="text-[var(--text-secondary)]"><X size={20} /></button>
-                        </div>
-
-                        <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                            {['all', 'songs', 'sections', 'recordings', 'beats'].map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setSearchFilter(f as SearchFilter)}
-                                    className={`px-4 py-1.5 rounded-full text-[10px] mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
-                                >{f}</button>
-                            ))}
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto px-6 pb-20 space-y-2">
-                            {searchResults.map((res) => (
-                                <button
-                                    key={`${res.type}-${res.id}`}
-                                    onClick={() => {
-                                        if (res.type === 'song') loadProject(res.raw);
-                                        if (res.type === 'recording') handlePlayTake(res.id);
-                                        if (res.type === 'beat') handlePlayBeat(res.id);
-                                        if (res.type === 'section') { setViewMode('studio'); setStudioMode('arrange'); }
-                                        setShowSearch(false);
-                                    }}
-                                    className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[9px] mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
-                                            <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
-                                        </div>
-                                        <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>
-                                    </div>
-                                    <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-
-            {showTour && (
-                <OnboardingTour
-                    onComplete={handleTourComplete}
-                    setViewMode={setViewMode}
-                    setStudioMode={setStudioMode}
-                    setShowRecorder={setShowRecorder}
-                    setRecorderMinimized={setRecorderMinimized}
-                    viewMode={viewMode}
-                    studioMode={studioMode}
-                />
-            )}
         </div>
     );
 };

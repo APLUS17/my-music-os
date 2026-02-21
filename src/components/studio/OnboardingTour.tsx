@@ -35,34 +35,13 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         {
             targetId: 'welcome-step',
             title: 'Welcome to Lyriq',
-            content: "Your creative music OS. Let's walk through the essentials: from finding your vibe to recording bars.",
+            content: "Your creative music OS. Let's walk through the essentials—from writing your first bars to AI-powered tools that level up your lyrics.",
             position: 'bottom'
         },
         {
-            targetId: 'tour-nav-library',
-            title: 'Library',
-            content: 'Your vault. All your songs and beats live here. Start here to find your sound or create something new.',
-            position: 'top',
-            action: () => setViewMode('collection')
-        },
-        {
-            targetId: 'tour-nav-studio',
-            title: 'The Studio',
-            content: 'Your creative canvas. This is where the magic happens—writing, recording, and arranging your music.',
-            position: 'top',
-            action: () => setViewMode('studio')
-        },
-        {
-            targetId: 'tour-audio-controls',
-            title: 'Beat Upload',
-            content: 'Upload a beat or loop here. The vibe starts with the instrumental—everything else follows.',
-            position: 'bottom',
-            action: () => setViewMode('studio')
-        },
-        {
             targetId: 'tour-mode-toggle',
-            title: 'Freestyle Mode',
-            content: 'Just write. No structure, no rules. Let your ideas pour out line by line. Great for brainstorming and finding your flow.',
+            title: 'Writing Modes',
+            content: 'Switch between Freestyle (freeform flow) and Sections (structured cards for verses, hooks, bridges). Use Freestyle to brainstorm, Sections to build.',
             position: 'bottom',
             action: () => {
                 setViewMode('studio');
@@ -70,38 +49,48 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
             }
         },
         {
-            targetId: 'tour-mode-toggle',
-            title: 'Sections Mode',
-            content: 'Organize your lyrics into verses, hooks, and bridges. Each section can have recordings attached. Move them around to build your song structure.',
+            targetId: 'tour-audio-controls',
+            title: 'Beat & Recording',
+            content: 'Upload a beat, record vocals over it, or enter Focus mode to minimize distractions. Your beat plays persistently across the app.',
             position: 'bottom',
-            action: () => {
-                setViewMode('studio');
-                setStudioMode('arrange');
-            }
+            action: () => setViewMode('studio')
         },
         {
-            targetId: 'tour-lyric-card',
-            title: 'Lyric Sections',
-            content: 'Each section holds your lyrics. Choose a type (verse, chorus, bridge), write your bars, and attach recordings to hear them back over the beat.',
-            position: 'bottom',
-            action: () => {
-                setViewMode('studio');
-                setStudioMode('arrange');
-            }
+            targetId: 'tour-suggest-tab',
+            title: 'AI Suggestions',
+            content: 'Select a line, then tap Suggest. AI writes continuations that match your style and vibe. Tap any suggestion to insert it.',
+            position: 'top',
+            action: () => setViewMode('studio')
         },
         {
-            targetId: 'tour-nav-record',
-            title: 'Record',
-            content: 'Tap to open the recording panel. Record yourself over the beat, then attach your best recording to any section with the clip icon.',
-            position: 'top'
-        }
+            targetId: 'tour-rhymes-tab',
+            title: 'Rhyme Finder',
+            content: 'Select a word and tap Rhymes. Get perfect and near rhymes instantly—tap to insert into your lyrics.',
+            position: 'top',
+            action: () => setViewMode('studio')
+        },
+        {
+            targetId: 'tour-words-tab',
+            title: 'Word Tools',
+            content: 'Synonyms, similes, imagery, and expansions—powered by AI to help you find the perfect word or phrase.',
+            position: 'top',
+            action: () => setViewMode('studio')
+        },
+        {
+            targetId: 'tour-export-btn',
+            title: 'Export & Share',
+            content: 'When you\'re done, tap here to copy your lyrics, download as .txt, or export a beautifully formatted PDF.',
+            position: 'bottom',
+            action: () => setViewMode('studio')
+        },
     ];
 
     const params = STEPS[currentStep];
 
-    // Navigate to library when tour starts
+    // Navigate to studio when tour starts
     useEffect(() => {
-        setViewMode('collection');
+        setViewMode('studio');
+        setStudioMode('flow');
     }, []);
 
     useEffect(() => {

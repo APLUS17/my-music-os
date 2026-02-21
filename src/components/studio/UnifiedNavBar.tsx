@@ -31,6 +31,7 @@ interface Props {
     showRecorder: boolean;
     recorderMinimized: boolean;
     onRecordPress: () => void;
+    isFocusMode?: boolean;
 }
 
 // ─── Animation variants ───────────────────────────────────────────────────────
@@ -136,6 +137,7 @@ export const UnifiedNavBar: React.FC<Props> = ({
     showRecorder,
     recorderMinimized,
     onRecordPress,
+    isFocusMode = false,
 }) => {
     const { activeTool, setActiveTool } = useFlow();
     const isStudio = viewMode === 'studio';
@@ -223,9 +225,9 @@ export const UnifiedNavBar: React.FC<Props> = ({
             className="fixed bottom-6 left-1/2 z-[110]"
             style={{ translateX: '-50%' }}
             animate={{
-                y: isRecorderOpen || hasActiveTool ? 120 : 0,
-                opacity: isRecorderOpen || hasActiveTool ? 0 : 1,
-                pointerEvents: hasActiveTool ? 'none' : 'auto',
+                y: isRecorderOpen || hasActiveTool || isFocusMode ? 120 : 0,
+                opacity: isRecorderOpen || hasActiveTool || isFocusMode ? 0 : 1,
+                pointerEvents: hasActiveTool || isFocusMode ? 'none' : 'auto',
             }}
             transition={{ type: 'spring', stiffness: 380, damping: 32 }}
         >

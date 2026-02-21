@@ -67,16 +67,14 @@ const FilterPill: React.FC<{ label: string; active: boolean; onToggle: () => voi
 // ─── Context chip ─────────────────────────────────────────────────────────────
 const ContextChip: React.FC<{ text: string; label: string }> = ({ text, label }) => (
     <div style={{
-        padding: '8px 12px',
-        borderRadius: 10,
-        background: 'rgba(165,139,255,0.07)',
-        border: '1px solid rgba(165,139,255,0.15)',
-        marginBottom: 12,
-        position: 'relative',
+        padding: '4px 0',
+        marginBottom: 10,
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 6,
     }}>
-        <div style={{ position: 'absolute', top: 8, right: 10, width: 6, height: 6, borderRadius: '50%', background: '#a58bff', boxShadow: '0 0 8px rgba(165,139,255,0.6)' }} />
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: 3 }}>{label}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{text}</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', fontWeight: 700 }}>{label}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>{text}</div>
     </div>
 );
 
@@ -89,6 +87,37 @@ const Skeleton: React.FC = () => (
     </div>
 );
 
+// ─── Free tier counter helpers ────────────────────────────────────────────────
+const DAILY_LIMIT = 25;
+const COUNTER_KEY = 'lyriq-suggest-count';
+const DATE_KEY = 'lyriq-suggest-date';
+
+const getSuggestionsRemaining = (): number => {
+    if (typeof window === 'undefined') return DAILY_LIMIT;
+    const today = new Date().toDateString();
+    const storedDate = localStorage.getItem(DATE_KEY);
+    if (storedDate !== today) {
+        localStorage.setItem(DATE_KEY, today);
+        localStorage.setItem(COUNTER_KEY, '0');
+        return DAILY_LIMIT;
+    }
+    const used = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10);
+    return Math.max(0, DAILY_LIMIT - used);
+};
+
+const incrementSuggestCounter = (): void => {
+    if (typeof window === 'undefined') return;
+    const today = new Date().toDateString();
+    const storedDate = localStorage.getItem(DATE_KEY);
+    if (storedDate !== today) {
+        localStorage.setItem(DATE_KEY, today);
+        localStorage.setItem(COUNTER_KEY, '1');
+        return;
+    }
+    const used = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10);
+    localStorage.setItem(COUNTER_KEY, String(used + 1));
+};
+
 // ─── SUGGEST TAB ─────────────────────────────────────────────────────────────
 const SuggestTab: React.FC<{ selectedText: string | null; genre: string }> = ({ selectedText, genre }) => {
     const { handleInsert } = useFlow();
@@ -96,9 +125,17 @@ const SuggestTab: React.FC<{ selectedText: string | null; genre: string }> = ({ 
     const [loading, setLoading] = useState(false);
     const [tone, setTone] = useState<'darker' | 'same' | 'hopeful'>('same');
     const lastText = useRef('');
+    const [remaining, setRemaining] = useState(DAILY_LIMIT);
+
+    // Sync remaining count on mount and after generations
+    useEffect(() => {
+        setRemaining(getSuggestionsRemaining());
+    }, []);
 
     const generate = useCallback(async (text: string) => {
         if (!text.trim() || text === lastText.current) return;
+        // Check free tier limit
+        if (getSuggestionsRemaining() <= 0) return;
         lastText.current = text;
         setLoading(true);
         setResults([]);
@@ -114,6 +151,8 @@ const SuggestTab: React.FC<{ selectedText: string | null; genre: string }> = ({ 
             });
             const parsed = parseJsonResponse(response.text ?? '').slice(0, 5);
             setResults(parsed);
+            incrementSuggestCounter();
+            setRemaining(getSuggestionsRemaining());
         } catch (e) {
             console.error(e);
         } finally {
@@ -134,17 +173,33 @@ const SuggestTab: React.FC<{ selectedText: string | null; genre: string }> = ({ 
         </div>
     );
 
+    // Limit reached
+    if (remaining <= 0) return (
+        <div>
+            <ContextChip label="Continuing from" text={selectedText} />
+            <div style={{ textAlign: 'center', padding: '32px 16px', color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>✨</div>
+                You&apos;ve used all {DAILY_LIMIT} suggestions today.
+                <br />Come back tomorrow for more inspiration!
+            </div>
+        </div>
+    );
+
     return (
         <div>
             <ContextChip label="Continuing from" text={selectedText} />
             {/* Tone filter */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14, alignItems: 'center' }}>
                 {(['darker', 'same', 'hopeful'] as const).map(t => (
                     <FilterPill key={t} label={t === 'same' ? 'Keep tone' : t.charAt(0).toUpperCase() + t.slice(1)} active={tone === t} onToggle={() => { setTone(t); lastText.current = ''; }} />
                 ))}
                 <button onClick={() => { lastText.current = ''; generate(selectedText); }} disabled={loading} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: loading ? 'rgba(255,255,255,0.2)' : 'rgba(165,139,255,0.7)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}>
                     <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
                 </button>
+            </div>
+            {/* Counter badge */}
+            <div style={{ textAlign: 'right', marginBottom: 8, fontSize: 10, color: remaining <= 5 ? 'rgba(255,180,100,0.6)' : 'rgba(255,255,255,0.2)', letterSpacing: '0.05em', textTransform: 'uppercase' as const }}>
+                {remaining} left today
             </div>
             {/* Results */}
             {loading ? <Skeleton /> : (
@@ -326,159 +381,30 @@ const WordsTab: React.FC<{ selectedText: string | null; genre: string }> = ({ se
     );
 };
 
-// ─── MAIN SHEET ───────────────────────────────────────────────────────────────
-const TABS: { id: TabId; label: string }[] = [
-    { id: 'suggestions', label: 'Suggest' },
-    { id: 'rhymes', label: 'Rhymes' },
-    { id: 'words', label: 'Words' },
-];
-
 export const StudioToolSheet: React.FC = () => {
-    const { activeTool, setActiveTool, selectedText, genre } = useFlow();
+    const { activeTool, selectedText, genre } = useFlow();
 
-    // activeTab follows activeTool from nav, but can also be changed within sheet
-    const [activeTab, setActiveTab] = useState<TabId>('suggestions');
-    const [expanded, setExpanded] = useState(false);
-
-    // When nav icon tapped, open to that tab
-    useEffect(() => {
-        if (activeTool === 'suggestions' || activeTool === 'rhymes' || activeTool === 'words') {
-            setActiveTab(activeTool);
-            setExpanded(true);
-        } else if (activeTool === null) {
-            setExpanded(false);
-        }
-    }, [activeTool]);
-
-    // Drag gesture
-    const dragY = useMotionValue(0);
-    const handleDragEnd = (_: unknown, info: { offset: { y: number } }) => {
-        if (info.offset.y > 60) {
-            // dragged down significantly
-            if (expanded) {
-                setExpanded(false);
-                // keep activeTool set so tab strip stays, but collapse
-            }
-        } else if (info.offset.y < -40) {
-            setExpanded(true);
-        }
-        dragY.set(0);
-    };
-
-    const handleTabClick = (id: TabId) => {
-        if (!expanded) {
-            setExpanded(true);
-        }
-        setActiveTab(id);
-        setActiveTool(id as any);
-    };
-
-    const isVisible = activeTool === 'suggestions' || activeTool === 'rhymes' || activeTool === 'words';
+    // The component now relies entirely on activeTool from context
+    // No more internal tab clicking or redundant tab bars
 
     return (
-        <AnimatePresence>
-            {isVisible && (
-                <motion.div
-                    key="tool-sheet"
-                    initial={{ y: 120, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 120, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-                    drag="y"
-                    dragConstraints={{ top: 0, bottom: 0 }}
-                    dragElastic={0.1}
-                    style={{
-                        y: dragY,
-                        position: 'fixed',
-                        bottom: 0,          // sheet IS the bottom bar — nav pill slides away
-                        left: 0,
-                        right: 0,
-                        zIndex: 130,
-                        borderRadius: '20px 20px 0 0',
-                        background: 'rgba(10, 8, 22, 0.97)',
-                        backdropFilter: 'blur(28px) saturate(160%)',
-                        WebkitBackdropFilter: 'blur(28px) saturate(160%)',
-                        borderTop: '1px solid rgba(255,255,255,0.09)',
-                        boxShadow: '0 -8px 40px rgba(0,0,0,0.6)',
-                        overflow: 'hidden',
-                    }}
-                    onDragEnd={handleDragEnd}
-                >
-                    {/* Drag handle */}
-                    <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 4 }}>
-                        <div style={{ width: 36, height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.12)' }} />
-                    </div>
-
-                    {/* Tab strip + close */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 10px', gap: 6 }}>
-                        {TABS.map(({ id, label }) => {
-                            const active = activeTab === id;
-                            return (
-                                <button key={id} onClick={() => handleTabClick(id)} style={{
-                                    flex: 1, padding: '9px 0', borderRadius: 12, fontSize: 11, fontWeight: 700,
-                                    letterSpacing: '0.06em', textTransform: 'uppercase' as const,
-                                    border: active ? '1px solid rgba(0,255,255,0.35)' : '1px solid rgba(255,255,255,0.07)',
-                                    background: active ? 'rgba(0,210,210,0.12)' : 'rgba(255,255,255,0.03)',
-                                    color: active ? 'rgba(0,255,255,0.95)' : 'rgba(255,255,255,0.3)',
-                                    cursor: 'pointer', transition: 'all 200ms', WebkitTapHighlightColor: 'transparent',
-                                }}>
-                                    {label}
-                                </button>
-                            );
-                        })}
-
-                        {/* Expand / collapse */}
-                        <motion.button
-                            onClick={() => setExpanded(e => !e)}
-                            animate={{ rotate: expanded ? 180 : 0 }}
-                            transition={{ duration: 0.2 }}
-                            style={{ width: 34, height: 34, borderRadius: 11, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}
-                        >
-                            <ChevronUp size={14} />
-                        </motion.button>
-
-                        {/* Close — dismisses sheet, shows nav pill again */}
-                        <motion.button
-                            whileTap={{ scale: 0.85 }}
-                            onClick={() => { setActiveTool(null); setExpanded(false); }}
-                            style={{ width: 34, height: 34, borderRadius: 11, border: '1px solid rgba(255,80,80,0.15)', background: 'rgba(255,80,80,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,100,100,0.7)', flexShrink: 0, fontSize: 16, lineHeight: 1 }}
-                        >
-                            ×
-                        </motion.button>
-                    </div>
-
-                    {/* Content — only shown when expanded */}
-                    <AnimatePresence initial={false}>
-                        {expanded && (
-                            <motion.div
-                                key="content"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: SNAP_FULL, opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ type: 'spring', stiffness: 340, damping: 32 }}
-                                style={{ overflow: 'hidden' }}
-                            >
-                                {/* env(safe-area-inset-bottom) padding for iOS home indicator */}
-                                <div style={{ height: SNAP_FULL, overflowY: 'auto' as const, padding: '4px 14px', paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
-                                    <AnimatePresence mode="wait" initial={false}>
-                                        <motion.div
-                                            key={activeTab}
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -8 }}
-                                            transition={{ duration: 0.18 }}
-                                        >
-                                            {activeTab === 'suggestions' && <SuggestTab selectedText={selectedText} genre={genre} />}
-                                            {activeTab === 'rhymes' && <RhymesTab selectedText={selectedText} />}
-                                            {activeTab === 'words' && <WordsTab selectedText={selectedText} genre={genre} />}
-                                        </motion.div>
-                                    </AnimatePresence>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </motion.div>
-            )}
-        </AnimatePresence>
+        <div className="w-full flex flex-col">
+            {/* Content Area */}
+            <div className="flex-1 min-h-0">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTool}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {activeTool === 'suggestions' && <SuggestTab selectedText={selectedText} genre={genre} />}
+                        {activeTool === 'rhymes' && <RhymesTab selectedText={selectedText} />}
+                        {activeTool === 'words' && <WordsTab selectedText={selectedText} genre={genre} />}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        </div>
     );
 };
