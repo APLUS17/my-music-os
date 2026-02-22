@@ -10,7 +10,6 @@ import { PuzzleView } from './PuzzleView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
-import { MuseDrawer } from './MuseDrawer';
 import {
     LayoutGrid,
     PenTool,
@@ -27,8 +26,7 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-    Save,
-    Sparkles
+    Save
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -343,8 +341,6 @@ const StudioWorkspace: React.FC = () => {
     const [recorderMinimized, setRecorderMinimized] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
-    const [showMuse, setShowMuse] = useState(false);
-    const [museContext, setMuseContext] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -1012,13 +1008,6 @@ const StudioWorkspace: React.FC = () => {
                                                 <span>Saved</span>
                                             </div>
                                         )}
-                                        <button
-                                            onClick={() => setShowMuse(true)}
-                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
-                                            title="Open Muse (AI Assistant)"
-                                        >
-                                            <Sparkles size={16} />
-                                        </button>
                                         <BeatUploader
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
@@ -1257,13 +1246,6 @@ const StudioWorkspace: React.FC = () => {
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
-                />
-            )}
-
-            {showMuse && (
-                <MuseDrawer
-                    onClose={() => setShowMuse(false)}
-                    contextText={museContext}
                 />
             )}
 
