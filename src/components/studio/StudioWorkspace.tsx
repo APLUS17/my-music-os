@@ -5,6 +5,7 @@ import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } 
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
+import { MusicPlayer } from './MusicPlayer';
 import { PuzzleView } from './PuzzleView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
@@ -340,6 +341,7 @@ const StudioWorkspace: React.FC = () => {
     const [recorderMinimized, setRecorderMinimized] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
+    const [showMusicPlayer, setShowMusicPlayer] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -1022,6 +1024,17 @@ const StudioWorkspace: React.FC = () => {
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
                                         />
+                                        {(uploadedBeat || takes.length > 0) && (
+                                            <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => setShowMusicPlayer(true)}
+                                                className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
+                                                title="Music Player"
+                                            >
+                                                <Music size={18} fill="currentColor" />
+                                            </motion.button>
+                                        )}
                                 </div>
                             </div>
                         </div>
@@ -1217,6 +1230,18 @@ const StudioWorkspace: React.FC = () => {
             )}
 
             {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+
+            {/* Music Player Modal */}
+            <AnimatePresence>
+                {showMusicPlayer && (
+                    <MusicPlayer
+                        onClose={() => setShowMusicPlayer(false)}
+                        beatSrc={uploadedBeat}
+                        vocalTakes={takes}
+                        projectTitle={projectTitle || "Untitled"}
+                    />
+                )}
+            </AnimatePresence>
 
             {showSearch && (
                 <div className="fixed inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">

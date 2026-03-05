@@ -1,13 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Undo2,
-  Redo2,
   Play,
   Pause,
   Check,
   Trash2,
-  Music,
   X,
   Timer,
   Clock,
@@ -15,6 +12,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { EQControls } from './EQControls';
 
 interface RecorderDrawerProps {
   onClose: () => void;
@@ -877,6 +875,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* EQ Controls */}
+              {recordedBlob && !isRecording && (
+                <div className="w-full px-2 mt-6 pt-4 border-t border-white/5">
+                  <EQControls audioRef={audioRef} isActive={!isRecording} />
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
