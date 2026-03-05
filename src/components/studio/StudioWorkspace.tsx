@@ -5,11 +5,11 @@ import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } 
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
-import { SandboxView } from './SandboxView';
 import { PuzzleView } from './PuzzleView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
     PenTool,
@@ -26,7 +26,8 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-    Save
+    Save,
+    Mic
 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
@@ -86,7 +87,6 @@ const deleteAudioData = async (id: string) => {
 };
 
 type ViewMode = 'collection' | 'studio' | 'board' | 'settings';
-type StudioMode = 'flow' | 'arrange';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -334,7 +334,6 @@ const MISSION_PROJECT: SavedProject = {
 const StudioWorkspace: React.FC = () => {
     const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
-    const [studioMode, setStudioMode] = useState<StudioMode>('flow');
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
     const [showRecorder, setShowRecorder] = useState(false);
@@ -390,9 +389,7 @@ const StudioWorkspace: React.FC = () => {
     const handleTourComplete = () => {
         localStorage.setItem('lyriq-tour-completed', 'true');
         setShowTour(false);
-        // Take user to Flow mode with a fresh blank canvas
         setViewMode('studio');
-        setStudioMode('flow');
         setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
         setProjectTitle('');
     };
@@ -674,7 +671,6 @@ const StudioWorkspace: React.FC = () => {
         setProjectKey("C Min");
         setUploadedBeat(null);
         setActiveProjectId(null);
-        setStudioMode('arrange');
         setViewMode('studio');
     };
 
@@ -725,7 +721,6 @@ const StudioWorkspace: React.FC = () => {
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
         setActiveProjectId(null);
-        setStudioMode('arrange');
         setViewMode('studio');
     };
 
@@ -951,7 +946,6 @@ const StudioWorkspace: React.FC = () => {
                         onSendToStudio={(text) => {
                             setSections(prev => [...prev, { id: randomId(), type: 'verse', repeats: 1, text }]);
                             setViewMode('studio');
-                            setStudioMode('arrange');
                             setToastMessage('Idea added to your current project.');
                             setTimeout(() => setToastMessage(null), 3000);
                         }}
@@ -978,30 +972,8 @@ const StudioWorkspace: React.FC = () => {
                                     </button>
                                 </div>
 
-                                {/* Bottom Row: Toggle and Audio Controls */}
-                                <div className="flex items-center justify-between">
-                                    <div id="tour-mode-toggle" className="relative flex w-[160px] bg-[var(--bg-secondary)] p-1 rounded-xl border border-[var(--border-main)] select-none">
-                                        {/* Sliding Pill */}
-                                        <div
-                                            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--bg-main)] shadow-sm transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${studioMode === 'flow' ? 'left-1' : 'left-[calc(50%+2px)]'}`}
-                                        />
-
-                                        {/* Buttons */}
-                                        <button
-                                            onClick={() => setStudioMode('flow')}
-                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'flow' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >
-                                            Freestyle
-                                        </button>
-                                        <button
-                                            onClick={() => setStudioMode('arrange')}
-                                            className={`relative z-10 w-1/2 py-1.5 text-[10px] mono uppercase tracking-wider transition-colors duration-200 ${studioMode === 'arrange' ? 'text-[var(--text-main)] font-medium' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
-                                        >
-                                            Sections
-                                        </button>
-                                    </div>
-
-                                    <div id="tour-audio-controls" className="flex items-center gap-2">
+                                {/* Audio Controls */}
+                                <div id="tour-audio-controls" className="flex items-center gap-2 justify-end">
                                         {saveIndicator === 'saved' && (
                                             <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
                                                 <Save size={10} />
@@ -1050,17 +1022,15 @@ const StudioWorkspace: React.FC = () => {
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
                                         />
-                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden">
-                            {/* Arrange Mode (Write) */}
-                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'arrange' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
+                            <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)]">
                                 <div className="max-w-2xl mx-auto space-y-12">
                                     {sections.map((section, idx) => (
-                                        <div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined}>
+                                        <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                             <LyricCard
                                                 section={section}
                                                 onUpdate={updateSection}
@@ -1070,7 +1040,7 @@ const StudioWorkspace: React.FC = () => {
                                                 beatAudioRef={beatAudioRef}
                                                 onDeleteTake={handleDeleteTake}
                                             />
-                                        </div>
+                                        </motion.div>
                                     ))}
                                     <button
                                         onClick={addSection}
@@ -1083,17 +1053,15 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Flow Mode (Sandbox) */}
-                            <div className={`absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] transition-all duration-200 ease-out ${studioMode === 'flow' ? 'opacity-100 translate-y-0 z-10' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
-                                <SandboxView
-                                    sections={sections}
-                                    takes={takes}
-                                    onUpdateSections={setSections}
-                                    onRecordStart={handleRecordStart}
-                                    onPlayTake={handlePlayTake}
-                                    currentlyPlayingTakeId={playingTakeId}
-                                />
-                            </div>
+                            {/* Floating Record Button */}
+                            <motion.button
+                                onClick={() => handleRecordStart()}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="absolute bottom-8 right-8 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow-lg hover:shadow-xl transition-all active:scale-90 z-30"
+                            >
+                                <Mic size={24} fill="currentColor" />
+                            </motion.button>
                         </div>
                     </div>
                 );
@@ -1135,7 +1103,6 @@ const StudioWorkspace: React.FC = () => {
                 text: text
             };
             setSections(prev => [...prev, newSection]);
-            setStudioMode('arrange');
         }
     };
 
@@ -1196,7 +1163,7 @@ const StudioWorkspace: React.FC = () => {
                                             if (res.type === 'song') loadProject(res.raw);
                                             if (res.type === 'recording') handlePlayTake(res.id);
                                             if (res.type === 'beat') handlePlayBeat(res.id);
-                                            if (res.type === 'section') { setViewMode('studio'); setStudioMode('arrange'); }
+                                            if (res.type === 'section') { setViewMode('studio'); }
                                             setShowSearch(false);
                                         }}
                                         className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
@@ -1286,7 +1253,7 @@ const StudioWorkspace: React.FC = () => {
                                         if (res.type === 'song') loadProject(res.raw);
                                         if (res.type === 'recording') handlePlayTake(res.id);
                                         if (res.type === 'beat') handlePlayBeat(res.id);
-                                        if (res.type === 'section') { setViewMode('studio'); setStudioMode('arrange'); }
+                                        if (res.type === 'section') { setViewMode('studio'); }
                                         setShowSearch(false);
                                     }}
                                     className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
@@ -1311,11 +1278,9 @@ const StudioWorkspace: React.FC = () => {
                 <OnboardingTour
                     onComplete={handleTourComplete}
                     setViewMode={setViewMode}
-                    setStudioMode={setStudioMode}
                     setShowRecorder={setShowRecorder}
                     setRecorderMinimized={setRecorderMinimized}
                     viewMode={viewMode}
-                    studioMode={studioMode}
                 />
             )}
         </div>

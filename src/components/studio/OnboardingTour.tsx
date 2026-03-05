@@ -12,21 +12,17 @@ interface Step {
 interface OnboardingTourProps {
     onComplete: () => void;
     setViewMode: (v: 'collection' | 'studio' | 'board' | 'settings') => void;
-    setStudioMode: (s: 'flow' | 'arrange') => void;
     setShowRecorder: (b: boolean) => void;
     setRecorderMinimized: (b: boolean) => void;
     viewMode: string;
-    studioMode: string;
 }
 
 export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     onComplete,
     setViewMode,
-    setStudioMode,
     setShowRecorder,
     setRecorderMinimized,
-    viewMode,
-    studioMode
+    viewMode
 }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [rect, setRect] = useState<DOMRect | null>(null);
@@ -60,39 +56,16 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
             action: () => setViewMode('studio')
         },
         {
-            targetId: 'tour-mode-toggle',
-            title: 'Freestyle Mode',
-            content: 'Just write. No structure, no rules. Let your ideas pour out line by line. Great for brainstorming and finding your flow.',
-            position: 'bottom',
-            action: () => {
-                setViewMode('studio');
-                setStudioMode('flow');
-            }
-        },
-        {
-            targetId: 'tour-mode-toggle',
-            title: 'Sections Mode',
-            content: 'Organize your lyrics into verses, hooks, and bridges. Each section can have recordings attached. Move them around to build your song structure.',
-            position: 'bottom',
-            action: () => {
-                setViewMode('studio');
-                setStudioMode('arrange');
-            }
-        },
-        {
             targetId: 'tour-lyric-card',
             title: 'Lyric Sections',
-            content: 'Each section holds your lyrics. Choose a type (verse, chorus, bridge), write your bars, and attach recordings to hear them back over the beat.',
+            content: 'Organize your lyrics into verses, hooks, and bridges. Tap a section to write, reorder them to build your song structure.',
             position: 'bottom',
-            action: () => {
-                setViewMode('studio');
-                setStudioMode('arrange');
-            }
+            action: () => setViewMode('studio')
         },
         {
             targetId: 'tour-nav-record',
-            title: 'Record',
-            content: 'Tap to open the recording panel. Record yourself over the beat, then attach your best recording to any section with the clip icon.',
+            title: 'Record Your Vocals',
+            content: 'Tap the big mic button. Record over the beat anytime inspiration strikes. Your take is instantly synced to the beat position.',
             position: 'top'
         }
     ];
@@ -147,7 +120,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
             window.removeEventListener('resize', updateRect);
             clearInterval(interval);
         };
-    }, [currentStep, params.targetId, viewMode, studioMode]);
+    }, [currentStep, params.targetId, viewMode]);
 
     const handleNext = () => {
         if (currentStep < STEPS.length - 1) {
