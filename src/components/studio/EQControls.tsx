@@ -28,7 +28,8 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
     const initializeAudio = () => {
       if (audioContextRef.current) return;
 
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as unknown as Record<string, unknown>).webkitAudioContext as typeof AudioContext;
+      const audioContext = new AudioContextClass();
       audioContextRef.current = audioContext;
 
       // Create source from audio element
