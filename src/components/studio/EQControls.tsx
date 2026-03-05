@@ -16,7 +16,7 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
   const midFilterRef = useRef<BiquadFilterNode | null>(null);
   const highFilterRef = useRef<BiquadFilterNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaElementAudioSource | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Initialize Web Audio API
   useEffect(() => {
