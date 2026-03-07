@@ -6,7 +6,7 @@ export interface LyricSection {
     type: SectionType;
     repeats: number;
     text: string;
-    pinnedTakeId?: string; // ID of the associated voice take
+    pinnedSessionId?: string;
 }
 
 export interface LyricScrap {
@@ -20,18 +20,37 @@ export interface LyricScrap {
 export interface SandboxLine {
     id: string;
     text: string;
-    takeId?: string;
+    sectionId?: string; // previously takeId
 }
 
-export interface VoiceTake {
+export interface AutoSection {
     id: string;
+    startTime: number;
+    endTime: number;
+    loopPass?: number;           // 1, 2, 3 for loop takes
+    type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+    label?: string;
+    transcription?: string;
+    emojiTag?: string;
+    isBest: boolean;
+    isFavorited: boolean;
+    sentToLyricsId?: string;     // links to a LyricSection if committed
+}
+
+export interface RecordingSession {
+    id: string;
+    name?: string;
     timestamp: string;
-    duration: string;
-    transcription: string;
-    associatedLyrics: string;
-    isPlaying: boolean;
-    audioUrl?: string; // URL to the blob for playback (ephemeral)
+    beatId?: string;
+    loopStart?: number;
+    loopEnd?: number;
+    isLoopSession: boolean;
     base64?: string; // Persisted data
+    audioUrl?: string; // URL to the blob for playback (ephemeral)
+    transcription?: string;
+    bpm?: number;
+    sections: AutoSection[];
+    duration?: number;
     beatOffset?: number; // The currentTime of the beat when recording started
 }
 
@@ -50,7 +69,7 @@ export interface SavedProject {
     lastModified: string;
     sections: LyricSection[];
     scraps: LyricScrap[];
-    takes: VoiceTake[];
+    sessions: RecordingSession[];
     beats: Beat[];
 }
 

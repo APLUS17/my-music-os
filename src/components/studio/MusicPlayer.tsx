@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Play, Pause, Volume2, SkipBack, SkipForward } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { VoiceTake } from '@/types';
+import { RecordingSession } from '@/types';
 
 interface MusicPlayerProps {
   onClose: () => void;
   beatSrc?: string | null;
-  vocalTakes: VoiceTake[];
+  vocalSessions: RecordingSession[];
   projectTitle: string;
 }
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   onClose,
   beatSrc,
-  vocalTakes,
+  vocalSessions,
   projectTitle
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -26,9 +26,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Play beat + current vocal
-  const currentVocal = vocalTakes[currentTrackIndex];
+  const currentVocal = vocalSessions[currentTrackIndex];
   const hasBeat = !!beatSrc;
-  const hasVocals = vocalTakes.length > 0;
+  const hasVocals = vocalSessions.length > 0;
 
   // Get max duration between beat and vocal
   useEffect(() => {
@@ -70,8 +70,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     beat.addEventListener('ended', handleEnded);
 
     if (isPlaying) {
-      if (beat.paused && hasBeat) beat.play().catch(() => {});
-      if (vocal.paused && hasVocals) vocal.play().catch(() => {});
+      if (beat.paused && hasBeat) beat.play().catch(() => { });
+      if (vocal.paused && hasVocals) vocal.play().catch(() => { });
     } else {
       if (!beat.paused && hasBeat) beat.pause();
       if (!vocal.paused && hasVocals) vocal.pause();
@@ -100,7 +100,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   };
 
   const handleNextVocal = () => {
-    if (currentTrackIndex < vocalTakes.length - 1) {
+    if (currentTrackIndex < vocalSessions.length - 1) {
       setCurrentTrackIndex(currentTrackIndex + 1);
     }
   };
@@ -145,7 +145,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           <div className="text-center px-4">
             <div className="text-3xl font-bold text-[var(--bg-main)] mb-2 truncate">{projectTitle}</div>
             <div className="text-xs mono text-[var(--bg-main)]/70 uppercase tracking-wider">
-              {hasVocals ? `${vocalTakes.length} take${vocalTakes.length > 1 ? 's' : ''}` : 'No vocals'}
+              {hasVocals ? `${vocalSessions.length} take${vocalSessions.length > 1 ? 's' : ''}` : 'No vocals'}
             </div>
           </div>
         </motion.div>
@@ -155,7 +155,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           <h2 className="text-2xl font-bold text-[var(--text-main)] mb-1">{projectTitle}</h2>
           {hasVocals && currentVocal && (
             <p className="text-sm text-[var(--text-secondary)]">
-              Take {currentTrackIndex + 1} of {vocalTakes.length} • {currentVocal.duration}
+              Take {currentTrackIndex + 1} of {vocalSessions.length} • {currentVocal.duration}
             </p>
           )}
         </div>
@@ -206,7 +206,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleNextVocal}
-            disabled={currentTrackIndex === vocalTakes.length - 1 || !hasVocals}
+            disabled={currentTrackIndex === vocalSessions.length - 1 || !hasVocals}
             className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <SkipForward size={18} />

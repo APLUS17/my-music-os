@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, VoiceTake, SectionType, Beat, SavedProject } from '../../types';
+import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
@@ -10,6 +10,10 @@ import { PuzzleView } from './PuzzleView';
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
+import { RecordingThread } from './RecordingThread';
+import { SplitEditor } from './SplitEditor';
+import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
+import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -328,7 +332,7 @@ const MISSION_PROJECT: SavedProject = {
         { id: 'mission-v1', type: 'verse', repeats: 1, text: "" }
     ],
     scraps: [],
-    takes: [],
+    sessions: [],
     beats: []
 };
 
@@ -365,10 +369,15 @@ const StudioWorkspace: React.FC = () => {
 
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
 
-    const [takes, setTakes] = useState<VoiceTake[]>([]);
+    const [sessions, setSessions] = useState<RecordingSession[]>([]);
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
+    const [splitEditorOpen, setSplitEditorOpen] = useState(false);
+    const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
+    const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+    const [playingSessionId, setPlayingSessionId] = useState<string | null>(null);
+
     const [beats, setBeats] = useState<Beat[]>([]);
     const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
-    const [playingTakeId, setPlayingTakeId] = useState<string | null>(null);
     const [playingBeatId, setPlayingBeatId] = useState<string | null>(null);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -437,18 +446,21 @@ const StudioWorkspace: React.FC = () => {
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
 
-                    if (parsed.takes) {
-                        const loadedTakes = await Promise.all(parsed.takes.map(async (t: VoiceTake) => {
+                    if (parsed.sessions) {
+                        const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
                             try {
                                 const b64 = await getAudioData(t.id);
                                 const url = b64 ? URL.createObjectURL(await base64ToBlob(b64)) : undefined;
                                 return { ...t, base64: b64, audioUrl: url };
                             } catch (e) {
-                                console.error(`Failed to load audio for take ${t.id}`, e);
+                                console.error(`Failed to load audio for session ${t.id}`, e);
                                 return t;
                             }
                         }));
-                        setTakes(loadedTakes);
+                        setSessions(loadedSessions);
+                    } else if (parsed.takes) {
+                        // Migration handle
+                        setSessions([]);
                     }
 
                     if (parsed.beats) {
@@ -477,20 +489,20 @@ const StudioWorkspace: React.FC = () => {
         if (typeof window === 'undefined') return;
         setSaveIndicator('saving');
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const takesToSave = takes.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+        const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
         const dataToSave = {
             sections, scraps, savedProjects,
             projectTitle, projectBpm, projectKey,
-            takes: takesToSave, beats: beatsToSave,
+            sessions: sessionsToSave, beats: beatsToSave,
             activeProjectId
         };
         try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
         catch (e) { console.error("Storage full or error", e); }
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, takes, beats, activeProjectId]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -498,66 +510,124 @@ const StudioWorkspace: React.FC = () => {
         setShowRecorder(true);
     };
 
-    const handleSaveTake = async (blob: Blob, duration: number, beatOffset?: number) => {
+    const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number) => {
         const url = URL.createObjectURL(blob);
         const base64 = await blobToBase64(blob);
         const id = randomId().substring(0, 6).toUpperCase();
         await saveAudioData(id, base64);
 
-        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const mins = Math.floor(duration / 60);
-        const secs = Math.floor(duration % 60);
-        const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+        const timestamp = new Date().toISOString();
 
-        const newTake: VoiceTake = {
-            id, timestamp, duration: durationStr, transcription: "", associatedLyrics: '',
-            isPlaying: false, audioUrl: url, base64: base64, beatOffset: beatOffset
+        let sections: AutoSection[] = [];
+        try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            const isLoopSession = isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null;
+            const passes = isLoopSession && beatLoopStart !== null && beatLoopEnd !== null
+                ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
+                : 1;
+
+            sections = await analyzeAudioAndSplit(audioBuffer, {
+                isLoopSession,
+                loopStart: beatLoopStart || 0,
+                loopEnd: beatLoopEnd || 0,
+                passCount: Math.ceil(passes)
+            });
+        } catch (err) {
+            console.error("Failed to split recording automatically", err);
+        }
+
+        const newSession: RecordingSession = {
+            id, name: `Recording ${id}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: beatOffset,
+            isLoopSession: isBeatLooping,
+            sections,
+            loopStart: beatLoopStart || undefined,
+            loopEnd: beatLoopEnd || undefined
         };
-        setTakes(prev => [newTake, ...prev]);
+        setSessions(prev => [newSession, ...prev]);
 
         if (recordingTargetLineId) {
             setRecordingTargetLineId(null);
         }
 
-        // Show confirmation toast
-        setToastMessage(`Recording saved (${durationStr}). Attach it to any section with the clip icon.`);
-        setTimeout(() => setToastMessage(null), 4000);
-    };
+        const hasApiKey = !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
-    const handlePlayTake = (takeId: string) => {
-        const take = takes.find(t => t.id === takeId);
-        if (!take) return;
-        if (playingTakeId === takeId) {
-            globalAudioRef.current?.pause();
-            setPlayingTakeId(null);
+        if (hasApiKey) {
+            setToastMessage(`Recording saved! AI analyzing...`);
+            // Background AI refinement
+            analyzeAudioWithGemini(base64).then(aiResult => {
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => {
+                        if (s.id === id) {
+                            return {
+                                ...s,
+                                transcription: aiResult.transcription || s.transcription,
+                                sections: aiResult.sections.length > 0
+                                    ? aiResult.sections.map(ais => ({
+                                        id: randomId(),
+                                        startTime: ais.startTime,
+                                        endTime: ais.endTime,
+                                        type: ais.type,
+                                        label: ais.label,
+                                        emojiTag: ais.emojiTag,
+                                        isBest: true,
+                                        isFavorited: false
+                                    }))
+                                    : s.sections
+                            };
+                        }
+                        return s;
+                    }));
+                    setToastMessage(`✨ AI refined your recording!`);
+                    setTimeout(() => setToastMessage(null), 3000);
+                } else {
+                    setTimeout(() => setToastMessage(null), 2000);
+                }
+            }).catch(err => {
+                console.error("AI refinement failed:", err);
+                setToastMessage(`Recording saved with ${sections.length} sections`);
+                setTimeout(() => setToastMessage(null), 2000);
+            });
         } else {
-            if (globalAudioRef.current) globalAudioRef.current.pause();
-            const audio = new Audio(take.audioUrl || take.base64);
-            audio.onended = () => setPlayingTakeId(null);
-            audio.play().catch(console.error);
-            globalAudioRef.current = audio;
-            setPlayingTakeId(takeId);
+            setToastMessage(`Recording saved with ${sections.length} sections!`);
+            setTimeout(() => setToastMessage(null), 3000);
         }
     };
 
-    const handleDeleteTake = async (takeId: string) => {
+
+
+    const handlePlaySession = (sessionId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        if (playingSessionId === sessionId) {
+            globalAudioRef.current?.pause();
+            setPlayingSessionId(null);
+        } else {
+            if (globalAudioRef.current) globalAudioRef.current.pause();
+            const audio = new Audio(session.audioUrl || session.base64);
+            audio.onended = () => setPlayingSessionId(null);
+            audio.play().catch(console.error);
+            globalAudioRef.current = audio;
+            setPlayingSessionId(sessionId);
+        }
+    };
+
+    const handleDeleteSession = async (sessionId: string) => {
         if (!confirm("Permanently delete this recording?")) return;
 
         // Stop playback if deleting current
-        if (playingTakeId === takeId) {
+        if (playingSessionId === sessionId) {
             globalAudioRef.current?.pause();
-            setPlayingTakeId(null);
+            setPlayingSessionId(null);
         }
 
-        // Remove from sections that have it pinned
-        setSections(prev => prev.map(s => s.pinnedTakeId === takeId ? { ...s, pinnedTakeId: undefined } : s));
-
-        // Remove from takes list
-        setTakes(prev => prev.filter(t => t.id !== takeId));
+        // Remove from sessions list
+        setSessions(prev => prev.filter(s => s.id !== sessionId));
 
         // Delete from DB
         try {
-            await deleteAudioData(takeId);
+            await deleteAudioData(sessionId);
         } catch (e) {
             console.error("Failed to delete audio data", e);
         }
@@ -647,7 +717,7 @@ const StudioWorkspace: React.FC = () => {
             id: randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
-            sections, scraps, takes: [], beats: []
+            sections, scraps, sessions: [], beats: []
         };
         setSavedProjects(prev => [newProject, ...prev]);
     };
@@ -796,23 +866,32 @@ const StudioWorkspace: React.FC = () => {
                     results.push({
                         id: s.id, type: 'section', title: `${s.type} (current project)`,
                         desc: `"...${matchedLine.trim().substring(0, 50)}..."`,
-                        date: '', raw: { id: 'current', name: projectTitle || 'Current Project', lastModified: '', sections, scraps, takes: [], beats: [] }
+                        date: '', raw: { id: 'current', name: projectTitle || 'Current Project', lastModified: '', sections, scraps, sessions: [], beats: [] }
                     });
                 }
             });
         }
 
         if (searchFilter === 'all' || searchFilter === 'recordings') {
-            takes.forEach(t => {
-                if (t.id.toLowerCase().includes(q) || t.timestamp.toLowerCase().includes(q)) {
+            sessions.forEach(t => {
+                const nameMatch = (t.name || `Recording ${t.id}`).toLowerCase().includes(q);
+                const transMatch = (t.transcription || '').toLowerCase().includes(q);
+                const sectionMatch = t.sections.some(s => (s.label || '').toLowerCase().includes(q));
+
+                if (nameMatch || transMatch || sectionMatch) {
+                    let desc = `${t.duration?.toFixed(1) || '0.0'}s - ${new Date(t.timestamp).toLocaleDateString()}`;
+                    if (transMatch) desc = `"...${t.transcription?.substring(0, 50)}..."`;
+                    else if (sectionMatch) desc = `Contains: ${t.sections.find(s => (s.label || '').toLowerCase().includes(q))?.label}`;
+
                     results.push({
-                        id: t.id, type: 'recording', title: `Recording ${t.id}`,
-                        desc: `${t.duration} - ${t.timestamp}`,
-                        date: t.timestamp, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], takes: [], beats: [] }
+                        id: t.id, type: 'recording', title: t.name || `Recording ${t.id}`,
+                        desc,
+                        date: t.timestamp, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], sessions: [], beats: [] }
                     });
                 }
             });
         }
+
 
         if (searchFilter === 'all' || searchFilter === 'beats') {
             beats.forEach(b => {
@@ -820,14 +899,14 @@ const StudioWorkspace: React.FC = () => {
                     results.push({
                         id: b.id, type: 'beat', title: b.name,
                         desc: b.duration,
-                        date: b.date, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], takes: [], beats: [] }
+                        date: b.date, raw: { id: 'current', name: '', lastModified: '', sections: [], scraps: [], sessions: [], beats: [] }
                     });
                 }
             });
         }
 
         return results;
-    }, [searchQuery, searchFilter, savedProjects, sections, takes, beats, scraps, projectTitle]);
+    }, [searchQuery, searchFilter, savedProjects, sections, sessions, beats, scraps, projectTitle]);
 
     const getActiveView = () => {
         switch (viewMode) {
@@ -976,105 +1055,116 @@ const StudioWorkspace: React.FC = () => {
 
                                 {/* Audio Controls */}
                                 <div id="tour-audio-controls" className="flex items-center gap-2 justify-end">
-                                        {saveIndicator === 'saved' && (
-                                            <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
-                                                <Save size={10} />
-                                                <span>Saved</span>
-                                            </div>
-                                        )}
-                                        <BeatUploader
-                                            audioSrc={uploadedBeat}
-                                            audioRef={beatAudioRef}
-                                            beatName={uploadedBeatName}
-                                            // Lifted Props
-                                            isPlaying={isBeatPlaying}
-                                            setIsPlaying={setIsBeatPlaying}
-                                            volume={beatVolume}
-                                            setVolume={setBeatVolume}
-                                            loopStart={beatLoopStart}
-                                            setLoopStart={setBeatLoopStart}
-                                            loopEnd={beatLoopEnd}
-                                            setLoopEnd={setBeatLoopEnd}
-                                            isLooping={isBeatLooping}
-                                            setIsLooping={setIsBeatLooping}
-                                            onUpload={async (file) => {
-                                                const url = URL.createObjectURL(file);
-                                                setUploadedBeat(url);
-                                                const name = file.name.replace(/\.\w+$/, '');
-                                                setUploadedBeatName(name);
+                                    {saveIndicator === 'saved' && (
+                                        <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
+                                            <Save size={10} />
+                                            <span>Saved</span>
+                                        </div>
+                                    )}
+                                    <BeatUploader
+                                        audioSrc={uploadedBeat}
+                                        audioRef={beatAudioRef}
+                                        beatName={uploadedBeatName}
+                                        // Lifted Props
+                                        isPlaying={isBeatPlaying}
+                                        setIsPlaying={setIsBeatPlaying}
+                                        volume={beatVolume}
+                                        setVolume={setBeatVolume}
+                                        loopStart={beatLoopStart}
+                                        setLoopStart={setBeatLoopStart}
+                                        loopEnd={beatLoopEnd}
+                                        setLoopEnd={setBeatLoopEnd}
+                                        isLooping={isBeatLooping}
+                                        setIsLooping={setIsBeatLooping}
+                                        onUpload={async (file) => {
+                                            const url = URL.createObjectURL(file);
+                                            setUploadedBeat(url);
+                                            const name = file.name.replace(/\.\w+$/, '');
+                                            setUploadedBeatName(name);
 
-                                                // Also add to Library beats
-                                                const base64 = await blobToBase64(file);
-                                                const id = randomId();
-                                                const audio = new Audio(url);
-                                                audio.onloadedmetadata = () => {
-                                                    const dur = audio.duration;
-                                                    const mins = Math.floor(dur / 60);
-                                                    const secs = Math.floor(dur % 60);
-                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                    const newBeat: Beat = {
-                                                        id, name, duration: durationStr,
-                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
-                                                    };
-                                                    setBeats(prev => {
-                                                        if (prev.some(b => b.name === name)) return prev;
-                                                        return [newBeat, ...prev];
-                                                    });
+                                            // Also add to Library beats
+                                            const base64 = await blobToBase64(file);
+                                            const id = randomId();
+                                            const audio = new Audio(url);
+                                            audio.onloadedmetadata = () => {
+                                                const dur = audio.duration;
+                                                const mins = Math.floor(dur / 60);
+                                                const secs = Math.floor(dur % 60);
+                                                const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                                const newBeat: Beat = {
+                                                    id, name, duration: durationStr,
+                                                    audioUrl: url, base64, date: new Date().toLocaleDateString()
                                                 };
-                                            }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
-                                        />
-                                        {(uploadedBeat || takes.length > 0) && (
-                                            <motion.button
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
-                                                onClick={() => setShowMusicPlayer(true)}
-                                                className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
-                                                title="Music Player"
-                                            >
-                                                <Music size={18} fill="currentColor" />
-                                            </motion.button>
-                                        )}
+                                                setBeats(prev => {
+                                                    if (prev.some(b => b.name === name)) return prev;
+                                                    return [newBeat, ...prev];
+                                                });
+                                            };
+                                        }}
+                                        onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                                    />
+                                    {(uploadedBeat || sessions.length > 0) && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => setShowMusicPlayer(true)}
+                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
+                                            title="Music Player"
+                                        >
+                                            <Music size={18} fill="currentColor" />
+                                        </motion.button>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        <div id="tour-workspace" className="flex-1 relative overflow-hidden">
-                            <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)]">
+                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
+                            {/* Toggle For Tabs */}
+                            <div className="flex border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
+                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-[11px] mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
+                                <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-[11px] mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
+                            </div>
+
+                            <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] mt-12">
                                 <div className="max-w-2xl mx-auto space-y-12">
-                                    {sections.map((section, idx) => (
-                                        <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                                            <LyricCard
-                                                section={section}
-                                                onUpdate={updateSection}
-                                                onDelete={deleteSection}
-                                                onMove={moveSection}
-                                                availableTakes={takes}
-                                                beatAudioRef={beatAudioRef}
-                                                onDeleteTake={handleDeleteTake}
-                                            />
-                                        </motion.div>
-                                    ))}
-                                    <button
-                                        onClick={addSection}
-                                        className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                    >
-                                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                        <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
-                                        <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                    </button>
+                                    {activeTab === 'lyrics' ? (
+                                        <>
+                                            {sections.map((section, idx) => (
+                                                <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                    <LyricCard
+                                                        section={section}
+                                                        onUpdate={updateSection}
+                                                        onDelete={deleteSection}
+                                                        onMove={moveSection}
+                                                    />
+                                                </motion.div>
+                                            ))}
+                                            <button
+                                                onClick={addSection}
+                                                className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                            >
+                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
+                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <RecordingThread
+                                            sessions={sessions}
+                                            activeSessionId={activeSessionId}
+                                            onSelectSession={(id) => setActiveSessionId(prev => prev === id ? null : id)}
+                                            onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
+                                            onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
+                                            onOpenSplitEditor={(id) => {
+                                                setRecordingToSplit(id);
+                                                setSplitEditorOpen(true);
+                                            }}
+                                            onDeleteSession={handleDeleteSession}
+                                        />
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Floating Record Button */}
-                            <motion.button
-                                onClick={() => handleRecordStart()}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="absolute bottom-8 right-8 w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow-lg hover:shadow-xl transition-all active:scale-90 z-30"
-                            >
-                                <Mic size={24} fill="currentColor" />
-                            </motion.button>
                         </div>
                     </div>
                 );
@@ -1174,7 +1264,7 @@ const StudioWorkspace: React.FC = () => {
                                         key={`${res.type}-${res.id}`}
                                         onClick={() => {
                                             if (res.type === 'song') loadProject(res.raw);
-                                            if (res.type === 'recording') handlePlayTake(res.id);
+                                            if (res.type === 'recording') handlePlaySession(res.id);
                                             if (res.type === 'beat') handlePlayBeat(res.id);
                                             if (res.type === 'section') { setViewMode('studio'); }
                                             setShowSearch(false);
@@ -1221,7 +1311,7 @@ const StudioWorkspace: React.FC = () => {
             {showRecorder && (
                 <RecorderDrawer
                     onClose={() => setShowRecorder(false)}
-                    onSave={handleSaveTake}
+                    onSave={handleSaveRecordingSession}
                     isMinimized={recorderMinimized}
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
@@ -1237,7 +1327,7 @@ const StudioWorkspace: React.FC = () => {
                     <MusicPlayer
                         onClose={() => setShowMusicPlayer(false)}
                         beatSrc={uploadedBeat}
-                        vocalTakes={takes}
+                        vocalSessions={sessions}
                         projectTitle={projectTitle || "Untitled"}
                     />
                 )}
@@ -1276,7 +1366,7 @@ const StudioWorkspace: React.FC = () => {
                                     key={`${res.type}-${res.id}`}
                                     onClick={() => {
                                         if (res.type === 'song') loadProject(res.raw);
-                                        if (res.type === 'recording') handlePlayTake(res.id);
+                                        if (res.type === 'recording') handlePlaySession(res.id);
                                         if (res.type === 'beat') handlePlayBeat(res.id);
                                         if (res.type === 'section') { setViewMode('studio'); }
                                         setShowSearch(false);

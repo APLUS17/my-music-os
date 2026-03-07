@@ -86,7 +86,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
       const prompt = buildPrompt(mode, query, secondQuery);
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: prompt,
         config: {
           responseMimeType: "application/json"
@@ -126,7 +126,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
 
   return (
     <div className="absolute inset-y-0 right-0 w-[85%] max-w-sm bg-[var(--bg-card)] border-l border-[var(--border-main)] shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-50 flex flex-col animate-in slide-in-from-right duration-300">
-      
+
       <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)]">
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-[var(--accent)]" />
@@ -140,8 +140,8 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
       <div className="p-4 space-y-3">
         <div className="relative group">
           <div className="flex items-center w-full h-12 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-xl overflow-hidden focus-within:border-[var(--accent)] transition-colors shadow-sm">
-            
-            <button 
+
+            <button
               onClick={() => setIsModeOpen(!isModeOpen)}
               className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors min-w-[100px] justify-between"
             >
@@ -149,7 +149,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               <ChevronDown size={12} className={`text-[var(--text-secondary)] transition-transform ${isModeOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            <input 
+            <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -158,7 +158,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               autoFocus
             />
 
-            <button 
+            <button
               onClick={handleSearch}
               disabled={loading || !query.trim() || (mode === 'fuse' && !secondQuery.trim())}
               className="pr-3 pl-2 text-[var(--accent)] hover:scale-110 transition-transform disabled:opacity-30 disabled:hover:scale-100"
@@ -183,7 +183,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
             <>
               <div className="fixed inset-0 z-10 cursor-default" onClick={() => setIsModeOpen(false)} />
               <div className="absolute top-14 left-0 w-56 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-150 max-h-96 overflow-y-auto">
-                
+
                 {wordModes.length > 0 && (
                   <>
                     <div className="px-4 py-1.5 text-[8px] mono uppercase tracking-widest text-[var(--text-tertiary)] font-bold">Word Tools</div>
@@ -243,7 +243,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
             {error}
           </div>
         )}
-        
+
         {results.length === 0 && !loading && !error && (
           <div className="h-full flex flex-col items-center justify-center opacity-30 text-center space-y-2 pb-20">
             <Sparkles size={40} strokeWidth={1} />
@@ -253,8 +253,8 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
 
         <div className={['next_line', 'rewrite', 'scene', 'acronym', 'simile'].includes(mode) ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"}>
           {results.map((res, i) => (
-            <div 
-              key={i} 
+            <div
+              key={i}
               onClick={() => copyToClipboard(res)}
               className="group relative p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:shadow-[0_0_15px_var(--accent-dim)] transition-all cursor-pointer active:scale-95 animate-in slide-in-from-bottom-2 fade-in"
               style={{ animationDelay: `${i * 50}ms` }}
@@ -267,7 +267,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
           ))}
         </div>
       </div>
-      
+
       <div className="p-3 text-center border-t border-[var(--border-main)]">
         <p className="text-[9px] mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
       </div>

@@ -1,16 +1,16 @@
 
 import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
-import { LyricSection, VoiceTake } from '@/types';
+import { LyricSection, RecordingSession } from '@/types';
 import { randomId } from '@/lib/utils/id';
 
 interface SandboxViewProps {
   sections: LyricSection[];
-  takes: VoiceTake[];
+  sessions: RecordingSession[];
   onUpdateSections: (sections: LyricSection[]) => void;
   onRecordStart: (lineId: string) => void;
-  onPlayTake: (takeId: string) => void;
-  currentlyPlayingTakeId: string | null;
+  onPlaySession: (sessionId: string) => void;
+  currentlyPlayingSessionId: string | null;
 }
 
 const AutoResizeTextarea = ({
@@ -63,24 +63,24 @@ const AutoResizeTextarea = ({
 
 export const SandboxView: React.FC<SandboxViewProps> = ({
   sections,
-  takes,
+  sessions,
   onUpdateSections,
   onRecordStart,
-  onPlayTake,
-  currentlyPlayingTakeId
+  onPlaySession,
+  currentlyPlayingSessionId
 }) => {
   const [activeLineId, setActiveLineId] = useState<string | null>(null);
-  const [draggedTakeId, setDraggedTakeId] = useState<string | null>(null);
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
 
   // Flatten sections into editable lines for Flow mode
-  type FlowLine = { id: string; text: string; sectionId: string; takeId?: string };
+  type FlowLine = { id: string; text: string; sectionId: string; sessionId?: string };
   const lines: FlowLine[] = sections.flatMap(section =>
     section.text.split('\n').map((lineText, idx) => ({
       id: `${section.id}-line-${idx}`,
       text: lineText,
       sectionId: section.id,
-      takeId: section.pinnedTakeId
+      sessionId: section.pinnedSessionId
     }))
   );
 
@@ -214,31 +214,31 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
 
   const handleDrop = (e: React.DragEvent, targetLineId: string) => {
     e.preventDefault();
-    const takeId = e.dataTransfer.getData('text/plain');
+    const sessionId = e.dataTransfer.getData('text/plain');
 
-    // Remove take from any other line and add to target
+    // Remove session from any other line and add to target
     const newLines = lines.map(line => {
-      if (line.id === targetLineId) return { ...line, takeId };
-      if (line.takeId === takeId) return { ...line, takeId: undefined };
+      if (line.id === targetLineId) return { ...line, sessionId };
+      if (line.sessionId === sessionId) return { ...line, sessionId: undefined };
       return line;
     });
 
-    // Convert back to sections (simplified - just update the pinned take on the section)
+    // Convert back to sections (simplified - just update the pinned session on the section)
     const targetLine = lines.find(l => l.id === targetLineId);
     if (targetLine) {
       const updatedSections = sections.map(s =>
-        s.id === targetLine.sectionId ? { ...s, pinnedTakeId: takeId } : s
+        s.id === targetLine.sectionId ? { ...s, pinnedSessionId: sessionId } : s
       );
       onUpdateSections(updatedSections);
     }
-    setDraggedTakeId(null);
+    setDraggedSessionId(null);
   };
 
-  const removeTakeFromLine = (lineId: string) => {
+  const removeSessionFromLine = (lineId: string) => {
     const targetLine = lines.find(l => l.id === lineId);
     if (targetLine) {
       const updatedSections = sections.map(s =>
-        s.id === targetLine.sectionId ? { ...s, pinnedTakeId: undefined } : s
+        s.id === targetLine.sectionId ? { ...s, pinnedSessionId: undefined } : s
       );
       onUpdateSections(updatedSections);
     }
@@ -258,8 +258,8 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       )}
 
       {lines.map((line, index) => {
-        const take = line.takeId ? takes.find(t => t.id === line.takeId) : null;
-        const isPlaying = take && currentlyPlayingTakeId === take.id;
+        const session = line.sessionId ? sessions.find(t => t.id === line.sessionId) : null;
+        const isPlaying = session && currentlyPlayingSessionId === session.id;
 
         const isLastLineOfSection = lines[index + 1]?.sectionId !== line.sectionId;
         // Negative margin to pull lines together and eliminate browser rendering gaps
@@ -280,11 +280,11 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
             )}
             {/* Controls - Absolute Positioned to left of content */}
             <div className="absolute -left-8 top-0 w-6 flex justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 z-10">
-              {!take ? (
+              {!session ? (
                 <button
                   onClick={() => onRecordStart(line.id)}
                   className="text-[var(--text-tertiary)] hover:text-red-500 transition-all hover:scale-125 p-1 active:scale-90"
-                  title="Record Take"
+                  title="Record Session"
                 >
                   <Mic size={14} />
                 </button>
@@ -292,8 +292,8 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
                 <div
                   draggable
                   onDragStart={(e) => {
-                    e.dataTransfer.setData('text/plain', take.id);
-                    setDraggedTakeId(take.id);
+                    e.dataTransfer.setData('text/plain', session.id);
+                    setDraggedSessionId(session.id);
                   }}
                   className="cursor-grab active:cursor-grabbing text-[var(--accent)] hover:text-[var(--text-main)] p-1 transition-transform hover:scale-110"
                 >
@@ -341,15 +341,15 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
             </div>
 
             {/* Audio Pill */}
-            {take && (
+            {session && (
               <div
                 className={`flex items-center gap-2 ml-3 pr-2 pl-1 py-1 rounded-full border transition-all select-none flex-shrink-0 ${isPlaying ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
               >
-                <button onClick={() => onPlayTake(take.id)} className="p-0.5 hover:scale-110 transition-transform">
+                <button onClick={() => onPlaySession(session.id)} className="p-0.5 hover:scale-110 transition-transform">
                   {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                 </button>
                 <button
-                  onClick={() => removeTakeFromLine(line.id)}
+                  onClick={() => removeSessionFromLine(line.id)}
                   className={`ml-1 hover:text-red-500 transition-colors ${isPlaying ? 'text-[var(--bg-main)] opacity-70' : 'text-[var(--text-tertiary)]'}`}
                 >
                   <Trash2 size={10} />
