@@ -578,7 +578,7 @@ const StudioWorkspace: React.FC = () => {
                                         type: ais.type,
                                         label: ais.label,
                                         emojiTag: ais.emojiTag,
-                                        isBest: true,
+                                        isBest: false,
                                         isFavorited: false
                                     }))
                                     : s.sections
