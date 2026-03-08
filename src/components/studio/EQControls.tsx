@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders } from 'lucide-react';
+import { Sliders, RotateCcw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface EQControlsProps {
   audioRef: React.RefObject<HTMLAudioElement | null>;
@@ -12,7 +16,7 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
   const [highGain, setHighGain] = useState(0);
   const [showEQ, setShowEQ] = useState(false);
 
-  const analyserRef = useRef<BiquadFilterNode | null>(null);
+  const lowFilterRef = useRef<BiquadFilterNode | null>(null);
   const midFilterRef = useRef<BiquadFilterNode | null>(null);
   const highFilterRef = useRef<BiquadFilterNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -24,47 +28,42 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
 
     const audio = audioRef.current;
 
-    // Create audio context on first interaction
     const initializeAudio = () => {
       if (audioContextRef.current) return;
 
-      const AudioContextClass = window.AudioContext || (window as unknown as Record<string, unknown>).webkitAudioContext as typeof AudioContext;
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioContext = new AudioContextClass();
       audioContextRef.current = audioContext;
 
-      // Create source from audio element
       const source = audioContext.createMediaElementSource(audio);
       sourceRef.current = source;
 
-      // Create filters
       const lowFilter = audioContext.createBiquadFilter();
       lowFilter.type = 'lowshelf';
       lowFilter.frequency.value = 100;
-      lowFilter.gain.value = 0;
+      lowFilter.gain.value = lowGain;
 
       const midFilter = audioContext.createBiquadFilter();
       midFilter.type = 'peaking';
       midFilter.frequency.value = 1000;
       midFilter.Q.value = 0.5;
-      midFilter.gain.value = 0;
+      midFilter.gain.value = midGain;
 
       const highFilter = audioContext.createBiquadFilter();
       highFilter.type = 'highshelf';
       highFilter.frequency.value = 5000;
-      highFilter.gain.value = 0;
+      highFilter.gain.value = highGain;
 
-      // Connect: source → lowFilter → midFilter → highFilter → destination
       source.connect(lowFilter);
       lowFilter.connect(midFilter);
       midFilter.connect(highFilter);
       highFilter.connect(audioContext.destination);
 
-      analyserRef.current = lowFilter;
+      lowFilterRef.current = lowFilter;
       midFilterRef.current = midFilter;
       highFilterRef.current = highFilter;
     };
 
-    // Initialize on audio play
     const handlePlay = () => initializeAudio();
     audio.addEventListener('play', handlePlay);
 
@@ -73,25 +72,16 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
     };
   }, [isActive, audioRef]);
 
-  // Update low gain
   useEffect(() => {
-    if (analyserRef.current) {
-      analyserRef.current.gain.value = lowGain;
-    }
+    if (lowFilterRef.current) lowFilterRef.current.gain.value = lowGain;
   }, [lowGain]);
 
-  // Update mid gain
   useEffect(() => {
-    if (midFilterRef.current) {
-      midFilterRef.current.gain.value = midGain;
-    }
+    if (midFilterRef.current) midFilterRef.current.gain.value = midGain;
   }, [midGain]);
 
-  // Update high gain
   useEffect(() => {
-    if (highFilterRef.current) {
-      highFilterRef.current.gain.value = highGain;
-    }
+    if (highFilterRef.current) highFilterRef.current.gain.value = highGain;
   }, [highGain]);
 
   const resetEQ = () => {
@@ -100,103 +90,99 @@ export const EQControls: React.FC<EQControlsProps> = ({ audioRef, isActive = tru
     setHighGain(0);
   };
 
+  const isAnyActive = lowGain !== 0 || midGain !== 0 || highGain !== 0;
+
   return (
     <div className="w-full">
-      <button
+      <Button
+        variant="ghost"
         onClick={() => setShowEQ(!showEQ)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-lg hover:bg-[var(--bg-hover)] transition-all text-[12px] mono uppercase tracking-wider text-[var(--text-secondary)]"
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-6 bg-white/5 border border-white/10 rounded-xl transition-all font-mono uppercase tracking-widest text-[10px]",
+          showEQ && "bg-white/10 border-white/20"
+        )}
       >
         <span className="flex items-center gap-2">
-          <Sliders size={14} />
-          EQ
+          <Sliders size={14} className={cn("transition-colors", isAnyActive ? "text-[var(--accent)]" : "text-white/40")} />
+          EQ SETTINGS
         </span>
-        <span className={`text-[10px] ${lowGain !== 0 || midGain !== 0 || highGain !== 0 ? 'text-[var(--accent)]' : 'opacity-50'}`}>
-          {lowGain !== 0 || midGain !== 0 || highGain !== 0 ? 'Active' : 'Off'}
+        <span className={cn(
+          "px-2 py-0.5 rounded-full text-[8px]",
+          isAnyActive ? "bg-[var(--accent)] text-black font-bold" : "bg-white/10 text-white/40"
+        )}>
+          {isAnyActive ? 'ACTIVE' : 'DEFAULT'}
         </span>
-      </button>
+      </Button>
 
       {showEQ && (
-        <div className="mt-3 p-3 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-lg space-y-3">
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          className="mt-3 p-4 bg-white/5 border border-white/10 rounded-2xl space-y-6 overflow-hidden"
+        >
           {/* Low */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)]">Low (100Hz)</label>
-              <span className="text-[9px] mono text-[var(--text-tertiary)]">{lowGain > 0 ? '+' : ''}{lowGain}dB</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] mono uppercase tracking-widest text-white/50">Low (100Hz)</label>
+              <span className={cn("text-[10px] mono", lowGain !== 0 ? "text-[var(--accent)]" : "text-white/30")}>
+                {lowGain > 0 ? '+' : ''}{lowGain.toFixed(1)}dB
+              </span>
             </div>
-            <input
-              type="range"
-              min="-12"
-              max="12"
-              step="0.5"
-              value={lowGain}
-              onChange={(e) => setLowGain(parseFloat(e.target.value))}
-              className="w-full h-2 bg-[var(--bg-main)] rounded-lg appearance-none cursor-pointer slider"
+            <Slider
+              min={-12}
+              max={12}
+              step={0.5}
+              value={[lowGain]}
+              onValueChange={(val) => setLowGain(val[0])}
             />
           </div>
 
           {/* Mid */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)]">Mid (1kHz)</label>
-              <span className="text-[9px] mono text-[var(--text-tertiary)]">{midGain > 0 ? '+' : ''}{midGain}dB</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] mono uppercase tracking-widest text-white/50">Mid (1kHz)</label>
+              <span className={cn("text-[10px] mono", midGain !== 0 ? "text-[var(--accent)]" : "text-white/30")}>
+                {midGain > 0 ? '+' : ''}{midGain.toFixed(1)}dB
+              </span>
             </div>
-            <input
-              type="range"
-              min="-12"
-              max="12"
-              step="0.5"
-              value={midGain}
-              onChange={(e) => setMidGain(parseFloat(e.target.value))}
-              className="w-full h-2 bg-[var(--bg-main)] rounded-lg appearance-none cursor-pointer slider"
+            <Slider
+              min={-12}
+              max={12}
+              step={0.5}
+              value={[midGain]}
+              onValueChange={(val) => setMidGain(val[0])}
             />
           </div>
 
           {/* High */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)]">High (5kHz)</label>
-              <span className="text-[9px] mono text-[var(--text-tertiary)]">{highGain > 0 ? '+' : ''}{highGain}dB</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] mono uppercase tracking-widest text-white/50">High (5kHz)</label>
+              <span className={cn("text-[10px] mono", highGain !== 0 ? "text-[var(--accent)]" : "text-white/30")}>
+                {highGain > 0 ? '+' : ''}{highGain.toFixed(1)}dB
+              </span>
             </div>
-            <input
-              type="range"
-              min="-12"
-              max="12"
-              step="0.5"
-              value={highGain}
-              onChange={(e) => setHighGain(parseFloat(e.target.value))}
-              className="w-full h-2 bg-[var(--bg-main)] rounded-lg appearance-none cursor-pointer slider"
+            <Slider
+              min={-12}
+              max={12}
+              step={0.5}
+              value={[highGain]}
+              onValueChange={(val) => setHighGain(val[0])}
             />
           </div>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={resetEQ}
-            className="w-full text-[9px] mono uppercase tracking-wider py-1.5 bg-[var(--bg-main)] text-[var(--text-tertiary)] hover:text-[var(--text-main)] border border-[var(--border-main)] rounded transition-colors"
+            disabled={!isAnyActive}
+            className="w-full text-[9px] mono uppercase tracking-widest gap-2 rounded-xl py-4"
           >
-            Reset
-          </button>
-        </div>
+            <RotateCcw size={12} />
+            Reset EQ
+          </Button>
+        </motion.div>
       )}
-
-      <style>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: var(--accent);
-          cursor: pointer;
-          box-shadow: 0 0 8px rgba(255,255,255,0.2);
-        }
-        .slider::-moz-range-thumb {
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: var(--accent);
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 0 8px rgba(255,255,255,0.2);
-        }
-      `}</style>
     </div>
   );
 };

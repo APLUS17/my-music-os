@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 interface FeedbackModalProps {
     onClose: () => void;
@@ -13,17 +18,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ onClose }) => {
     // ---------------------------------------------------------
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-            <div className="w-full max-w-md h-[80vh] bg-[var(--bg-card)] border border-[var(--border-main)] ring-1 ring-white/10 rounded-2xl shadow-2xl relative m-4 overflow-hidden flex flex-col">
-                <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)]">
-                    <h3 className="text-sm font-medium text-[var(--text-main)] ml-2">Beta Feedback</h3>
-                    <button
-                        onClick={onClose}
-                        className="text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors p-1 rounded-md hover:bg-[var(--bg-main)]"
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
+        <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+            <DialogContent className="max-w-md h-[80vh] p-0 overflow-hidden flex flex-col bg-[var(--bg-card)] border-[var(--border-main)]">
+                <DialogHeader className="p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)] space-y-0">
+                    <DialogTitle className="text-sm font-medium text-[var(--text-main)] ml-2">
+                        Beta Feedback
+                    </DialogTitle>
+                </DialogHeader>
 
                 <div className="flex-1 bg-[var(--bg-main)]">
                     <iframe
@@ -37,7 +38,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ onClose }) => {
                         className="w-full h-full"
                     ></iframe>
                 </div>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     );
 };

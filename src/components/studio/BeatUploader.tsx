@@ -1,6 +1,19 @@
-
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, X, RotateCcw, Repeat, Flag, Trash2, ChevronDown, Music, Settings2, Volume2 } from 'lucide-react';
+import { Play, Pause, X, RotateCcw, Repeat, Trash2, Music, Volume2 } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface BeatUploaderProps {
   audioSrc: string | null;
@@ -189,7 +202,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // --- EMPTY STATE ---
   if (!audioSrc) {
     return (
       <>
@@ -200,69 +212,66 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           className="absolute opacity-0 w-0 h-0 pointer-events-none"
           onChange={handleFileChange}
         />
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 px-3 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center gap-2 text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)] transition-all"
-          title="Load Reference Track"
+          className="h-8 rounded-xl bg-white/5 border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-all uppercase tracking-widest text-[10px] font-mono gap-2"
         >
           <Music size={12} />
-          <span className="text-[10px] mono uppercase tracking-wider hidden sm:inline">Load Beat</span>
-        </button>
+          <span>Load Beat</span>
+        </Button>
       </>
     );
   }
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // --- LOADED STATE (PILL) ---
   return (
     <div className="relative z-30">
+      <Popover open={showControls} onOpenChange={setShowControls}>
+        <div className="group relative h-9 rounded-xl border border-white/10 bg-white/5 flex items-center overflow-hidden hover:border-white/20 transition-all shadow-sm">
+          <div
+            className="absolute inset-0 bg-white opacity-5 pointer-events-none transition-all duration-200 ease-linear origin-left"
+            style={{ transform: `scaleX(${progressPercent / 100})` }}
+          />
 
-      {/* Split Action Pill */}
-      <div className="group relative h-8 rounded-md border border-[var(--border-main)] bg-[var(--bg-secondary)] flex items-center overflow-hidden hover:border-[var(--text-tertiary)] transition-colors">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-white/10 text-white active:scale-90 transition-all rounded-none"
+          >
+            {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+          </Button>
 
-        {/* Progress Background Fill (Underneath everything) */}
-        <div
-          className="absolute inset-0 bg-[var(--text-main)] opacity-10 pointer-events-none transition-all duration-200 ease-linear origin-left"
-          style={{ transform: `scaleX(${progressPercent / 100})` }}
-        />
+          <div className="w-[1px] h-3 bg-white/10 relative z-10" />
 
-        {/* Action 1: Play/Pause Toggle */}
-        <button
-          onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-          className="relative z-20 h-full pl-2 pr-2 flex items-center justify-center hover:bg-[var(--bg-hover)] active:scale-95 transition-all text-[var(--text-main)]"
-          title={isPlaying ? "Pause" : "Play"}
-        >
-          {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" />}
-        </button>
-
-        {/* Divider (Optional visual separation) */}
-        <div className="w-[1px] h-3 bg-[var(--border-main)] relative z-10 opacity-50" />
-
-        {/* Action 2: Open Controls */}
-        <button
-          onClick={() => setShowControls(!showControls)}
-          className="relative z-10 h-full pl-2 pr-3 flex items-center gap-2 hover:bg-[var(--bg-hover)] transition-colors"
-          title="Open Controls"
-        >
-          <span className="text-[10px] mono uppercase font-medium text-[var(--text-main)] max-w-[80px] truncate">{beatName || 'Beat'}</span>
-        </button>
-      </div>
-
-      {/* --- CONTROLS POPOVER --- */}
-      {showControls && (
-        <div className="absolute top-full right-0 mt-2 w-72 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] p-3 animate-in fade-in zoom-in-95 origin-top-right z-50">
-
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-[10px] mono uppercase text-[var(--text-tertiary)]">{beatName || 'Beat'}</span>
-            <button onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-500 transition-colors">
-              <Trash2 size={12} />
+          <PopoverTrigger asChild>
+            <button
+              className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-white/5 transition-colors text-left"
+            >
+              <span className="text-[10px] mono uppercase font-bold tracking-widest text-white/80 max-w-[100px] truncate">{beatName || 'Beat'}</span>
+              <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-white/40">BEAT</Badge>
             </button>
+          </PopoverTrigger>
+        </div>
+
+        <PopoverContent align="end" className="w-80 p-4 bg-[var(--bg-card)] border-white/10 shadow-2xl rounded-2xl flex flex-col gap-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] mono uppercase tracking-widest text-white/30">Backing Track</span>
+              <span className="text-sm font-bold text-white truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onClear} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
+              <Trash2 size={14} />
+            </Button>
           </div>
 
-          <div className="relative w-full h-12 flex items-center mb-1 select-none touch-none">
-            <div className="relative w-full h-8 bg-[var(--bg-secondary)] rounded-md cursor-pointer overflow-hidden border border-[var(--border-main)]"
+          {/* Timeline / Scrubber */}
+          <div className="relative w-full h-12 flex items-center select-none touch-none">
+            <div className="relative w-full h-8 bg-black/40 rounded-xl cursor-pointer overflow-hidden border border-white/5"
               ref={progressRef}
               onMouseDown={handleSeek}
               onTouchStart={handleTouchSeek}
@@ -270,7 +279,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               {/* Loop Region background */}
               {isLooping && loopStart !== null && loopEnd !== null && (
                 <div
-                  className="absolute top-0 bottom-0 bg-[var(--accent)] opacity-10 pointer-events-none"
+                  className="absolute top-0 bottom-0 bg-[var(--accent)] opacity-20 pointer-events-none"
                   style={{
                     left: `${(loopStart / duration) * 100}%`,
                     width: `${((loopEnd - loopStart) / duration) * 100}%`
@@ -279,81 +288,86 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               )}
               {/* Progress fill */}
               <div
-                className="absolute top-0 bottom-0 bg-[var(--text-secondary)] opacity-30 pointer-events-none"
+                className="absolute top-0 bottom-0 bg-white opacity-20 pointer-events-none"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            {/* Loop Markers (Circular Handles) - Outside overflow-hidden container */}
+            {/* Loop Markers */}
             {isLooping && loopStart !== null && (
               <div
-                className="absolute top-0 bottom-2 w-6 -ml-3 z-30 cursor-col-resize flex flex-col items-center group"
+                className="absolute top-0 bottom-0 w-6 -ml-3 z-30 cursor-col-resize flex flex-col items-center group"
                 style={{ left: `${(loopStart / duration) * 100}%` }}
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
               >
-                {/* The Circle Handle (Top) */}
-                <div className="w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg border border-[var(--bg-main)] z-10 group-hover:scale-125 group-active:scale-95 transition-transform" />
-                {/* The Vertical Line */}
-                <div className="w-[1.5px] flex-1 bg-[var(--accent)] opacity-60 group-hover:opacity-100 shadow-[0_0_8px_rgba(var(--accent-rgb),0.5)]" />
+                <div className="w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-[1.5px] flex-1 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
               </div>
             )}
             {isLooping && loopEnd !== null && (
               <div
-                className="absolute top-2 bottom-0 w-6 -ml-3 z-30 cursor-col-resize flex flex-col-reverse items-center group"
+                className="absolute top-0 bottom-0 w-6 -ml-3 z-30 cursor-col-resize flex flex-col-reverse items-center group"
                 style={{ left: `${(loopEnd / duration) * 100}%` }}
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
               >
-                {/* The Circle Handle (Bottom) */}
-                <div className="w-3 h-3 rounded-full bg-[var(--text-main)] shadow-lg border border-[var(--bg-main)] z-10 group-hover:scale-125 group-active:scale-95 transition-transform" />
-                {/* The Vertical Line */}
-                <div className="w-[1.5px] flex-1 bg-[var(--text-main)] opacity-60 group-hover:opacity-100 shadow-[0_0_8px_rgba(255,255,255,0.3)]" />
+                <div className="w-3 h-3 rounded-full bg-white shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-[1.5px] flex-1 bg-white opacity-60" />
               </div>
             )}
           </div>
 
-          {/* Controls Row */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] mono tabular-nums text-[var(--text-main)]">
-              {formatTime(currentTime)} / {formatTime(duration)}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] mono tabular-nums text-white/40">
+              {formatTime(currentTime)} <span className="opacity-30">/</span> {formatTime(duration)}
             </span>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)]">
-                <RotateCcw size={14} />
-              </button>
-              <button
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/5">
+                    <RotateCcw size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reset position</TooltipContent>
+              </Tooltip>
+
+              <Button
+                variant={isLooping ? "default" : "outline"}
+                size="sm"
                 onClick={() => setIsLooping(!isLooping)}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] mono uppercase border transition-all ${isLooping ? 'bg-[var(--bg-hover)] border-[var(--accent)] text-[var(--text-main)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                className={cn(
+                  "h-7 rounded-lg text-[10px] mono uppercase tracking-widest gap-2",
+                  isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-white/10 text-white/40"
+                )}
               >
-                <Repeat size={10} /> Loop
-              </button>
+                <Repeat size={10} /> {isLooping ? 'Looping' : 'Loop'}
+              </Button>
             </div>
           </div>
 
-          {/* Loop Points Details (only if looping) */}
           {isLooping && (
-            <div className="flex gap-2 mb-3">
-              <button onClick={() => setLoopStart(currentTime)} className="flex-1 py-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded text-[9px] mono uppercase text-[var(--text-secondary)] hover:text-[var(--text-main)]">Set Start</button>
-              <button onClick={() => setLoopEnd(currentTime)} className="flex-1 py-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded text-[9px] mono uppercase text-[var(--text-secondary)] hover:text-[var(--text-main)]">Set End</button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setLoopStart(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set Start</Button>
+              <Button variant="outline" size="sm" onClick={() => setLoopEnd(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set End</Button>
             </div>
           )}
 
           {/* Volume */}
-          <div className="pt-3 border-t border-[var(--border-main)] flex items-center gap-2">
-            <Volume2 size={12} className="text-[var(--text-tertiary)]" />
-            <input
-              type="range"
-              min="0" max="1" step="0.1"
-              value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="flex-1 h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-secondary)] hover:[&::-webkit-slider-thumb]:bg-[var(--text-main)]"
+          <div className="pt-4 border-t border-white/5 flex items-center gap-4">
+            <Volume2 size={14} className="text-white/20" />
+            <Slider
+              min={0}
+              max={1}
+              step={0.01}
+              value={[volume]}
+              onValueChange={(val) => setVolume(val[0])}
+              className="flex-1"
             />
           </div>
-
-        </div>
-      )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };

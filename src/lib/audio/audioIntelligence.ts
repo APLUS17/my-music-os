@@ -56,7 +56,7 @@ Return ONLY a JSON object with this exact structure:
         const genAI = new GoogleGenAI({ apiKey });
 
         const response = await genAI.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-3.1-flash-lite-preview",
             contents: [
                 { text: prompt },
                 {

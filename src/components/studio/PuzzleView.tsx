@@ -1,7 +1,15 @@
-
 import React, { useState } from 'react';
 import { LyricScrap, SectionType } from '@/types';
 import { Plus, GripVertical, Hash, FilePlus2, Send, Tag } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface PuzzleViewProps {
   scraps: LyricScrap[];
@@ -19,88 +27,93 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
   const [selectedType, setSelectedType] = useState<SectionType>('idea');
 
   const getCardStyle = (type: SectionType) => {
-    switch(type) {
-      case 'chorus': return 'border-[var(--accent)] shadow-[0_0_15px_rgba(0,0,0,0.3)]';
-      case 'verse': return 'border-[var(--border-main)]';
-      case 'bridge': return 'border-[var(--text-secondary)]';
-      default: return 'border-dashed border-[var(--text-tertiary)] opacity-80';
+    switch (type) {
+      case 'chorus': return 'border-[var(--accent)] shadow-[0_0_15px_rgba(0,0,0,0.3)] shadow-[var(--accent)]/5';
+      case 'verse': return 'border-white/10';
+      case 'bridge': return 'border-white/20';
+      default: return 'border-dashed border-white/5 opacity-80';
     }
   };
 
   return (
     <div className="h-full flex flex-col pt-4 pb-36 px-4 overflow-y-auto scrollbar-hide">
-      
+
       {/* Header */}
       <div className="mb-6 px-2 flex items-end justify-between">
-        <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">Muse</h1>
-        <span className="text-[10px] mono text-[var(--text-secondary)] mb-1">{scraps.length} ITEMS</span>
+        <h1 className="text-3xl font-bold tracking-tighter text-white">Muse</h1>
+        <Badge variant="outline" className="text-[10px] mono border-white/5 text-white/40 mb-1">{scraps.length} ITEMS</Badge>
       </div>
 
       {/* Dynamic Input Area */}
-      <div className="mb-8 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-[1.5rem] p-4 shadow-xl z-10 relative">
-        <textarea 
+      <div className="mb-8 bg-white/5 border border-white/10 rounded-[1.5rem] p-4 shadow-xl z-10 relative group-focus-within:border-white/20 transition-all">
+        <textarea
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
           placeholder="Capture an idea..."
-          className="w-full bg-transparent p-2 text-sm font-sans text-[var(--text-main)] focus:outline-none min-h-[60px] resize-none placeholder:text-[var(--text-tertiary)]"
+          className="w-full bg-transparent p-2 text-sm font-sans text-white focus:outline-none min-h-[80px] resize-none placeholder:text-white/20"
         />
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-main)]">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
             {['idea', 'verse', 'chorus', 'bridge'].map((t) => (
               <button
                 key={t}
                 onClick={() => setSelectedType(t as SectionType)}
-                className={`px-3 py-1 rounded-full text-[9px] mono uppercase tracking-widest transition-all ${
-                  selectedType === t 
-                    ? 'bg-[var(--text-main)] text-[var(--bg-main)]' 
-                    : 'bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-main)]'
-                }`}
+                className={cn(
+                  "px-3 py-1 rounded-full text-[9px] mono uppercase tracking-widest transition-all",
+                  selectedType === t
+                    ? 'bg-white text-black font-bold'
+                    : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
+                )}
               >
                 {t}
               </button>
             ))}
           </div>
-          <button 
-            onClick={() => { if(newText.trim()) { onAdd(newText, selectedType); setNewText(""); } }}
+          <Button
+            size="icon"
+            onClick={() => { if (newText.trim()) { onAdd(newText, selectedType); setNewText(""); } }}
             disabled={!newText.trim()}
-            className="w-10 h-10 bg-[var(--accent)] text-[var(--bg-main)] rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50 disabled:shadow-none"
+            className="w-10 h-10 bg-[var(--accent)] text-black rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50 hover:brightness-110"
           >
             <Plus size={18} strokeWidth={3} />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* The Spatial Board */}
       <div className="columns-2 gap-4 space-y-4 pb-20">
         {scraps.map((scrap, idx) => (
-          <div 
-            key={scrap.id} 
-            className={`break-inside-avoid relative p-4 rounded-xl bg-[var(--bg-card)] border transition-all hover:-translate-y-1 group ${getCardStyle(scrap.type)}`}
+          <div
+            key={scrap.id}
+            className={cn(
+              "break-inside-avoid relative p-4 rounded-xl bg-white/5 border transition-all hover:scale-[1.02] shadow-sm group",
+              getCardStyle(scrap.type)
+            )}
           >
             <div className="flex items-center justify-between mb-3">
-               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[8px] mono uppercase tracking-widest text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors cursor-pointer">
-                 <Hash size={8} /> {scrap.type}
-               </div>
-               <GripVertical size={12} className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]" />
+              <Badge variant="ghost" className="h-5 px-1.5 text-[8px] mono uppercase tracking-widest bg-white/5 text-white/40 group-hover:text-white transition-colors cursor-pointer gap-1">
+                <Hash size={8} className="opacity-40" /> {scrap.type}
+              </Badge>
+              <GripVertical size={12} className="text-white/20 group-hover:text-white/40" />
             </div>
-            
-            <p className="text-sm font-sans text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
+
+            <p className="text-sm font-sans text-white/90 leading-relaxed whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-black">
               {scrap.text}
             </p>
 
             {/* Tags */}
             {scrap.tags && scrap.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-3">
                 {scrap.tags.map((tag, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[8px] mono">#{tag}</span>
+                  <Badge key={i} variant="outline" className="px-1.5 h-4 border-[var(--accent)]/20 bg-[var(--accent)]/5 text-[var(--accent)] text-[8px] mono rounded-md">#{tag}</Badge>
                 ))}
               </div>
             )}
 
             {/* Tag editor */}
             {editingTagsId === scrap.id && (
-              <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <input
+              <div className="mt-3 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <Input
                   autoFocus
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
@@ -109,51 +122,72 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                       const existing = scrap.tags || [];
                       onUpdateTags?.(scrap.id, [...existing, tagInput.trim()]);
                       setTagInput("");
+                      setEditingTagsId(null);
                     }
                     if (e.key === 'Escape') { setEditingTagsId(null); setTagInput(""); }
                   }}
                   placeholder="Add tag..."
-                  className="flex-1 bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded px-2 py-1 text-[9px] text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
+                  className="h-7 text-[10px] bg-black/40 border-white/10 rounded-lg focus:ring-[var(--accent)]"
                 />
               </div>
             )}
 
             {/* Actions */}
             <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all">
-              <button
-                onClick={(e) => { e.stopPropagation(); setEditingTagsId(editingTagsId === scrap.id ? null : scrap.id); setTagInput(""); }}
-                className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all shadow-sm"
-                title="Add Tag"
-              >
-                <Tag size={12} />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); setEditingTagsId(editingTagsId === scrap.id ? null : scrap.id); setTagInput(""); }}
+                    className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-white hover:bg-white/10"
+                  >
+                    <Tag size={12} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add Tag</TooltipContent>
+              </Tooltip>
+
               {onSendToStudio && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onSendToStudio(scrap.text); }}
-                  className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all shadow-sm"
-                  title="Send to Studio"
-                >
-                  <Send size={12} />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); onSendToStudio(scrap.text); }}
+                      className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                    >
+                      <Send size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Send to Studio</TooltipContent>
+                </Tooltip>
               )}
+
               {scrap.type !== 'idea' && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
-                  className="p-1.5 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all shadow-sm"
-                  title="Start New Project"
-                >
-                  <FilePlus2 size={12} />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
+                      className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-black hover:bg-[var(--accent)]"
+                    >
+                      <FilePlus2 size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Start Project</TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>
         ))}
-        
+
         {scraps.length === 0 && (
-            <div className="break-inside-avoid flex flex-col items-center justify-center opacity-20 py-10 col-span-2">
-                <Hash size={48} strokeWidth={1} />
-                <p className="mt-4 text-[10px] mono uppercase tracking-widest">Board Empty</p>
-            </div>
+          <div className="break-inside-avoid flex flex-col items-center justify-center opacity-10 py-16 col-span-2">
+            <Hash size={64} strokeWidth={1} />
+            <p className="mt-4 text-[11px] mono uppercase tracking-[0.2em]">Board Empty</p>
+          </div>
         )}
       </div>
     </div>

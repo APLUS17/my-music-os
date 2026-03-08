@@ -1,8 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Scissors, Trash2, Mic } from 'lucide-react';
+import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession, AutoSection } from '@/types';
 import { cn } from '@/lib/utils';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RecordingThreadProps {
     sessions: RecordingSession[];
@@ -26,7 +34,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return (
-        <div className="flex flex-col gap-4 p-4 pb-32 max-w-2xl mx-auto w-full">
+        <div className="flex flex-col gap-6 p-4 pb-32 max-w-3xl mx-auto w-full">
             {sortedSessions.map((session) => (
                 <SessionCard
                     key={session.id}
@@ -44,7 +52,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
                 <div className="flex flex-col items-center justify-center p-12 text-[var(--text-secondary)] border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
                     <Mic size={32} className="mb-4 opacity-40" />
                     <p className="text-center font-medium text-sm">No recordings yet</p>
-                    <p className="text-center text-xs opacity-60 mt-1">Tap the record button to start</p>
+                    <p className="text-center text-xs opacity-60 mt-1">Tap the record button to start session capturing</p>
                 </div>
             )}
         </div>
@@ -52,7 +60,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
 };
 
 // ────────────────────────────────────────────────────
-// Session Card
+// Session Card (Dubnote Threaded View)
 // ────────────────────────────────────────────────────
 
 const SessionCard = ({
@@ -72,9 +80,12 @@ const SessionCard = ({
     onUpdateSection: (sectionId: string, updates: Partial<AutoSection>) => void;
     onOpenSplitEditor: () => void;
 }) => {
-    const [isPlaying, setIsPlaying] = useState(false);
+    const [isPlayingAll, setIsPlayingAll] = useState(false);
+    const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [progress, setProgress] = useState(0);
+
+    const activePlaybackSection = session.sections.find(s => s.id === playingSectionId);
 
     useEffect(() => {
         if (session.audioUrl && audioRef.current) {
@@ -82,16 +93,52 @@ const SessionCard = ({
         }
     }, [session.audioUrl]);
 
-    const togglePlay = (e: React.MouseEvent) => {
+    // Handle Time Updates specifically for playing single sections
+    const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+        const audio = e.currentTarget;
+        const dur = session.duration || 0;
+
+        if (dur > 0) setProgress(audio.currentTime / dur);
+
+        if (playingSectionId && activePlaybackSection) {
+            if (audio.currentTime >= activePlaybackSection.endTime) {
+                audio.pause();
+                setPlayingSectionId(null);
+                setIsPlayingAll(false);
+            }
+        }
+    };
+
+    const togglePlayAll = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (audioRef.current) {
-            if (isPlaying) {
+            if (isPlayingAll && !playingSectionId) {
                 audioRef.current.pause();
+                setIsPlayingAll(false);
             } else {
+                // If a section was playing, just reset to play all from current time, or from 0
+                setPlayingSectionId(null);
                 audioRef.current.play();
                 onSelect();
+                setIsPlayingAll(true);
             }
-            setIsPlaying(!isPlaying);
+        }
+    };
+
+    const playSection = (sec: AutoSection, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (audioRef.current) {
+            if (playingSectionId === sec.id && !audioRef.current.paused) {
+                audioRef.current.pause();
+                setPlayingSectionId(null);
+                setIsPlayingAll(false);
+            } else {
+                audioRef.current.currentTime = sec.startTime;
+                audioRef.current.play();
+                setPlayingSectionId(sec.id);
+                setIsPlayingAll(false);
+                onSelect();
+            }
         }
     };
 
@@ -101,222 +148,174 @@ const SessionCard = ({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             className={cn(
-                "group flex flex-col bg-[var(--bg-card)] border rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer",
-                isActive
-                    ? "border-[var(--accent)]/50 shadow-[0_8px_32px_rgba(0,0,0,0.3),0_0_15px_rgba(255,255,255,0.03)] ring-1 ring-[var(--accent)]/20"
-                    : "border-white/10 opacity-70 hover:opacity-100 hover:border-white/20 hover:translate-y-[-2px]"
+                "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden transition-all duration-300",
+                "bg-[#111] border border-white/10",
+                isActive ? "ring-1 ring-white/20 shadow-lg" : "opacity-90 hover:opacity-100 hover:border-white/15"
             )}
             onClick={onSelect}
         >
             <audio
                 ref={audioRef}
-                onTimeUpdate={(e) => {
-                    const dur = session.duration || 0;
-                    if (dur > 0) setProgress(e.currentTarget.currentTime / dur);
-                }}
-                onEnded={() => { setIsPlaying(false); setProgress(0); }}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => { setIsPlayingAll(false); setPlayingSectionId(null); setProgress(0); }}
             />
 
-            {/* Header */}
-            <div className={cn(
-                "flex items-center justify-between p-4 pb-3 transition-colors",
-                isActive ? "bg-gradient-to-br from-white/[0.05] to-transparent" : "bg-black/20"
-            )}>
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <button
-                        onClick={togglePlay}
-                        className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all duration-300 shadow-lg",
-                            isPlaying
-                                ? "bg-[var(--accent)] text-black scale-105"
-                                : "bg-white/10 text-white hover:bg-white/20 hover:scale-110 active:scale-95 border border-white/5"
-                        )}
-                    >
-                        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
-                    </button>
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={session.name || 'Untitled Recording'}
-                                onChange={(e) => onUpdate({ name: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                className="bg-transparent text-base font-semibold text-[var(--text-main)] outline-none border-b border-transparent focus:border-[var(--accent)]/50 transition-all w-full max-w-[200px] tracking-tight"
-                            />
+            {/* Header: Master Controls & Metadata */}
+            <div className="flex items-start gap-4">
+                <Button
+                    onClick={togglePlayAll}
+                    size="icon"
+                    className={cn(
+                        "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-white/10",
+                        (isPlayingAll && !playingSectionId)
+                            ? "bg-white text-black hover:bg-white/90"
+                            : "bg-[#222] text-white hover:bg-[#333]"
+                    )}
+                >
+                    {(isPlayingAll && !playingSectionId) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                </Button>
+
+                <div className="flex flex-col flex-1 min-w-0 pt-1">
+                    <Input
+                        type="text"
+                        value={session.name || 'Untitled Recording'}
+                        onChange={(e) => onUpdate({ name: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-auto p-0 -ml-1 bg-transparent border-none text-lg font-semibold text-white outline-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-white/30"
+                    />
+                    <div className="flex items-center justify-between mt-1">
+                        <div className="flex items-center gap-2 text-xs text-white/50 font-medium">
+                            <span>{new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="w-1 h-1 rounded-full bg-white/20" />
+                            <span>{(session.duration || 0).toFixed(1)}s</span>
+                            {session.isLoopSession && (
+                                <Badge variant="outline" className="h-5 px-1.5 ml-1 text-[9px] bg-white/5 text-white/80 border-white/10 uppercase tracking-wide">
+                                    LOOP
+                                </Badge>
+                            )}
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-[var(--text-tertiary)] mono uppercase tracking-widest font-medium flex items-center gap-1.5">
-                                {new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                <span className="w-1 h-1 rounded-full bg-white/20" />
-                                {(session.duration || 0).toFixed(1)}s
-                                {session.isLoopSession && (
-                                    <>
-                                        <span className="w-1 h-1 rounded-full bg-white/20" />
-                                        <span className="text-[var(--accent)]/80">Loop</span>
-                                    </>
-                                )}
-                            </span>
-                        </div>
-                        {session.transcription && (
-                            <span className="text-[11px] text-[var(--text-secondary)] italic line-clamp-1 mt-1.5 opacity-60 leading-relaxed font-serif tracking-tight pr-4">
-                                &ldquo;{session.transcription}&rdquo;
-                            </span>
-                        )}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <button
+                <div className="flex items-center gap-1 shrink-0 transition-opacity">
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => { e.stopPropagation(); onOpenSplitEditor(); }}
-                        className="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/10 transition-all active:scale-90"
-                        title="Split/Merge Editor"
+                        className="w-10 h-10 rounded-full text-white/40 hover:text-white hover:bg-white/10"
                     >
-                        <Scissors size={15} />
-                    </button>
-                    <button
+                        <Scissors size={18} />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm('Delete this recording?')) onDelete();
+                            if (confirm('Delete this session?')) onDelete();
                         }}
-                        className="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-400/10 transition-all active:scale-90"
+                        className="w-10 h-10 rounded-full text-white/40 hover:text-red-400 hover:bg-red-400/10"
                     >
-                        <Trash2 size={15} />
-                    </button>
+                        <Trash2 size={18} />
+                    </Button>
                 </div>
             </div>
 
-            {/* Timeline Mini-map */}
-            <div className="h-2 bg-black/60 relative w-full overflow-hidden mx-4 w-[calc(100%-32px)] rounded-full mb-3 border border-white/[0.03]">
-                <div
-                    className="absolute left-0 top-0 bottom-0 bg-[var(--accent)] transition-all duration-300 ease-out z-10 opacity-60 shadow-[0_0_10px_var(--accent)]"
-                    style={{ width: `${progress * 100}%` }}
+            {/* Master Progress Bar */}
+            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
+                <motion.div
+                    className="h-full bg-white/80 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress * 100}%` }}
+                    transition={{ duration: 0.1, ease: "linear" }}
                 />
-                <div className="absolute inset-0 z-0 flex gap-[2px]">
-                    {Array.from({ length: 40 }).map((_, i) => (
-                        <div key={i} className="flex-1 h-full bg-white/[0.03]" />
-                    ))}
-                </div>
-                {session.sections.map(sec => {
-                    const dur = session.duration || 1;
-                    const secLeft = (sec.startTime / dur) * 100;
-                    const secWidth = ((sec.endTime - sec.startTime) / dur) * 100;
-                    return (
-                        <div
-                            key={sec.id}
-                            className={cn(
-                                "absolute top-[2px] bottom-[2px] rounded-full transition-all duration-500 z-2",
-                                sec.isBest ? "bg-white/40 shadow-[0_0_4px_white]" : "bg-white/5"
-                            )}
-                            style={{
-                                left: `${secLeft}%`,
-                                width: `${Math.max(secWidth, 1)}%`,
-                            }}
-                        />
-                    );
-                })}
             </div>
 
-            {/* Sections List */}
-            <div className={cn(
-                "flex flex-col p-3 pt-2 gap-1.5 transition-all",
-                isActive ? "bg-black/20" : "bg-black/10"
-            )}>
-                <div className="flex items-center justify-between px-1 mb-1">
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] font-bold mono">
-                        {session.isLoopSession ? `Takes (${session.sections.length})` : `Sections (${session.sections.length})`}
+            {/* Threaded Sections */}
+            <div className="mt-2 pl-[22px] border-l-2 border-white/[0.05] ml-[22px] flex flex-col gap-3 pb-2">
+                {session.sections.length > 0 ? session.sections.map((sec, idx) => {
+                    const isThisSectionPlaying = playingSectionId === sec.id;
+
+                    return (
+                        <div key={sec.id} className="relative flex items-center group/sec">
+                            {/* Emoji Node on thread line */}
+                            <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-[10px] shadow-sm z-10">
+                                {sec.emojiTag || getEmojiForType(sec.type)}
+                            </div>
+
+                            {/* Section Content Card */}
+                            <div
+                                onClick={(e) => playSection(sec, e)}
+                                className={cn(
+                                    "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer",
+                                    isThisSectionPlaying
+                                        ? "bg-white/10 border-white/20 shadow-inner"
+                                        : "bg-black/20 border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10"
+                                )}
+                            >
+                                <div className="flex flex-col min-w-0 pr-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn(
+                                            "text-sm font-semibold truncate transition-colors",
+                                            isThisSectionPlaying ? "text-white" : "text-white/80 group-hover/sec:text-white"
+                                        )}>
+                                            {sec.label || sec.type}
+                                        </span>
+                                        {sec.isBest && <Heart size={10} className="text-white/60" />}
+                                    </div>
+                                    <span className="text-[10px] text-white/40 font-mono tracking-tighter mt-0.5">
+                                        {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onUpdateSection(sec.id, { isBest: !sec.isBest });
+                                        }}
+                                        className={cn("w-8 h-8 rounded-full", sec.isBest ? "text-red-400 hover:text-red-300 hover:bg-red-400/10" : "text-white/30 hover:text-white hover:bg-white/10")}
+                                    >
+                                        <Heart size={14} fill={sec.isBest ? "currentColor" : "none"} />
+                                    </Button>
+
+                                    <div className={cn(
+                                        "flex justify-center items-center w-8 h-8 rounded-full border transition-all",
+                                        isThisSectionPlaying
+                                            ? "bg-white text-black border-transparent"
+                                            : "bg-[#222] text-white border-white/10 group-hover/sec:bg-[#333]"
+                                    )}>
+                                        {isThisSectionPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }) : (
+                    <div className="text-xs text-white/30 italic py-2">
+                        Processing sections...
                     </div>
-                </div>
-                <div className="flex flex-col gap-1.5 px-0.5">
-                    {session.sections.map((sec, idx) => (
-                        <motion.div
-                            key={sec.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: idx * 0.04, duration: 0.3 }}
-                        >
-                            <SectionItem
-                                section={sec}
-                                duration={session.duration || 0}
-                                onToggleBest={() => {
-                                    if (session.isLoopSession) {
-                                        onUpdateSection(sec.id, { isBest: true });
-                                    } else {
-                                        onUpdateSection(sec.id, { isBest: !sec.isBest });
-                                    }
-                                }}
-                                isLoopMode={session.isLoopSession}
-                            />
-                        </motion.div>
-                    ))}
-                </div>
+                )}
+
+                {session.sections.length > 0 && (
+                    <div className="relative mt-2">
+                        <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-white/20 bg-[#111] z-10" />
+                    </div>
+                )}
             </div>
+
         </motion.div>
     );
 };
 
-// ────────────────────────────────────────────────────
-// Section Item
-// ────────────────────────────────────────────────────
-
-const TYPE_STYLES: Record<string, string> = {
-    vocal: "bg-blue-500/10 text-blue-300 ring-1 ring-blue-500/20",
-    speech: "bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20",
-    instrumental: "bg-purple-500/10 text-purple-300 ring-1 ring-purple-500/20",
-    silence: "bg-gray-500/10 text-gray-400 ring-1 ring-white/10"
-};
-
-const SectionItem = ({ section, duration, onToggleBest, isLoopMode }: {
-    section: AutoSection;
-    duration: number;
-    onToggleBest: () => void;
-    isLoopMode?: boolean;
-}) => {
-    const sectionLabel = section.label
-        || (isLoopMode
-            ? (section.loopPass ? `Take ${section.loopPass}` : `Take`)
-            : `${section.startTime.toFixed(1)}s – ${section.endTime.toFixed(1)}s`);
-
-    const isBest = section.isBest;
-
-    return (
-        <div
-            onClick={(e) => { e.stopPropagation(); onToggleBest(); }}
-            className={cn(
-                "group/item flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-300 cursor-pointer border",
-                isBest
-                    ? "bg-white/[0.08] text-[var(--text-main)] border-white/20 shadow-sm"
-                    : "bg-white/[0.02] text-[var(--text-secondary)] border-transparent hover:bg-white/[0.05] hover:border-white/10"
-            )}
-        >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 flex-shrink-0",
-                    isBest
-                        ? "border-[var(--accent)] bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"
-                        : "border-white/10 bg-transparent group-hover/item:border-white/30"
-                )}>
-                    {isBest && <motion.div layoutId={`best-${section.id}`} className="w-2 h-2 rounded-full bg-black" />}
-                </div>
-
-                <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                        {section.emojiTag && <span className="text-sm flex-shrink-0 animate-in zoom-in-0 duration-500">{section.emojiTag}</span>}
-                        <span className={cn(
-                            "font-medium text-xs truncate tracking-tight transition-colors",
-                            isBest ? "text-white" : "text-[var(--text-secondary)]"
-                        )}>{sectionLabel}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                <div className={cn(
-                    "px-2 py-0.5 rounded-full text-[8px] uppercase tracking-[0.15em] font-bold flex-shrink-0 backdrop-blur-md transition-all",
-                    TYPE_STYLES[section.type] || TYPE_STYLES.vocal
-                )}>
-                    {section.type}
-                </div>
-            </div>
-        </div>
-    );
-};
+// Helper for default emojis based on type
+function getEmojiForType(type: string): string {
+    switch (type) {
+        case 'vocal': return '🎤';
+        case 'speech': return '💬';
+        case 'instrumental': return '🎸';
+        case 'silence': return '⏸️';
+        default: return '🎵';
+    }
+}

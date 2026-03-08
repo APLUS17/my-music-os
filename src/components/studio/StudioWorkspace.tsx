@@ -32,8 +32,16 @@ import {
     Trash2,
     MessageSquare,
     Save,
-    Mic
+    Mic,
+    FileMusic,
+    History,
+    Type
 } from 'lucide-react';
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -350,7 +358,6 @@ const StudioWorkspace: React.FC = () => {
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
     const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
-    const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const [fabOpen, setFabOpen] = useState(false);
@@ -554,7 +561,7 @@ const StudioWorkspace: React.FC = () => {
         const hasApiKey = !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
         if (hasApiKey) {
-            setToastMessage(`Recording saved! AI analyzing...`);
+            toast.success('Recording saved! AI analyzing...');
             // Background AI refinement
             analyzeAudioWithGemini(base64).then(aiResult => {
                 if (aiResult) {
@@ -579,19 +586,13 @@ const StudioWorkspace: React.FC = () => {
                         }
                         return s;
                     }));
-                    setToastMessage(`✨ AI refined your recording!`);
-                    setTimeout(() => setToastMessage(null), 3000);
-                } else {
-                    setTimeout(() => setToastMessage(null), 2000);
+                    toast.success('✨ AI refined your recording!');
                 }
             }).catch(err => {
                 console.error("AI refinement failed:", err);
-                setToastMessage(`Recording saved with ${sections.length} sections`);
-                setTimeout(() => setToastMessage(null), 2000);
             });
         } else {
-            setToastMessage(`Recording saved with ${sections.length} sections!`);
-            setTimeout(() => setToastMessage(null), 3000);
+            // No toast message here anymore
         }
     };
 
@@ -1027,8 +1028,7 @@ const StudioWorkspace: React.FC = () => {
                         onSendToStudio={(text) => {
                             setSections(prev => [...prev, { id: randomId(), type: 'verse', repeats: 1, text }]);
                             setViewMode('studio');
-                            setToastMessage('Idea added to your current project.');
-                            setTimeout(() => setToastMessage(null), 3000);
+                            toast.success('Idea added to your current project.');
                         }}
                         onUpdateTags={(id, tags) => setScraps(prev => prev.map(s => s.id === id ? { ...s, tags } : s))}
                     />
@@ -1219,15 +1219,6 @@ const StudioWorkspace: React.FC = () => {
 
                 {getActiveView()}
 
-                {/* Toast notification */}
-                {toastMessage && (
-                    <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="bg-[var(--bg-card)] border border-[var(--accent)] rounded-xl px-4 py-3 shadow-2xl flex items-center gap-2 max-w-xs">
-                            <Check size={14} className="text-[var(--accent)] flex-shrink-0" />
-                            <span className="text-xs text-[var(--text-main)]">{toastMessage}</span>
-                        </div>
-                    </div>
-                )}
 
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 

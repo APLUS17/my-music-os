@@ -1,6 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, Copy, Sparkles, RefreshCw, ArrowRight } from 'lucide-react';
+import { Copy, Sparkles, RefreshCw, ArrowRight, Check } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface MuseDrawerProps {
   onClose: () => void;
@@ -120,34 +141,100 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
     navigator.clipboard.writeText(text);
   };
 
-  const wordModes = MODES.filter(m => m.section === 'words');
-  const textfxModes = MODES.filter(m => m.section === 'textfx');
-  const lyricModes = MODES.filter(m => m.section === 'lyric');
-
   return (
-    <div className="absolute inset-y-0 right-0 w-[85%] max-w-sm bg-[var(--bg-card)] border-l border-[var(--border-main)] shadow-[-10px_0_30px_rgba(0,0,0,0.5)] z-50 flex flex-col animate-in slide-in-from-right duration-300">
-
-      <div className="flex items-center justify-between p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)]">
-        <div className="flex items-center gap-2">
+    <Sheet open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <SheetContent side="right" className="w-[85%] max-w-sm p-0 bg-[var(--bg-card)] border-l border-[var(--border-main)] flex flex-col sm:max-w-sm">
+        <SheetHeader className="p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)] flex-row items-center gap-3 space-y-0">
           <Sparkles size={16} className="text-[var(--accent)]" />
-          <h2 className="text-sm font-medium tracking-wide">MUSE</h2>
-        </div>
-        <button onClick={onClose} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] rounded-full hover:bg-[var(--bg-hover)]">
-          <X size={18} />
-        </button>
-      </div>
+          <SheetTitle className="text-sm font-medium tracking-wide">MUSE</SheetTitle>
+        </SheetHeader>
 
-      <div className="p-4 space-y-3">
-        <div className="relative group">
-          <div className="flex items-center w-full h-12 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-xl overflow-hidden focus-within:border-[var(--accent)] transition-colors shadow-sm">
-
-            <button
-              onClick={() => setIsModeOpen(!isModeOpen)}
-              className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors min-w-[100px] justify-between"
-            >
-              <span className="text-[10px] mono uppercase tracking-wider font-medium text-[var(--text-main)]">{activeMode.label}</span>
-              <ChevronDown size={12} className={`text-[var(--text-secondary)] transition-transform ${isModeOpen ? 'rotate-180' : ''}`} />
-            </button>
+        <div className="p-4 space-y-3">
+          <div className="flex items-center w-full h-12 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-[var(--accent)] transition-all shadow-sm">
+            <Popover open={isModeOpen} onOpenChange={setIsModeOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors rounded-none min-w-[100px] justify-between text-[10px] mono uppercase tracking-wider font-medium text-[var(--text-main)]"
+                >
+                  {activeMode.label}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-0 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search tools..." className="h-9" />
+                  <CommandList className="max-h-72">
+                    <CommandEmpty>No tool found.</CommandEmpty>
+                    <CommandGroup heading="Word Tools">
+                      {MODES.filter(m => m.section === 'words').map((m) => (
+                        <CommandItem
+                          key={m.id}
+                          onSelect={() => {
+                            setMode(m.id);
+                            setIsModeOpen(false);
+                            setSecondQuery('');
+                          }}
+                          className="text-xs"
+                        >
+                          <span className="mr-2 w-4 text-center opacity-50 font-mono">{m.icon}</span>
+                          {m.label}
+                          <Check
+                            className={cn(
+                              "ml-auto h-4 w-4",
+                              mode === m.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <CommandGroup heading="TextFX Creative">
+                      {MODES.filter(m => m.section === 'textfx').map((m) => (
+                        <CommandItem
+                          key={m.id}
+                          onSelect={() => {
+                            setMode(m.id);
+                            setIsModeOpen(false);
+                            setSecondQuery('');
+                          }}
+                          className="text-xs"
+                        >
+                          <span className="mr-2 w-4 text-center opacity-50 font-mono">{m.icon}</span>
+                          {m.label}
+                          <Check
+                            className={cn(
+                              "ml-auto h-4 w-4",
+                              mode === m.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <CommandGroup heading="Lyric Tools">
+                      {MODES.filter(m => m.section === 'lyric').map((m) => (
+                        <CommandItem
+                          key={m.id}
+                          onSelect={() => {
+                            setMode(m.id);
+                            setIsModeOpen(false);
+                            setSecondQuery('');
+                          }}
+                          className="text-xs"
+                        >
+                          <span className="mr-2 w-4 text-center opacity-50 font-mono">{m.icon}</span>
+                          {m.label}
+                          <Check
+                            className={cn(
+                              "ml-auto h-4 w-4",
+                              mode === m.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
             <input
               value={query}
@@ -178,100 +265,43 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               />
             </div>
           )}
-
-          {isModeOpen && (
-            <>
-              <div className="fixed inset-0 z-10 cursor-default" onClick={() => setIsModeOpen(false)} />
-              <div className="absolute top-14 left-0 w-56 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-xl z-20 py-2 animate-in fade-in zoom-in-95 duration-150 max-h-96 overflow-y-auto">
-
-                {wordModes.length > 0 && (
-                  <>
-                    <div className="px-4 py-1.5 text-[8px] mono uppercase tracking-widest text-[var(--text-tertiary)] font-bold">Word Tools</div>
-                    {wordModes.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setMode(m.id); setIsModeOpen(false); setSecondQuery(''); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-3 hover:bg-[var(--bg-hover)] ${mode === m.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
-                      >
-                        <span className="w-5 text-center opacity-50 font-mono">{m.icon}</span>
-                        <span>{m.label}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {textfxModes.length > 0 && (
-                  <>
-                    <div className="px-4 py-1.5 mt-1 text-[8px] mono uppercase tracking-widest text-[var(--accent)] font-bold">TextFX Creative</div>
-                    {textfxModes.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setMode(m.id); setIsModeOpen(false); setSecondQuery(''); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-3 hover:bg-[var(--bg-hover)] ${mode === m.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
-                      >
-                        <span className="w-5 text-center opacity-50 font-mono">{m.icon}</span>
-                        <span>{m.label}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-
-                {lyricModes.length > 0 && (
-                  <>
-                    <div className="px-4 py-1.5 mt-1 text-[8px] mono uppercase tracking-widest text-[var(--text-tertiary)] font-bold">Lyric Tools</div>
-                    {lyricModes.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => { setMode(m.id); setIsModeOpen(false); setSecondQuery(''); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-3 hover:bg-[var(--bg-hover)] ${mode === m.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}
-                      >
-                        <span className="w-5 text-center opacity-50 font-mono">{m.icon}</span>
-                        <span>{m.label}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            </>
-          )}
         </div>
-      </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2">
-        {error && (
-          <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
-            {error}
-          </div>
-        )}
-
-        {results.length === 0 && !loading && !error && (
-          <div className="h-full flex flex-col items-center justify-center opacity-30 text-center space-y-2 pb-20">
-            <Sparkles size={40} strokeWidth={1} />
-            <p className="text-xs max-w-[150px]">Select a tool and cast your query.</p>
-          </div>
-        )}
-
-        <div className={['next_line', 'rewrite', 'scene', 'acronym', 'simile'].includes(mode) ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"}>
-          {results.map((res, i) => (
-            <div
-              key={i}
-              onClick={() => copyToClipboard(res)}
-              className="group relative p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:shadow-[0_0_15px_var(--accent-dim)] transition-all cursor-pointer active:scale-95 animate-in slide-in-from-bottom-2 fade-in"
-              style={{ animationDelay: `${i * 50}ms` }}
-            >
-              <p className="text-sm text-[var(--text-main)] line-clamp-3">{res}</p>
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Copy size={12} className="text-[var(--text-tertiary)]" />
-              </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2">
+          {error && (
+            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
+              {error}
             </div>
-          ))}
+          )}
+
+          {results.length === 0 && !loading && !error && (
+            <div className="h-full flex flex-col items-center justify-center opacity-30 text-center space-y-2 pb-20">
+              <Sparkles size={40} strokeWidth={1} />
+              <p className="text-xs max-w-[150px]">Select a tool and cast your query.</p>
+            </div>
+          )}
+
+          <div className={['next_line', 'rewrite', 'scene', 'acronym', 'simile'].includes(mode) ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"}>
+            {results.map((res, i) => (
+              <div
+                key={i}
+                onClick={() => copyToClipboard(res)}
+                className="group relative p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:shadow-[0_0_15px_var(--accent-dim)] transition-all cursor-pointer active:scale-95 animate-in slide-in-from-bottom-2 fade-in"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <p className="text-sm text-[var(--text-main)] line-clamp-3">{res}</p>
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Copy size={12} className="text-[var(--text-tertiary)]" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <div className="p-3 text-center border-t border-[var(--border-main)]">
-        <p className="text-[9px] mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
-      </div>
-
-    </div>
+        <div className="p-3 text-center border-t border-[var(--border-main)]">
+          <p className="text-[9px] mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };

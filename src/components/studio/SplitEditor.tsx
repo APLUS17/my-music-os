@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { X, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { RecordingSession, AutoSection } from '@/types';
 import { randomId } from '@/lib/utils/id';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 
 interface SplitEditorProps {
     session: RecordingSession;
@@ -57,39 +65,32 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
     };
 
     return (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-[var(--bg-card)] border border-white/10 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative"
-            >
-                <button
-                    onClick={onCancel}
-                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
-                >
-                    <X size={20} />
-                </button>
-
-                <h3 className="text-xl font-bold mb-6 text-[var(--accent)]">Edit Splits</h3>
+        <Dialog open={true} onOpenChange={(open) => { if (!open) onCancel(); }}>
+            <DialogContent className="max-w-lg p-6 bg-[var(--bg-card)] border-white/10 rounded-3xl shadow-2xl">
+                <DialogHeader>
+                    <DialogTitle className="text-xl font-bold text-[var(--accent)]">Edit Splits</DialogTitle>
+                    <DialogDescription className="hidden">Manual split and merge tool for audio sections.</DialogDescription>
+                </DialogHeader>
 
                 <div className="mb-6 bg-black/40 rounded-xl p-4">
-                    <label className="text-sm font-medium text-[var(--text-secondary)] block mb-4">Set Split Playhead ({(splitPoint).toFixed(2)}s)</label>
-                    <input
-                        type="range"
-                        min="0"
-                        max={session.duration || 0}
-                        step="0.1"
-                        value={splitPoint}
-                        onChange={(e) => setSplitPoint(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-white/20 rounded-full appearance-none cursor-pointer mb-4"
+                    <label className="text-sm font-medium text-[var(--text-secondary)] block mb-4">
+                        Set Split Playhead ({(splitPoint).toFixed(2)}s)
+                    </label>
+                    <Slider
+                        min={0}
+                        max={session.duration || 100}
+                        step={0.1}
+                        value={[splitPoint]}
+                        onValueChange={(val) => setSplitPoint(val[0])}
+                        className="mb-6"
                     />
-                    <button
+                    <Button
                         onClick={handleSplit}
-                        className="px-4 py-2 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full text-sm font-bold w-full"
+                        variant="secondary"
+                        className="w-full bg-[var(--text-main)] text-[var(--bg-main)] hover:bg-[var(--text-main)]/90 font-bold rounded-full"
                     >
                         Split Here
-                    </button>
+                    </Button>
                 </div>
 
                 <div className="max-h-64 overflow-y-auto pr-2 mb-6 border border-white/5 rounded-xl p-2 bg-black/20">
@@ -111,15 +112,14 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
                     ))}
                 </div>
 
-                <button
+                <Button
                     onClick={() => onSave(sections)}
-                    className="w-full py-4 rounded-xl font-bold bg-[var(--accent)] text-black flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all text-lg"
+                    className="w-full py-6 rounded-xl font-bold bg-[var(--accent)] text-black hover:brightness-110 active:scale-95 transition-all text-lg gap-2"
                 >
                     <Check size={20} />
                     Save Changes
-                </button>
-
-            </motion.div>
-        </div>
+                </Button>
+            </DialogContent>
+        </Dialog>
     );
 };

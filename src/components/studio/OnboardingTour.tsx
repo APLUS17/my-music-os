@@ -179,7 +179,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                 <div className="mb-6">
                     <span className="text-[10px] mono uppercase tracking-widest text-[var(--accent)] mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
                     <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{params.title}</h3>
-                    <p className="text-sm text-gray-400 leading-relaxed font-light">{params.content}</p>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-light">{params.content}</p>
                 </div>
 
                 <div className="flex items-center justify-between mt-2">
@@ -213,7 +213,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
                 <button
                     onClick={onComplete}
-                    className="absolute top-6 right-6 text-gray-600 hover:text-white transition-colors p-1"
+                    className="absolute top-6 right-6 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors p-1"
                 >
                     <X size={18} />
                 </button>
