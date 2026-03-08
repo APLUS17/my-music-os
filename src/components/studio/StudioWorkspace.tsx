@@ -546,8 +546,8 @@ const StudioWorkspace: React.FC = () => {
         }
 
         const newSession: RecordingSession = {
-            id, name: `Recording ${id}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: beatOffset,
-            isLoopSession: isBeatLooping,
+            id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: beatOffset,
+            isLoopSession: !!uploadedBeat && isBeatLooping,
             sections,
             loopStart: beatLoopStart || undefined,
             loopEnd: beatLoopEnd || undefined
@@ -909,6 +909,43 @@ const StudioWorkspace: React.FC = () => {
         return results;
     }, [searchQuery, searchFilter, savedProjects, sections, sessions, beats, scraps, projectTitle]);
 
+    const updateSection = (id: string, updates: Partial<LyricSection>) => {
+        setSections(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    };
+
+    const moveSection = (id: string, direction: 'up' | 'down') => {
+        const index = sections.findIndex(s => s.id === id);
+        if (index === -1) return;
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= sections.length) return;
+        const newSections = [...sections];
+        [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
+        setSections(newSections);
+    };
+
+    const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
+
+    const addSection = () => {
+        setSections(prev => [...prev, {
+            id: randomId(),
+            type: 'verse',
+            repeats: 1,
+            text: ""
+        }]);
+    };
+
+    const promoteToSection = (text: string) => {
+        if (text.trim()) {
+            const newSection: LyricSection = {
+                id: randomId(),
+                type: 'verse',
+                repeats: 1,
+                text: text
+            };
+            setSections(prev => [...prev, newSection]);
+        }
+    };
+
     const getActiveView = () => {
         switch (viewMode) {
             case 'settings':
@@ -1016,7 +1053,7 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                    </div >
+                    </div>
                 );
             case 'board':
                 return (
@@ -1037,83 +1074,72 @@ const StudioWorkspace: React.FC = () => {
                 return (
                     <div className="h-full flex flex-col relative">
                         <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
-                            <div className="px-6 pt-12 pb-6 space-y-4">
-                                {/* Top Row: Title and Share */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                        <input
-                                            value={projectTitle}
-                                            onChange={(e) => setProjectTitle(e.target.value)}
-                                            className="bg-transparent border-none text-2xl font-medium text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)]"
-                                            placeholder="Untitled Project"
+                            <div className="px-6 py-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    {/* Left: Title and Save Status */}
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <div className="max-w-[240px] flex-1">
+                                            <input
+                                                value={projectTitle}
+                                                onChange={(e) => setProjectTitle(e.target.value)}
+                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate"
+                                                placeholder="Untitled Project"
+                                            />
+                                        </div>
+
+                                        {saveIndicator === 'saved' && (
+                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/5 border border-emerald-500/10 text-[9px] font-mono uppercase tracking-wider text-emerald-500/60">
+                                                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span>Saved</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Right: Audio Controls */}
+                                    <div id="tour-audio-controls" className="flex items-center gap-2">
+                                        <BeatUploader
+                                            audioSrc={uploadedBeat}
+                                            audioRef={beatAudioRef}
+                                            beatName={uploadedBeatName}
+                                            // Lifted Props
+                                            isPlaying={isBeatPlaying}
+                                            setIsPlaying={setIsBeatPlaying}
+                                            volume={beatVolume}
+                                            setVolume={setBeatVolume}
+                                            loopStart={beatLoopStart}
+                                            setLoopStart={setBeatLoopStart}
+                                            loopEnd={beatLoopEnd}
+                                            setLoopEnd={setBeatLoopEnd}
+                                            isLooping={isBeatLooping}
+                                            setIsLooping={setIsBeatLooping}
+                                            onUpload={async (file) => {
+                                                const url = URL.createObjectURL(file);
+                                                setUploadedBeat(url);
+                                                const name = file.name.replace(/\.\w+$/, '');
+                                                setUploadedBeatName(name);
+
+                                                // Also add to Library beats
+                                                const base64 = await blobToBase64(file);
+                                                const id = randomId();
+                                                const audio = new Audio(url);
+                                                audio.onloadedmetadata = () => {
+                                                    const dur = audio.duration;
+                                                    const mins = Math.floor(dur / 60);
+                                                    const secs = Math.floor(dur % 60);
+                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                                    const newBeat: Beat = {
+                                                        id, name, duration: durationStr,
+                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                                    };
+                                                    setBeats(prev => {
+                                                        if (prev.some(b => b.name === name)) return prev;
+                                                        return [newBeat, ...prev];
+                                                    });
+                                                };
+                                            }}
+                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
                                         />
                                     </div>
-                                    <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95">
-                                        <MessageSquare size={16} fill="currentColor" />
-                                    </button>
-                                </div>
-
-                                {/* Audio Controls */}
-                                <div id="tour-audio-controls" className="flex items-center gap-2 justify-end">
-                                    {saveIndicator === 'saved' && (
-                                        <div className="flex items-center gap-1 text-[9px] mono text-[var(--text-tertiary)] opacity-60">
-                                            <Save size={10} />
-                                            <span>Saved</span>
-                                        </div>
-                                    )}
-                                    <BeatUploader
-                                        audioSrc={uploadedBeat}
-                                        audioRef={beatAudioRef}
-                                        beatName={uploadedBeatName}
-                                        // Lifted Props
-                                        isPlaying={isBeatPlaying}
-                                        setIsPlaying={setIsBeatPlaying}
-                                        volume={beatVolume}
-                                        setVolume={setBeatVolume}
-                                        loopStart={beatLoopStart}
-                                        setLoopStart={setBeatLoopStart}
-                                        loopEnd={beatLoopEnd}
-                                        setLoopEnd={setBeatLoopEnd}
-                                        isLooping={isBeatLooping}
-                                        setIsLooping={setIsBeatLooping}
-                                        onUpload={async (file) => {
-                                            const url = URL.createObjectURL(file);
-                                            setUploadedBeat(url);
-                                            const name = file.name.replace(/\.\w+$/, '');
-                                            setUploadedBeatName(name);
-
-                                            // Also add to Library beats
-                                            const base64 = await blobToBase64(file);
-                                            const id = randomId();
-                                            const audio = new Audio(url);
-                                            audio.onloadedmetadata = () => {
-                                                const dur = audio.duration;
-                                                const mins = Math.floor(dur / 60);
-                                                const secs = Math.floor(dur % 60);
-                                                const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                const newBeat: Beat = {
-                                                    id, name, duration: durationStr,
-                                                    audioUrl: url, base64, date: new Date().toLocaleDateString()
-                                                };
-                                                setBeats(prev => {
-                                                    if (prev.some(b => b.name === name)) return prev;
-                                                    return [newBeat, ...prev];
-                                                });
-                                            };
-                                        }}
-                                        onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
-                                    />
-                                    {(uploadedBeat || sessions.length > 0) && (
-                                        <motion.button
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
-                                            onClick={() => setShowMusicPlayer(true)}
-                                            className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)] transition-all shadow-sm active:scale-95"
-                                            title="Music Player"
-                                        >
-                                            <Music size={18} fill="currentColor" />
-                                        </motion.button>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1164,7 +1190,6 @@ const StudioWorkspace: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 );
@@ -1172,42 +1197,6 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const updateSection = (id: string, updates: Partial<LyricSection>) => {
-        setSections(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
-    };
-
-    const moveSection = (id: string, direction: 'up' | 'down') => {
-        const index = sections.findIndex(s => s.id === id);
-        if (index === -1) return;
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= sections.length) return;
-        const newSections = [...sections];
-        [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-        setSections(newSections);
-    };
-
-    const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
-
-    const addSection = () => {
-        setSections(prev => [...prev, {
-            id: randomId(),
-            type: 'verse',
-            repeats: 1,
-            text: ""
-        }]);
-    };
-
-    const promoteToSection = (text: string) => {
-        if (text.trim()) {
-            const newSection: LyricSection = {
-                id: randomId(),
-                type: 'verse',
-                repeats: 1,
-                text: text
-            };
-            setSections(prev => [...prev, newSection]);
-        }
-    };
 
     return (
         <div className="h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>

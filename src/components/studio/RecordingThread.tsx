@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge, ChevronDown } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { RecordingSession, AutoSection } from '@/types';
 import { cn } from '@/lib/utils';
 import { Badge } from "@/components/ui/badge";
@@ -143,17 +143,30 @@ const SessionCard = ({
         }
     };
 
+    const x = useMotionValue(0);
+    const backgroundScale = useTransform(x, [-100, 0], [1, 0.8]);
+    const backgroundOpacity = useTransform(x, [-100, -20], [1, 0]);
+
     return (
         <div className="relative">
-            {/* Delete Background Layer */}
-            <div className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-end px-6 overflow-hidden">
-                <Trash2 className="text-white" size={24} />
-            </div>
+            {/* Delete Background Layer - Only visible after entry animation to prevent initial red flash */}
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{ opacity: backgroundOpacity }}
+                className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-end px-6 overflow-hidden"
+            >
+                <motion.div style={{ scale: backgroundScale }}>
+                    <Trash2 className="text-white" size={24} />
+                </motion.div>
+            </motion.div>
 
             <motion.div
                 layout
+                style={{ x }}
                 drag="x"
                 dragConstraints={{ left: -100, right: 0 }}
+                dragElastic={0.05}
                 onDragEnd={(_, info) => {
                     if (info.offset.x < -80) {
                         if (confirm('Permanently delete this recording?')) {
@@ -161,10 +174,11 @@ const SessionCard = ({
                         }
                     }
                 }}
+                transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                    "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden transition-all duration-300",
+                    "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden",
                     "bg-[#111] border border-white/10",
                     isActive ? "ring-1 ring-white/20 shadow-lg" : "opacity-90 hover:opacity-100 hover:border-white/15"
                 )}

@@ -55,3 +55,130 @@
 ✓ Compiled in 254ms
 ✓ Compiled in 820ms
 ✓ Compiled in 349ms
+✓ Compiled in 254ms
+✓ Compiled in 562ms
+✓ Compiled in 383ms
+✓ Compiled in 203ms
+✓ Compiled in 261ms
+ GET / 200 in 540ms (compile: 424ms, render: 116ms)
+✓ Compiled in 286ms
+✓ Finished filesystem cache database compaction in 10.3s
+ GET / 200 in 998ms (compile: 626ms, render: 372ms)
+⨯ ./src/components/studio/StudioWorkspace.tsx:1174:93
+Parsing ecmascript source code failed
+[0m [90m 1172 |[39m     }[33m;[39m
+ [90m 1173 |[39m
+[31m[1m>[22m[39m[90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {
+ [90m      |[39m                                                                                             [31m[1m^[22m[39m
+ [90m 1175 |[39m                             setSections(prev [33m=>[39m prev[33m.[39mmap(s [33m=>[39m s[33m.[39mid [33m===[39m id [33m?[39m { [33m...[39ms[33m,[39m [33m...[39mupdates } [33m:[39m s))[33m;[39m
+ [90m 1176 |[39m     }[33m;[39m
+ [90m 1177 |[39m[0m
+
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+
+./src/components/studio/StudioWorkspace.tsx:1171:9
+Parsing ecmascript source code failed
+[0m [90m 1169 |[39m                         )[33m;[39m
+ [90m 1170 |[39m                         [36mdefault[39m[33m:[39m [36mreturn[39m [36mnull[39m[33m;[39m
+[31m[1m>[22m[39m[90m 1171 |[39m         }
+ [90m      |[39m         [31m[1m^[22m[39m
+ [90m 1172 |[39m     }[33m;[39m
+ [90m 1173 |[39m
+ [90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+
+./src/components/studio/StudioWorkspace.tsx:1172:5
+Parsing ecmascript source code failed
+[0m [90m 1170 |[39m                         [36mdefault[39m[33m:[39m [36mreturn[39m [36mnull[39m[33m;[39m
+ [90m 1171 |[39m         }
+[31m[1m>[22m[39m[90m 1172 |[39m     }[33m;[39m
+ [90m      |[39m     [31m[1m^[22m[39m
+ [90m 1173 |[39m
+ [90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {
+ [90m 1175 |[39m                             setSections(prev [33m=>[39m prev[33m.[39mmap(s [33m=>[39m s[33m.[39mid [33m===[39m id [33m?[39m { [33m...[39ms[33m,[39m [33m...[39mupdates } [33m:[39m s))[33m;[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+✓ Compiled in 17ms
+ GET / 500 in 1343ms (compile: 1208ms, render: 135ms)
+⨯ ./src/components/studio/StudioWorkspace.tsx:1174:93
+Parsing ecmascript source code failed
+[0m [90m 1172 |[39m     }[33m;[39m
+ [90m 1173 |[39m
+[31m[1m>[22m[39m[90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {
+ [90m      |[39m                                                                                             [31m[1m^[22m[39m
+ [90m 1175 |[39m                             setSections(prev [33m=>[39m prev[33m.[39mmap(s [33m=>[39m s[33m.[39mid [33m===[39m id [33m?[39m { [33m...[39ms[33m,[39m [33m...[39mupdates } [33m:[39m s))[33m;[39m
+ [90m 1176 |[39m     }[33m;[39m
+ [90m 1177 |[39m[0m
+
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+
+./src/components/studio/StudioWorkspace.tsx:1171:9
+Parsing ecmascript source code failed
+[0m [90m 1169 |[39m                         )[33m;[39m
+ [90m 1170 |[39m                         [36mdefault[39m[33m:[39m [36mreturn[39m [36mnull[39m[33m;[39m
+[31m[1m>[22m[39m[90m 1171 |[39m         }
+ [90m      |[39m         [31m[1m^[22m[39m
+ [90m 1172 |[39m     }[33m;[39m
+ [90m 1173 |[39m
+ [90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+
+./src/components/studio/StudioWorkspace.tsx:1172:5
+Parsing ecmascript source code failed
+[0m [90m 1170 |[39m                         [36mdefault[39m[33m:[39m [36mreturn[39m [36mnull[39m[33m;[39m
+ [90m 1171 |[39m         }
+[31m[1m>[22m[39m[90m 1172 |[39m     }[33m;[39m
+ [90m      |[39m     [31m[1m^[22m[39m
+ [90m 1173 |[39m
+ [90m 1174 |[39m                         [36mconst[39m updateSection [33m=[39m (id[33m:[39m string[33m,[39m updates[33m:[39m [33mPartial[39m[33m<[39m[33mLyricSection[39m[33m>[39m) [33m=>[39m {
+ [90m 1175 |[39m                             setSections(prev [33m=>[39m prev[33m.[39mmap(s [33m=>[39m s[33m.[39mid [33m===[39m id [33m?[39m { [33m...[39ms[33m,[39m [33m...[39mupdates } [33m:[39m s))[33m;[39m[0m
+
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+
+Import trace:
+  Server Component:
+    ./src/components/studio/StudioWorkspace.tsx
+    ./src/app/page.tsx
+
+
+ GET / 500 in 133ms (compile: 116ms, render: 17ms)
+✓ Compiled in 373ms
+ GET / 200 in 992ms (compile: 553ms, render: 440ms)
+✓ Compiled in 429ms
