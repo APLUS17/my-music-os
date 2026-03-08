@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge } from 'lucide-react';
+import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession, AutoSection } from '@/types';
 import { cn } from '@/lib/utils';
@@ -82,6 +82,7 @@ const SessionCard = ({
 }) => {
     const [isPlayingAll, setIsPlayingAll] = useState(false);
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
+    const [isExpanded, setIsExpanded] = useState(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [progress, setProgress] = useState(0);
 
@@ -176,13 +177,24 @@ const SessionCard = ({
                 </Button>
 
                 <div className="flex flex-col flex-1 min-w-0 pt-1">
-                    <Input
-                        type="text"
-                        value={session.name || 'Untitled Recording'}
-                        onChange={(e) => onUpdate({ name: e.target.value })}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-auto p-0 -ml-1 bg-transparent border-none text-lg font-semibold text-white outline-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-white/30"
-                    />
+                    <div className="flex items-center gap-2 group/title">
+                        <Input
+                            type="text"
+                            value={session.name || 'Untitled Recording'}
+                            onChange={(e) => onUpdate({ name: e.target.value })}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-auto p-0 -ml-1 bg-transparent border-none text-lg font-semibold text-white outline-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-white/30"
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                            className="w-6 h-6 rounded-full text-white/20 hover:text-white hover:bg-white/10 transition-transform duration-300"
+                            style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                        >
+                            <ChevronDown size={14} />
+                        </Button>
+                    </div>
                     <div className="flex items-center justify-between mt-1">
                         <div className="flex items-center gap-2 text-xs text-white/50 font-medium">
                             <span>{new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -220,90 +232,100 @@ const SessionCard = ({
                 </div>
             </div>
 
-            {/* Master Progress Bar */}
-            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
-                <motion.div
-                    className="h-full bg-white/80 rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress * 100}%` }}
-                    transition={{ duration: 0.1, ease: "linear" }}
-                />
-            </div>
+            <motion.div
+                initial={false}
+                animate={{
+                    height: isExpanded ? 'auto' : 0,
+                    opacity: isExpanded ? 1 : 0,
+                    marginTop: isExpanded ? 0 : -16 // Reduce gap when collapsed
+                }}
+                className="overflow-hidden flex flex-col gap-4"
+            >
+                {/* Master Progress Bar */}
+                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
+                    <motion.div
+                        className="h-full bg-white/80 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress * 100}%` }}
+                        transition={{ duration: 0.1, ease: "linear" }}
+                    />
+                </div>
 
-            {/* Threaded Sections */}
-            <div className="mt-2 pl-[22px] border-l-2 border-white/[0.05] ml-[22px] flex flex-col gap-3 pb-2">
-                {session.sections.length > 0 ? session.sections.map((sec, idx) => {
-                    const isThisSectionPlaying = playingSectionId === sec.id;
+                {/* Threaded Sections */}
+                <div className="mt-2 pl-[22px] border-l-2 border-white/[0.05] ml-[22px] flex flex-col gap-3 pb-2">
+                    {session.sections.length > 0 ? session.sections.map((sec, idx) => {
+                        const isThisSectionPlaying = playingSectionId === sec.id;
 
-                    return (
-                        <div key={sec.id} className="relative flex items-center group/sec">
-                            {/* Emoji Node on thread line */}
-                            <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-[10px] shadow-sm z-10">
-                                {sec.emojiTag || getEmojiForType(sec.type)}
-                            </div>
-
-                            {/* Section Content Card */}
-                            <div
-                                onClick={(e) => playSection(sec, e)}
-                                className={cn(
-                                    "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer",
-                                    isThisSectionPlaying
-                                        ? "bg-white/10 border-white/20 shadow-inner"
-                                        : "bg-black/20 border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10"
-                                )}
-                            >
-                                <div className="flex flex-col min-w-0 pr-4">
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                            "text-sm font-semibold truncate transition-colors",
-                                            isThisSectionPlaying ? "text-white" : "text-white/80 group-hover/sec:text-white"
-                                        )}>
-                                            {sec.label || sec.type}
-                                        </span>
-                                        {sec.isBest && <Heart size={10} className="text-white/60" />}
-                                    </div>
-                                    <span className="text-[10px] text-white/40 font-mono tracking-tighter mt-0.5">
-                                        {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
-                                    </span>
+                        return (
+                            <div key={sec.id} className="relative flex items-center group/sec">
+                                {/* Emoji Node on thread line */}
+                                <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-[10px] shadow-sm z-10">
+                                    {sec.emojiTag || getEmojiForType(sec.type)}
                                 </div>
 
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onUpdateSection(sec.id, { isBest: !sec.isBest });
-                                        }}
-                                        className={cn("w-8 h-8 rounded-full", sec.isBest ? "text-red-400 hover:text-red-300 hover:bg-red-400/10" : "text-white/30 hover:text-white hover:bg-white/10")}
-                                    >
-                                        <Heart size={14} fill={sec.isBest ? "currentColor" : "none"} />
-                                    </Button>
-
-                                    <div className={cn(
-                                        "flex justify-center items-center w-8 h-8 rounded-full border transition-all",
+                                {/* Section Content Card */}
+                                <div
+                                    onClick={(e) => playSection(sec, e)}
+                                    className={cn(
+                                        "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer",
                                         isThisSectionPlaying
-                                            ? "bg-white text-black border-transparent"
-                                            : "bg-[#222] text-white border-white/10 group-hover/sec:bg-[#333]"
-                                    )}>
-                                        {isThisSectionPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                            ? "bg-white/10 border-white/20 shadow-inner"
+                                            : "bg-black/20 border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10"
+                                    )}
+                                >
+                                    <div className="flex flex-col min-w-0 pr-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className={cn(
+                                                "text-sm font-semibold truncate transition-colors",
+                                                isThisSectionPlaying ? "text-white" : "text-white/80 group-hover/sec:text-white"
+                                            )}>
+                                                {sec.label || sec.type}
+                                            </span>
+                                            {sec.isBest && <Heart size={10} className="text-white/60" />}
+                                        </div>
+                                        <span className="text-[10px] text-white/40 font-mono tracking-tighter mt-0.5">
+                                            {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onUpdateSection(sec.id, { isBest: !sec.isBest });
+                                            }}
+                                            className={cn("w-8 h-8 rounded-full", sec.isBest ? "text-red-400 hover:text-red-300 hover:bg-red-400/10" : "text-white/30 hover:text-white hover:bg-white/10")}
+                                        >
+                                            <Heart size={14} fill={sec.isBest ? "currentColor" : "none"} />
+                                        </Button>
+
+                                        <div className={cn(
+                                            "flex justify-center items-center w-8 h-8 rounded-full border transition-all",
+                                            isThisSectionPlaying
+                                                ? "bg-white text-black border-transparent"
+                                                : "bg-[#222] text-white border-white/10 group-hover/sec:bg-[#333]"
+                                        )}>
+                                            {isThisSectionPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        );
+                    }) : (
+                        <div className="text-xs text-white/30 italic py-2">
+                            Processing sections...
                         </div>
-                    );
-                }) : (
-                    <div className="text-xs text-white/30 italic py-2">
-                        Processing sections...
-                    </div>
-                )}
+                    )}
 
-                {session.sections.length > 0 && (
-                    <div className="relative mt-2">
-                        <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-white/20 bg-[#111] z-10" />
-                    </div>
-                )}
-            </div>
+                    {session.sections.length > 0 && (
+                        <div className="relative mt-2">
+                            <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-white/20 bg-[#111] z-10" />
+                        </div>
+                    )}
+                </div>
+            </motion.div>
 
         </motion.div>
     );

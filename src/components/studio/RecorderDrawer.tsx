@@ -7,7 +7,8 @@ import {
   X,
   Timer,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EQControls } from './EQControls';
@@ -44,8 +45,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const [duration, setDuration] = useState(0);
 
   // UI States
-  const [metronomeActive, setMetronomeActive] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [eqCurve, setEqCurve] = useState<Float32Array | null>(null);
+  const [audioCtxReady, setAudioCtxReady] = useState(false);
 
   // Refs for logic
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -55,6 +58,11 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const startTimeRef = useRef<number>(0);
   const recordingStartOffsetRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [micSource, setMicSource] = useState<MediaStreamAudioSourceNode | null>(null);
+  const monitorGainRef = useRef<GainNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,9 +74,11 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const timelineRef = useRef<HTMLDivElement>(null);
   const timelineMinRef = useRef<HTMLDivElement>(null);
 
-  // Ref to track progress inside animation loop without stale closures
+  // Ref to track state inside animation loop without stale closures
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
+  const eqCurveRef = useRef<Float32Array | null>(null);
+  eqCurveRef.current = eqCurve;
 
   useEffect(() => {
     return () => {
@@ -99,8 +109,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     const recordingColor = '#EF4444';
 
     const render = () => {
-      const width = canvas.width;
-      const height = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
       const centerY = height / 2;
       const currentProgress = visualizerProgressRef.current;
 
@@ -108,36 +119,91 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       ctx.lineWidth = isMinimized ? 1.5 : 2;
       ctx.lineCap = 'round';
 
-      if (isRecording) {
+      if (analyserRef.current && (isRecording || isMonitoring)) {
         if (analyserRef.current && dataArrayRef.current) {
           const dataArray = dataArrayRef.current;
-          analyserRef.current.getByteTimeDomainData(dataArray as any);
+          analyserRef.current.getByteFrequencyData(dataArray as any);
+
+          // Drawing faint Time-Domain Waveform in background
+          const timeData = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteTimeDomainData(timeData);
 
           ctx.beginPath();
-          ctx.strokeStyle = recordingColor;
-
-          const sliceWidth = width * 1.0 / dataArray.length;
-          let x = 0;
-
-          for (let i = 0; i < dataArray.length; i++) {
-            const v = dataArray[i] / 128.0;
-            const y = v * height / 2;
-
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-
-            x += sliceWidth;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 1;
+          const sliceWidth = width / timeData.length;
+          let tx = 0;
+          for (let i = 0; i < timeData.length; i++) {
+            const v = timeData[i] / 128.0;
+            const ty = v * centerY;
+            if (i === 0) ctx.moveTo(tx, ty);
+            else ctx.lineTo(tx, ty);
+            tx += sliceWidth;
           }
           ctx.stroke();
 
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            const v = (dataArray[i] - 128) / 128;
-            sum += v * v;
+          // Drawing Logarithmic Spectral Bars
+          const sampleRate = audioContext?.sampleRate || 44100;
+          const nyquist = sampleRate / 2;
+          const minFreq = 20;
+          const maxFreq = 20000;
+
+          const barCount = 64;
+          const logMin = Math.log10(minFreq);
+          const logMax = Math.log10(maxFreq);
+          const logRange = logMax - logMin;
+
+          const barWidth = (width / barCount);
+
+          for (let i = 0; i < barCount; i++) {
+            // Find frequency range for this bar
+            const freqStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
+            const freqEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
+
+            // Map freq to FFT bin
+            const binStart = Math.floor((freqStart / nyquist) * dataArray.length);
+            const binEnd = Math.floor((freqEnd / nyquist) * dataArray.length);
+
+            // Average magnitude in this range
+            let sum = 0;
+            let count = 0;
+            for (let j = binStart; j <= binEnd && j < dataArray.length; j++) {
+              sum += dataArray[j];
+              count++;
+            }
+            const magnitude = count > 0 ? sum / count : 0;
+            const barHeight = (magnitude / 255) * height * 0.6;
+
+            const x = i * barWidth;
+
+            // Gradient based on frequency
+            const hue = 200 + (i / barCount) * 120;
+            const gradient = ctx.createLinearGradient(x, height, x, height - barHeight);
+            gradient.addColorStop(0, `hsla(${hue}, 80%, 40%, 0.8)`);
+            gradient.addColorStop(1, `hsla(${hue}, 90%, 60%, 0.3)`);
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x + 1, height - barHeight, barWidth - 2, barHeight);
           }
-          const rms = Math.sqrt(sum / dataArray.length);
-          setAudioLevel(Math.min(1, rms * 3));
-          if (Math.random() > 0.5) peaksRef.current.push(rms);
+
+          // Drawing EQ Curve if available
+          if (eqCurveRef.current) {
+            ctx.beginPath();
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+
+            for (let i = 0; i < eqCurveRef.current.length; i++) {
+              const xPos = (i / (eqCurveRef.current.length - 1)) * width;
+              const gain = eqCurveRef.current[i];
+              const yPos = centerY - (Math.log10(gain) * 2 * (height / 4));
+
+              if (i === 0) ctx.moveTo(xPos, yPos);
+              else ctx.lineTo(xPos, yPos);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
         }
 
       } else if (recordedBlob) {
@@ -274,31 +340,75 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   }, [isPlaying, backingTrackSrc]);
 
+  // Handle live monitoring connection
+  useEffect(() => {
+    if (audioContext && monitorGainRef.current) {
+      if (isMonitoring && streamRef.current) {
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        monitorGainRef.current.connect(audioContext.destination);
+      } else {
+        monitorGainRef.current.disconnect();
+      }
+    }
+  }, [isMonitoring, isRecording, audioContext]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startRecording = async () => {
+  const initializeMic = async () => {
+    if (streamRef.current && audioContext) return;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false },
       });
+      streamRef.current = stream;
 
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass();
+      setAudioContext(audioCtx);
+
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
       const source = audioCtx.createMediaStreamSource(stream);
+      setMicSource(source);
+
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = 512; // Lower for cleaner bars
       source.connect(analyser);
 
       analyserRef.current = analyser;
       dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-      peaksRef.current = [];
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const monitorGain = audioCtx.createGain();
+      monitorGain.gain.value = 0.8;
+      monitorGainRef.current = monitorGain;
+
+      setAudioCtxReady(true);
+      return { stream, audioCtx, source, monitorGain };
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      throw err;
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      await initializeMic();
+
+      if (!streamRef.current || !audioContext) return;
+
+      const mediaRecorder = new MediaRecorder(streamRef.current);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
+      peaksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -307,9 +417,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         setRecordedBlob(blob);
-        source.disconnect();
-        if (backingAudioRef?.current) backingAudioRef.current.pause();
-        stream.getTracks().forEach(track => track.stop());
+        // Don't stop the stream here if we might still want to monitor
+        // Mic cleanup will happen on onClose or explicit discard
       };
 
       if (backingAudioRef?.current && backingTrackSrc) {
@@ -333,7 +442,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }, 100);
 
     } catch (err) {
-      console.error("Error accessing microphone:", err);
+      console.error("Start recording failed:", err);
     }
   };
 
@@ -440,92 +549,118 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       </AnimatePresence>
 
       <Sheet open={!isMinimized} onOpenChange={(open) => { if (!open) onClose(); }}>
-        <SheetContent side="bottom" className="p-0 border-t border-white/10 bg-[var(--bg-card)] rounded-t-[2rem] overflow-hidden sm:max-w-full">
+        <SheetContent
+          side="bottom"
+          className="p-0 border-t border-white/10 bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[85vh] flex flex-col"
+        >
           <SheetHeader className="hidden">
             <SheetTitle>Recorder</SheetTitle>
           </SheetHeader>
-          <div className={`p-4 pb-8 flex flex-col items-center gap-6 transition-all duration-700 ${isRecording ? 'shadow-[0_0_50px_rgba(220,38,38,0.4)] border-red-500/30' : ''}`}>
 
-            <div className="w-12 h-1 bg-white/10 rounded-full cursor-pointer" onClick={onMinimizeToggle} />
+          <div className="flex-1 overflow-y-auto scrollbar-hide">
+            <div className={`p-6 pb-8 flex flex-col items-center gap-6 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.2)]' : ''}`}>
 
-            <div className="w-full flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={onMinimizeToggle} className="text-[var(--text-secondary)]">
-                <ChevronDown size={18} />
-              </Button>
-              {(recordedBlob || isRecording) && (
-                <Button variant="ghost" size="icon" onClick={handleDiscard} className="text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-500/10">
-                  <Trash2 size={16} />
+              <div className="w-12 h-1.5 bg-white/10 rounded-full cursor-pointer hover:bg-white/20 transition-colors" onClick={onMinimizeToggle} />
+
+              <div className="w-full flex items-center justify-between">
+                <Button variant="ghost" size="icon" onClick={onMinimizeToggle} className="text-[var(--text-secondary)] hover:text-[var(--text-main)]">
+                  <ChevronDown size={22} />
                 </Button>
-              )}
-            </div>
-
-            <div className="w-full px-4">
-              <Slider
-                disabled={isRecording || !recordedBlob}
-                max={1}
-                step={0.01}
-                value={[progress]}
-                onValueChange={(val) => {
-                  setProgress(val[0]);
-                  if (audioRef.current) audioRef.current.currentTime = val[0] * duration;
-                }}
-                className="h-12"
-              />
-            </div>
-
-            <div className="w-full grid grid-cols-3 items-center">
-              <div className="justify-self-start">
-                <Button variant="outline" size="sm" disabled={isRecording} onClick={() => fileInputRef.current?.click()} className="rounded-xl text-[10px] mono uppercase tracking-widest gap-2">
-                  <Timer size={12} />
-                  <span>In</span>
-                </Button>
+                {(recordedBlob || isRecording) && (
+                  <Button variant="ghost" size="icon" onClick={handleDiscard} className="text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-400/10 transition-colors">
+                    <Trash2 size={20} />
+                  </Button>
+                )}
               </div>
 
-              <div className="justify-self-center relative">
-                {isRecording && <div className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />}
-                <Button
-                  onClick={handleToggleRecord}
-                  className={`w-16 h-16 rounded-full border-2 p-0 flex items-center justify-center transition-all ${isRecording ? 'border-red-500/50 bg-red-500/10' : 'border-white/10 bg-white/5'}`}
-                >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-[var(--bg-main)]'}`}>
-                    {isRecording ? (
-                      <div className="w-5 h-5 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.6)]" />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.4)]" />
+              <div className="w-full px-2">
+                <Slider
+                  disabled={isRecording || !recordedBlob}
+                  max={1}
+                  step={0.01}
+                  value={[progress]}
+                  onValueChange={(val) => {
+                    setProgress(val[0]);
+                    if (audioRef.current) audioRef.current.currentTime = val[0] * duration;
+                  }}
+                  className="h-10"
+                />
+              </div>
+
+              <div className="w-full grid grid-cols-3 items-center">
+                <div className="justify-self-start">
+                  <Button variant="outline" size="sm" disabled={isRecording} onClick={() => fileInputRef.current?.click()} className="rounded-xl text-[10px] mono uppercase tracking-widest gap-2 h-10 border-white/10 hover:bg-white/5">
+                    <Timer size={14} />
+                    <span>In</span>
+                  </Button>
+                </div>
+
+                <div className="justify-self-center relative">
+                  {isRecording && <div className="absolute inset-0 rounded-full bg-red-500/20 animate-ping" />}
+                  <Button
+                    onClick={handleToggleRecord}
+                    className={`w-20 h-20 rounded-full border-2 p-0 flex items-center justify-center transition-all ${isRecording ? 'border-red-500/50 bg-red-500/10 scale-110' : 'border-white/10 bg-white/5 hover:border-red-500/30'}`}
+                  >
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-[var(--bg-main)]'}`}>
+                      {isRecording ? (
+                        <div className="w-6 h-6 rounded-sm bg-red-500 shadow-[0_0_25px_rgba(239,68,68,0.7)]" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-red-600 shadow-[0_0_20px_rgba(220,38,38,0.5)]" />
+                      )}
+                    </div>
+                  </Button>
+                </div>
+
+                <div className="justify-self-end">
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      variant={isMonitoring ? "default" : "outline"}
+                      size="sm"
+                      className={`rounded-xl text-[10px] mono uppercase tracking-widest h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'border-white/10 hover:bg-white/5'}`}
+                      onClick={async () => {
+                        if (!isMonitoring && !streamRef.current) {
+                          await initializeMic();
+                        }
+                        setIsMonitoring(!isMonitoring);
+                      }}
+                    >
+                      <Headphones size={14} className="mr-2" />
+                      MONITOR
+                    </Button>
+                    {isMonitoring && (
+                      <span className="text-[7px] mono text-red-500 font-bold animate-pulse pr-1 tracking-tighter">
+                        HEADPHONES REQUIRED
+                      </span>
                     )}
                   </div>
-                </Button>
+                </div>
               </div>
 
-              <div className="justify-self-end">
+              <div className="w-full flex flex-col gap-4 mt-0">
+                <div className="h-28 bg-black/40 rounded-3xl relative overflow-hidden group border border-white/5 shadow-inner">
+                  <canvas ref={canvasRef} className="w-full h-full cursor-pointer" />
+                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] mono text-white/40 border border-white/5">ANALYSER</div>
+                </div>
+                <EQControls
+                  audioRef={audioRef}
+                  externalSource={(isRecording || isMonitoring) ? micSource : null}
+                  audioContext={audioContext}
+                  destinationNode={monitorGainRef.current}
+                  onCurveChange={setEqCurve}
+                  isAlwaysOpen={true}
+                />
+              </div>
+
+              <div className="w-full flex gap-4 mt-4">
+                <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-7 font-bold text-[var(--text-secondary)] hover:text-white transition-colors uppercase tracking-widest text-xs">CANCEL</Button>
                 <Button
-                  variant={metronomeActive ? "default" : "outline"}
-                  size="sm"
-                  className="rounded-xl text-[10px] mono uppercase tracking-widest h-9"
-                  onClick={() => setMetronomeActive(!metronomeActive)}
+                  disabled={!recordedBlob}
+                  onClick={handleSave}
+                  className="flex-1 rounded-2xl py-7 font-bold bg-white text-black hover:bg-[var(--accent)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs shadow-xl"
                 >
-                  METRO
+                  KEEP TAKE
                 </Button>
               </div>
-            </div>
-
-            <div className="w-full flex flex-col gap-6">
-              <div className="h-24 bg-black/20 rounded-2xl relative overflow-hidden group">
-                <canvas ref={canvasRef} className="w-full h-full cursor-pointer" />
-                <div className="absolute top-2 left-2 px-2 py-1 bg-black/40 rounded text-[10px] mono text-white/50">WAVEFORM</div>
-              </div>
-              <EQControls audioRef={audioRef} />
-            </div>
-
-            <div className="w-full flex gap-3 mt-4">
-              <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-6 font-bold text-[var(--text-secondary)]">CANCEL</Button>
-              <Button
-                disabled={!recordedBlob}
-                onClick={handleSave}
-                className="flex-1 rounded-2xl py-6 font-bold bg-[var(--accent)] text-black hover:brightness-110"
-              >
-                KEEP TAKE
-              </Button>
             </div>
           </div>
           <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => {
