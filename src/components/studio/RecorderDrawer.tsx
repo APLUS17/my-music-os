@@ -11,7 +11,7 @@ import {
   Headphones
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EQControls } from './EQControls';
+import { SpectralEQ } from './SpectralEQ';
 import {
   Sheet,
   SheetContent,
@@ -49,7 +49,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // UI States
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [eqCurve, setEqCurve] = useState<Float32Array | null>(null);
   const [audioCtxReady, setAudioCtxReady] = useState(false);
 
   // Refs for logic
@@ -79,8 +78,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Ref to track state inside animation loop without stale closures
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
-  const eqCurveRef = useRef<Float32Array | null>(null);
-  eqCurveRef.current = eqCurve;
 
   const stopMicStream = () => {
     if (streamRef.current) {
@@ -137,94 +134,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       ctx.lineWidth = isMinimized ? 1.5 : 2;
       ctx.lineCap = 'round';
 
-      if (analyserRef.current && (isRecording || isMonitoring)) {
-        if (analyserRef.current && dataArrayRef.current) {
-          const dataArray = dataArrayRef.current;
-          analyserRef.current.getByteFrequencyData(dataArray as any);
-
-          // Drawing faint Time-Domain Waveform in background
-          const timeData = new Uint8Array(analyserRef.current.frequencyBinCount);
-          analyserRef.current.getByteTimeDomainData(timeData);
-
-          ctx.beginPath();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-          ctx.lineWidth = 1;
-          const sliceWidth = width / timeData.length;
-          let tx = 0;
-          for (let i = 0; i < timeData.length; i++) {
-            const v = timeData[i] / 128.0;
-            const ty = v * centerY;
-            if (i === 0) ctx.moveTo(tx, ty);
-            else ctx.lineTo(tx, ty);
-            tx += sliceWidth;
-          }
-          ctx.stroke();
-
-          // Drawing Logarithmic Spectral Bars
-          const sampleRate = audioContext?.sampleRate || 44100;
-          const nyquist = sampleRate / 2;
-          const minFreq = 20;
-          const maxFreq = 20000;
-
-          const barCount = 64;
-          const logMin = Math.log10(minFreq);
-          const logMax = Math.log10(maxFreq);
-          const logRange = logMax - logMin;
-
-          const barWidth = (width / barCount);
-
-          for (let i = 0; i < barCount; i++) {
-            // Find frequency range for this bar
-            const freqStart = minFreq * Math.pow(maxFreq / minFreq, i / barCount);
-            const freqEnd = minFreq * Math.pow(maxFreq / minFreq, (i + 1) / barCount);
-
-            // Map freq to FFT bin
-            const binStart = Math.floor((freqStart / nyquist) * dataArray.length);
-            const binEnd = Math.floor((freqEnd / nyquist) * dataArray.length);
-
-            // Average magnitude in this range
-            let sum = 0;
-            let count = 0;
-            for (let j = binStart; j <= binEnd && j < dataArray.length; j++) {
-              sum += dataArray[j];
-              count++;
-            }
-            const magnitude = count > 0 ? sum / count : 0;
-            const barHeight = (magnitude / 255) * height * 0.6;
-
-            const x = i * barWidth;
-
-            // Gradient based on frequency
-            const hue = 200 + (i / barCount) * 120;
-            const gradient = ctx.createLinearGradient(x, height, x, height - barHeight);
-            gradient.addColorStop(0, `hsla(${hue}, 80%, 40%, 0.8)`);
-            gradient.addColorStop(1, `hsla(${hue}, 90%, 60%, 0.3)`);
-
-            ctx.fillStyle = gradient;
-            ctx.fillRect(x + 1, height - barHeight, barWidth - 2, barHeight);
-          }
-
-          // Drawing EQ Curve if available
-          if (eqCurveRef.current) {
-            ctx.beginPath();
-            ctx.strokeStyle = accentColor;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-
-            for (let i = 0; i < eqCurveRef.current.length; i++) {
-              const xPos = (i / (eqCurveRef.current.length - 1)) * width;
-              const gain = eqCurveRef.current[i];
-              const yPos = centerY - (Math.log10(gain) * 2 * (height / 4));
-
-              if (i === 0) ctx.moveTo(xPos, yPos);
-              else ctx.lineTo(xPos, yPos);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-        }
-
-      } else if (recordedBlob) {
+      if (recordedBlob) {
         const peaks = peaksRef.current;
         const barWidth = isMinimized ? 2 : 3;
         const gap = 1;
@@ -685,13 +595,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   <canvas ref={canvasRef} className="w-full h-full cursor-pointer" />
                   <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] mono text-white/40 border border-white/5">ANALYSER</div>
                 </div>
-                <EQControls
-                  audioRef={audioRef}
-                  externalSource={(isRecording || isMonitoring) ? micSource : null}
+                <SpectralEQ
+                  analyserRef={analyserRef}
+                  dataArrayRef={dataArrayRef}
                   audioContext={audioContext}
+                  externalSource={(isRecording || isMonitoring) ? micSource : null}
+                  audioRef={audioRef}
                   destinationNode={monitorGainRef.current}
-                  onCurveChange={setEqCurve}
-                  isAlwaysOpen={true}
+                  isActive={true}
                 />
               </div>
 
