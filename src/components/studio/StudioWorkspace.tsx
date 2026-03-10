@@ -351,6 +351,7 @@ const StudioWorkspace: React.FC = () => {
 
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
+    const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
@@ -1087,12 +1088,7 @@ const StudioWorkspace: React.FC = () => {
                                             />
                                         </div>
 
-                                        {saveIndicator === 'saved' && (
-                                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/5 border border-emerald-500/10 text-[9px] font-mono uppercase tracking-wider text-emerald-500/60">
-                                                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                                                <span>Saved</span>
-                                            </div>
-                                        )}
+
                                     </div>
 
                                     {/* Right: Audio Controls */}
@@ -1276,6 +1272,7 @@ const StudioWorkspace: React.FC = () => {
                             onClick={() => {
                                 setShowRecorder(true);
                                 setRecorderMinimized(true);
+                                setRecorderAutoStart(true);
                             }}
                             className="w-12 h-12 bg-[var(--accent)] text-[var(--bg-main)] rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all mx-1"
                         >
@@ -1290,12 +1287,13 @@ const StudioWorkspace: React.FC = () => {
 
             {showRecorder && (
                 <RecorderDrawer
-                    onClose={() => setShowRecorder(false)}
+                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); }}
                     onSave={handleSaveRecordingSession}
                     isMinimized={recorderMinimized}
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
+                    autoStart={recorderAutoStart}
                 />
             )}
 

@@ -28,6 +28,7 @@ interface RecorderDrawerProps {
   backingAudioRef?: React.RefObject<HTMLAudioElement | null>;
   isMinimized?: boolean;
   onMinimizeToggle?: () => void;
+  autoStart?: boolean;
 }
 
 export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
@@ -36,7 +37,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   backingTrackSrc,
   backingAudioRef,
   isMinimized = false,
-  onMinimizeToggle
+  onMinimizeToggle,
+  autoStart = false
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -94,6 +96,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
     };
   }, []);
+
+  // Auto-start recording when opened via nav button
+  useEffect(() => {
+    if (autoStart) {
+      startRecording();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   // --- Visualizer & Canvas Logic ---
   useEffect(() => {
@@ -333,12 +343,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         }
       } else {
         audioRef.current.pause();
-        if (backingAudioRef?.current) {
+        // Only pause the backing beat when reviewing a recording (not on initial mount or during recording)
+        if (backingAudioRef?.current && recordedBlob) {
           backingAudioRef.current.pause();
         }
       }
     }
-  }, [isPlaying, backingTrackSrc]);
+  }, [isPlaying, backingTrackSrc, recordedBlob]);
 
   // Handle live monitoring connection
   useEffect(() => {
@@ -401,9 +412,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const startRecording = async () => {
     try {
-      await initializeMic();
+      const micResult = await initializeMic();
 
-      if (!streamRef.current || !audioContext) return;
+      if (!streamRef.current) return;
+      // audioContext state may not have updated yet (React async), so fall back to the returned value
+      const activeCtx = audioContext ?? micResult?.audioCtx;
+      if (!activeCtx) return;
 
       const mediaRecorder = new MediaRecorder(streamRef.current);
       mediaRecorderRef.current = mediaRecorder;
