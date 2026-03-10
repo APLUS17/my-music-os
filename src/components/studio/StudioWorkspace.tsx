@@ -1272,7 +1272,7 @@ const StudioWorkspace: React.FC = () => {
                             onClick={() => {
                                 setShowRecorder(true);
                                 setRecorderMinimized(true);
-                                setRecorderAutoStart(true);
+                                setRecorderAutoStart(isBeatPlaying);
                             }}
                             className="w-12 h-12 bg-[var(--accent)] text-[var(--bg-main)] rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all mx-1"
                         >

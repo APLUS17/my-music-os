@@ -82,6 +82,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const eqCurveRef = useRef<Float32Array | null>(null);
   eqCurveRef.current = eqCurve;
 
+  const stopMicStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -94,6 +101,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
+      stopMicStream();
     };
   }, []);
 
@@ -376,7 +384,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false },
+        audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false, channelCount: 1 },
       });
       streamRef.current = stream;
 
@@ -398,8 +406,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       analyserRef.current = analyser;
       dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 
+      // Merge mono mic signal into both L+R channels for headphone monitoring
+      const merger = audioCtx.createChannelMerger(2);
+      analyser.connect(merger, 0, 0);
+      analyser.connect(merger, 0, 1);
+
       const monitorGain = audioCtx.createGain();
       monitorGain.gain.value = 0.8;
+      merger.connect(monitorGain);
       monitorGainRef.current = monitorGain;
 
       setAudioCtxReady(true);
@@ -465,6 +479,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
+      // Release mic immediately if not monitoring — kills the browser mic indicator
+      if (!isMonitoring) stopMicStream();
     }
   };
 
@@ -523,18 +539,26 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   {isRecording ? <div className="w-4 h-4 bg-white rounded-sm" /> : <div className="w-4 h-4 bg-white rounded-full" />}
                 </button>
 
-                <div className="flex-1 h-8 bg-black/20 rounded-md relative flex items-center px-2">
-                  <Slider
-                    disabled={isRecording || !recordedBlob}
-                    max={1}
-                    step={0.01}
-                    value={[progress]}
-                    onValueChange={(val) => {
-                      setProgress(val[0]);
-                      if (audioRef.current) audioRef.current.currentTime = val[0] * duration;
-                    }}
-                  />
-                </div>
+                {recordedBlob ? (
+                  <div className="flex-1 h-8 bg-black/20 rounded-md relative flex items-center px-2">
+                    <Slider
+                      disabled={isRecording}
+                      max={1}
+                      step={0.01}
+                      value={[progress]}
+                      onValueChange={(val) => {
+                        setProgress(val[0]);
+                        if (audioRef.current) audioRef.current.currentTime = val[0] * duration;
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex-1 h-8 rounded-md relative flex items-center justify-center px-2">
+                    <div className="text-[10px] mono text-[var(--text-secondary)] uppercase tracking-widest opacity-50">
+                      {isRecording ? "Recording..." : "Ready"}
+                    </div>
+                  </div>
+                )}
 
                 <div className="text-[10px] mono tabular-nums text-[var(--text-secondary)] w-10 text-right">
                   {formatTime(isRecording ? duration : (progress * duration))}
@@ -587,7 +611,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 )}
               </div>
 
-              <div className="w-full px-2">
+              <div className={`w-full px-2 transition-opacity duration-300 ${recordedBlob ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <Slider
                   disabled={isRecording || !recordedBlob}
                   max={1}
@@ -603,10 +627,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
               <div className="w-full grid grid-cols-3 items-center">
                 <div className="justify-self-start">
-                  <Button variant="outline" size="sm" disabled={isRecording} onClick={() => fileInputRef.current?.click()} className="rounded-xl text-[10px] mono uppercase tracking-widest gap-2 h-10 border-white/10 hover:bg-white/5">
-                    <Timer size={14} />
-                    <span>In</span>
-                  </Button>
+                  {(recordedBlob && !isRecording) ? (
+                    <Button variant="default" size="sm" onClick={handleSave} className="rounded-xl text-[10px] mono uppercase tracking-widest gap-2 h-10 bg-[var(--text-main)] text-[var(--bg-main)] hover:bg-[var(--text-main)]/90 hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                      <Check size={14} strokeWidth={3} />
+                      <span className="font-bold">Keep</span>
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div className="justify-self-center relative">
@@ -632,10 +658,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                       size="sm"
                       className={`rounded-xl text-[10px] mono uppercase tracking-widest h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'border-white/10 hover:bg-white/5'}`}
                       onClick={async () => {
-                        if (!isMonitoring && !streamRef.current) {
-                          await initializeMic();
+                        if (!isMonitoring) {
+                          if (!streamRef.current) await initializeMic();
+                          setIsMonitoring(true);
+                        } else {
+                          setIsMonitoring(false);
+                          // Release mic when monitoring off and not recording
+                          if (!isRecording) stopMicStream();
                         }
-                        setIsMonitoring(!isMonitoring);
                       }}
                     >
                       <Headphones size={14} className="mr-2" />
