@@ -20,6 +20,8 @@ interface RecordingThreadProps {
     onDeleteSession: (id: string) => void;
     onUpdateSection: (sessionId: string, sectionId: string, updates: Partial<AutoSection>) => void;
     onOpenSplitEditor: (sessionId: string) => void;
+    beatSrc?: string | null;
+    beatVolume?: number;
 }
 
 export const RecordingThread: React.FC<RecordingThreadProps> = ({
@@ -30,6 +32,8 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     onDeleteSession,
     onUpdateSection,
     onOpenSplitEditor,
+    beatSrc,
+    beatVolume = 1,
 }) => {
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -45,6 +49,8 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
                     onDelete={() => onDeleteSession(session.id)}
                     onUpdateSection={(sectionId, updates) => onUpdateSection(session.id, sectionId, updates)}
                     onOpenSplitEditor={() => onOpenSplitEditor(session.id)}
+                    beatSrc={beatSrc}
+                    beatVolume={beatVolume}
                 />
             ))}
 
@@ -70,7 +76,9 @@ const SessionCard = ({
     onUpdate,
     onDelete,
     onUpdateSection,
-    onOpenSplitEditor
+    onOpenSplitEditor,
+    beatSrc,
+    beatVolume = 1
 }: {
     session: RecordingSession;
     isActive: boolean;
@@ -79,11 +87,14 @@ const SessionCard = ({
     onDelete: () => void;
     onUpdateSection: (sectionId: string, updates: Partial<AutoSection>) => void;
     onOpenSplitEditor: () => void;
+    beatSrc?: string | null;
+    beatVolume?: number;
 }) => {
     const [isPlayingAll, setIsPlayingAll] = useState(false);
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const beatAudioRef = useRef<HTMLAudioElement | null>(null);
     const [progress, setProgress] = useState(0);
 
     const activePlaybackSection = session.sections.find(s => s.id === playingSectionId);
@@ -93,6 +104,29 @@ const SessionCard = ({
             audioRef.current.src = session.audioUrl;
         }
     }, [session.audioUrl]);
+
+    // Sync beat and vocal playback (play/pause only, not constant time syncing)
+    useEffect(() => {
+        const vocal = audioRef.current;
+        const beat = beatAudioRef.current;
+
+        if (!vocal || !beat || !beatSrc) return;
+
+        if (isPlayingAll || playingSectionId) {
+            vocal.play().catch(() => { });
+            beat.play().catch(() => { });
+        } else {
+            vocal.pause();
+            beat.pause();
+        }
+    }, [isPlayingAll, playingSectionId, beatSrc]);
+
+    // Update beat volume when beatVolume changes
+    useEffect(() => {
+        if (beatAudioRef.current) {
+            beatAudioRef.current.volume = beatVolume;
+        }
+    }, [beatVolume]);
 
     // Handle Time Updates specifically for playing single sections
     const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
@@ -104,6 +138,7 @@ const SessionCard = ({
         if (playingSectionId && activePlaybackSection) {
             if (audio.currentTime >= activePlaybackSection.endTime) {
                 audio.pause();
+                if (beatAudioRef.current) beatAudioRef.current.pause();
                 setPlayingSectionId(null);
                 setIsPlayingAll(false);
             }
@@ -115,11 +150,13 @@ const SessionCard = ({
         if (audioRef.current) {
             if (isPlayingAll && !playingSectionId) {
                 audioRef.current.pause();
+                if (beatAudioRef.current) beatAudioRef.current.pause();
                 setIsPlayingAll(false);
             } else {
                 // If a section was playing, just reset to play all from current time, or from 0
                 setPlayingSectionId(null);
                 audioRef.current.play();
+                if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
                 onSelect();
                 setIsPlayingAll(true);
             }
@@ -131,11 +168,14 @@ const SessionCard = ({
         if (audioRef.current) {
             if (playingSectionId === sec.id && !audioRef.current.paused) {
                 audioRef.current.pause();
+                if (beatAudioRef.current) beatAudioRef.current.pause();
                 setPlayingSectionId(null);
                 setIsPlayingAll(false);
             } else {
                 audioRef.current.currentTime = sec.startTime;
+                if (beatAudioRef.current) beatAudioRef.current.currentTime = sec.startTime;
                 audioRef.current.play();
+                if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
                 setPlayingSectionId(sec.id);
                 setIsPlayingAll(false);
                 onSelect();
@@ -189,6 +229,7 @@ const SessionCard = ({
                     onTimeUpdate={handleTimeUpdate}
                     onEnded={() => { setIsPlayingAll(false); setPlayingSectionId(null); setProgress(0); }}
                 />
+                {beatSrc && <audio ref={beatAudioRef} src={beatSrc} crossOrigin="anonymous" />}
 
                 {/* Header: Master Controls & Metadata */}
                 <div className="flex items-start gap-4">

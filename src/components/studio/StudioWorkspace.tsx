@@ -719,7 +719,7 @@ const StudioWorkspace: React.FC = () => {
             id: randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
-            sections, scraps, sessions: [], beats: []
+            sections, scraps, sessions, beats: []
         };
         setSavedProjects(prev => [newProject, ...prev]);
     };
@@ -740,6 +740,8 @@ const StudioWorkspace: React.FC = () => {
             text: text
         }]);
 
+        setSessions([]);
+        setActiveSessionId(null);
         setProjectTitle("");
         setProjectBpm("120");
         setProjectKey("C Min");
@@ -754,6 +756,8 @@ const StudioWorkspace: React.FC = () => {
         if (id === activeProjectId) {
             setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
+            setSessions([]);
+            setActiveSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
@@ -765,6 +769,8 @@ const StudioWorkspace: React.FC = () => {
             archiveCurrentProject();
             setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
+            setSessions([]);
+            setActiveSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
@@ -776,6 +782,8 @@ const StudioWorkspace: React.FC = () => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
             setSections(p.sections || []);
             setScraps(p.scraps || []);
+            setSessions(p.sessions || []);
+            setActiveSessionId(null);
             setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
             setUploadedBeat(p.beats?.[0]?.audioUrl || null);
             setUploadedBeatName(p.beats?.[0]?.name || "");
@@ -791,6 +799,8 @@ const StudioWorkspace: React.FC = () => {
         archiveCurrentProject();
         setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
         setScraps([]);
+        setSessions([]);
+        setActiveSessionId(null);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
@@ -1182,6 +1192,8 @@ const StudioWorkspace: React.FC = () => {
                                                 setSplitEditorOpen(true);
                                             }}
                                             onDeleteSession={handleDeleteSession}
+                                            beatSrc={uploadedBeat}
+                                            beatVolume={beatVolume}
                                         />
                                     )}
                                 </div>

@@ -173,9 +173,14 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioContextClass() as AudioContext;
       internalAudioCtxRef.current = ctx;
-      if (ctx.state === 'suspended') await ctx.resume();
+      // Wire the graph BEFORE resuming — createMediaElementSource works on a
+      // suspended context, so the routing transition happens at t=0 (no frames
+      // have played through the browser's direct pipeline yet). Resuming after
+      // the graph is connected avoids the mid-playback rerouting glitch that
+      // causes the recorded audio to stutter and drift from the beat.
       const source = ctx.createMediaElementSource(audio);
       initializeAudio(ctx, source);
+      if (ctx.state === 'suspended') await ctx.resume();
     };
 
     audio.addEventListener('play', handlePlay);
