@@ -58,13 +58,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     };
   }, [currentTrackIndex]); // Re-run whenever the vocal track (and thus the audio element) changes
 
-  // Get max duration between beat and vocal
+  // Set duration from the vocal recording (progress bar represents vocal time, 0-based)
   useEffect(() => {
     const updateDuration = () => {
-      let maxDur = 0;
-      if (beatAudioRef.current) maxDur = Math.max(maxDur, beatAudioRef.current.duration);
-      if (vocalAudioRef.current) maxDur = Math.max(maxDur, vocalAudioRef.current.duration);
-      setDuration(maxDur);
+      // Use vocal duration so the scrubber maps to vocal time (0 → end of recording).
+      // Fall back to beat if no vocal is loaded yet.
+      if (vocalAudioRef.current && isFinite(vocalAudioRef.current.duration)) {
+        setDuration(vocalAudioRef.current.duration);
+      } else if (beatAudioRef.current && isFinite(beatAudioRef.current.duration)) {
+        setDuration(beatAudioRef.current.duration);
+      }
     };
 
     const beat = beatAudioRef.current;
@@ -83,23 +86,30 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   useEffect(() => {
     const beat = beatAudioRef.current;
     const vocal = vocalAudioRef.current;
+    const beatOffset = currentVocal?.beatOffset || 0;
 
     if (!beat || !vocal) return;
 
+    // Track progress from the vocal's time (0-based), not the beat's (which starts at beatOffset)
     const handleTimeUpdate = () => {
-      setProgress(beat.currentTime);
+      setProgress(vocal.currentTime);
     };
 
+    // Stop when the vocal ends (beat may be longer or looping)
     const handleEnded = () => {
       setIsPlaying(false);
     };
 
-    beat.addEventListener('timeupdate', handleTimeUpdate);
-    beat.addEventListener('ended', handleEnded);
+    vocal.addEventListener('timeupdate', handleTimeUpdate);
+    vocal.addEventListener('ended', handleEnded);
 
     if (isPlaying) {
       vocalAudioCtxRef.current?.resume();
-      if (beat.paused && hasBeat) beat.play().catch(() => { });
+      if (beat.paused && hasBeat) {
+        // Align beat to vocal's current position + the offset from when recording started
+        beat.currentTime = vocal.currentTime + beatOffset;
+        beat.play().catch(() => { });
+      }
       if (vocal.paused && hasVocals) vocal.play().catch(() => { });
     } else {
       if (!beat.paused && hasBeat) beat.pause();
@@ -107,8 +117,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
 
     return () => {
-      beat.removeEventListener('timeupdate', handleTimeUpdate);
-      beat.removeEventListener('ended', handleEnded);
+      vocal.removeEventListener('timeupdate', handleTimeUpdate);
+      vocal.removeEventListener('ended', handleEnded);
     };
   }, [isPlaying, hasBeat, hasVocals, currentVocal]);
 
@@ -124,8 +134,8 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const handleProgressChange = (newProgress: number) => {
     setProgress(newProgress);
-    if (beatAudioRef.current) beatAudioRef.current.currentTime = newProgress;
     if (vocalAudioRef.current) vocalAudioRef.current.currentTime = newProgress;
+    if (beatAudioRef.current) beatAudioRef.current.currentTime = newProgress + (currentVocal?.beatOffset || 0);
   };
 
   const handleNextVocal = () => {

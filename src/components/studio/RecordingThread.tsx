@@ -137,6 +137,11 @@ const SessionCard = ({
         if (isPlayingAll || playingSectionId) {
             vocalAudioCtxRef.current?.resume();
             vocal.play().catch(() => { });
+            // If beat isn't already playing (e.g. this effect fires before the click handler),
+            // align its position to the vocal + beatOffset before starting it.
+            if (beat.paused) {
+                beat.currentTime = vocal.currentTime + (session.beatOffset || 0);
+            }
             beat.play().catch(() => { });
         } else {
             vocal.pause();
@@ -180,7 +185,11 @@ const SessionCard = ({
                 setPlayingSectionId(null);
                 vocalAudioCtxRef.current?.resume();
                 audioRef.current.play();
-                if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
+                if (beatAudioRef.current) {
+                    // Align beat to vocal's position + the offset captured at recording start
+                    beatAudioRef.current.currentTime = audioRef.current.currentTime + (session.beatOffset || 0);
+                    beatAudioRef.current.play().catch(() => { });
+                }
                 onSelect();
                 setIsPlayingAll(true);
             }
@@ -197,10 +206,13 @@ const SessionCard = ({
                 setIsPlayingAll(false);
             } else {
                 audioRef.current.currentTime = sec.startTime;
-                if (beatAudioRef.current) beatAudioRef.current.currentTime = sec.startTime;
                 vocalAudioCtxRef.current?.resume();
                 audioRef.current.play();
-                if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
+                if (beatAudioRef.current) {
+                    // Section time is vocal-relative; beat must be offset by beatOffset
+                    beatAudioRef.current.currentTime = sec.startTime + (session.beatOffset || 0);
+                    beatAudioRef.current.play().catch(() => { });
+                }
                 setPlayingSectionId(sec.id);
                 setIsPlayingAll(false);
                 onSelect();
