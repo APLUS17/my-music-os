@@ -24,11 +24,39 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
   const beatAudioRef = useRef<HTMLAudioElement | null>(null);
   const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
+  const vocalAudioCtxRef = useRef<AudioContext | null>(null);
 
   // Play beat + current vocal
   const currentVocal = vocalSessions[currentTrackIndex];
   const hasBeat = !!beatSrc;
   const hasVocals = vocalSessions.length > 0;
+
+  // Route vocal audio through Web Audio API so mono recording plays in both ears
+  useEffect(() => {
+    const audio = vocalAudioRef.current;
+    if (!audio) return;
+
+    // Close any previous context for the old vocal element
+    if (vocalAudioCtxRef.current) {
+      vocalAudioCtxRef.current.close();
+      vocalAudioCtxRef.current = null;
+    }
+
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioContextClass() as AudioContext;
+    vocalAudioCtxRef.current = ctx;
+
+    const source = ctx.createMediaElementSource(audio);
+    const merger = ctx.createChannelMerger(2);
+    source.connect(merger, 0, 0); // mono → left
+    source.connect(merger, 0, 1); // mono → right
+    merger.connect(ctx.destination);
+
+    return () => {
+      ctx.close();
+      vocalAudioCtxRef.current = null;
+    };
+  }, [currentTrackIndex]); // Re-run whenever the vocal track (and thus the audio element) changes
 
   // Get max duration between beat and vocal
   useEffect(() => {
@@ -70,6 +98,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     beat.addEventListener('ended', handleEnded);
 
     if (isPlaying) {
+      vocalAudioCtxRef.current?.resume();
       if (beat.paused && hasBeat) beat.play().catch(() => { });
       if (vocal.paused && hasVocals) vocal.play().catch(() => { });
     } else {

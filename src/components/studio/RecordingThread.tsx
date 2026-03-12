@@ -96,6 +96,7 @@ const SessionCard = ({
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const beatAudioRef = useRef<HTMLAudioElement | null>(null);
     const [progress, setProgress] = useState(0);
+    const vocalAudioCtxRef = useRef<AudioContext | null>(null);
 
     const activePlaybackSection = session.sections.find(s => s.id === playingSectionId);
 
@@ -105,6 +106,27 @@ const SessionCard = ({
         }
     }, [session.audioUrl]);
 
+    // Route vocal audio through Web Audio API so mono recording plays in both ears
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContextClass() as AudioContext;
+        vocalAudioCtxRef.current = ctx;
+
+        const source = ctx.createMediaElementSource(audio);
+        const merger = ctx.createChannelMerger(2);
+        source.connect(merger, 0, 0); // mono → left
+        source.connect(merger, 0, 1); // mono → right
+        merger.connect(ctx.destination);
+
+        return () => {
+            ctx.close();
+            vocalAudioCtxRef.current = null;
+        };
+    }, []); // Run once — audio element is stable for the lifetime of this card
+
     // Sync beat and vocal playback (play/pause only, not constant time syncing)
     useEffect(() => {
         const vocal = audioRef.current;
@@ -113,6 +135,7 @@ const SessionCard = ({
         if (!vocal || !beat || !beatSrc) return;
 
         if (isPlayingAll || playingSectionId) {
+            vocalAudioCtxRef.current?.resume();
             vocal.play().catch(() => { });
             beat.play().catch(() => { });
         } else {
@@ -155,6 +178,7 @@ const SessionCard = ({
             } else {
                 // If a section was playing, just reset to play all from current time, or from 0
                 setPlayingSectionId(null);
+                vocalAudioCtxRef.current?.resume();
                 audioRef.current.play();
                 if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
                 onSelect();
@@ -174,6 +198,7 @@ const SessionCard = ({
             } else {
                 audioRef.current.currentTime = sec.startTime;
                 if (beatAudioRef.current) beatAudioRef.current.currentTime = sec.startTime;
+                vocalAudioCtxRef.current?.resume();
                 audioRef.current.play();
                 if (beatAudioRef.current) beatAudioRef.current.play().catch(() => { });
                 setPlayingSectionId(sec.id);
