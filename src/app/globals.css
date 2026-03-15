@@ -27,16 +27,20 @@
     --text-tertiary: #52525B;
     /* zinc-600 */
 
-    --accent: oklch(0.97 0 0);
-    --accent-dim: rgba(255, 255, 255, 0.4);
+    /* Sonic Lime — primary accent per DESIGN.md */
+    --accent: #BFFF00;
+    --accent-dim: rgba(191, 255, 0, 0.3);
 
     --glass: rgba(10, 10, 10, 0.8);
 
-    /* Shapes & Fonts Defaults */
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
+    /* Shapes & Fonts — expressive radius scale (Baton/Apple feel) */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.625rem;
+    --radius-lg: 0.875rem;
+    --radius-xl: 1.25rem;
+
+    /* Display font token */
+    --font-display: var(--font-instrument-serif);
 
     --background: var(--bg-main);
     --foreground: var(--text-main);
@@ -85,6 +89,7 @@
 }
 
 /* Light */
+
 [data-theme="light"] {
     --bg-main: #F5F5F4;
     /* stone-100 */
@@ -227,6 +232,12 @@ body {
     margin: 0;
     padding: 0;
     background-color: var(--bg-main);
+    /* Subtle radial ambience glow — Baton dark aesthetic */
+    background-image: radial-gradient(
+        ellipse 80% 50% at 50% -10%,
+        rgba(191, 255, 0, 0.04) 0%,
+        transparent 65%
+    );
     color: var(--text-main);
     overflow: hidden;
     touch-action: manipulation;
@@ -256,9 +267,25 @@ body {
 
 .glass {
     background: var(--glass);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
     border: 1px solid var(--border-main);
+}
+
+/* Liquid Glass nav — Apple iOS 26 inspired, deep blur + specular edge */
+.glass-nav {
+    background: rgba(8, 8, 8, 0.72);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
+        0 24px 48px -12px rgba(0, 0, 0, 0.65);
+}
+
+/* Display font utility (Instrument Serif for major headers) */
+.display {
+    font-family: var(--font-display), serif;
 }
 
 ::selection {

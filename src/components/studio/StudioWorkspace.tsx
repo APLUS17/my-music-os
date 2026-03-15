@@ -966,7 +966,7 @@ const StudioWorkspace: React.FC = () => {
                             <button onClick={() => setViewMode('collection')} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors">
                                 <ChevronRight size={20} className="rotate-180" />
                             </button>
-                            <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">Settings</h1>
+                            <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] display">Settings</h1>
                         </div>
                         <div className="space-y-8 overflow-y-auto pb-20">
                             <section>
@@ -1008,7 +1008,7 @@ const StudioWorkspace: React.FC = () => {
                     <div className="h-full flex flex-col pt-12">
                         <div className="px-6 mb-8 flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
+                                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6 display">Library</h1>
                                 <div className="flex border-b border-[var(--border-main)]">
                                     <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-[11px] mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
                                     <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-[11px] mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
@@ -1022,22 +1022,35 @@ const StudioWorkspace: React.FC = () => {
                         <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
                             {libraryTab === 'beats' && (
                                 <div className="space-y-4">
-                                    {beats.map(beat => (
-                                        <SwipeableBeatCard
+                                    {beats.map((beat, index) => (
+                                        <motion.div
                                             key={beat.id}
-                                            beat={beat}
-                                            isPlaying={playingBeatId === beat.id}
-                                            onPlay={() => handlePlayBeat(beat.id)}
-                                            onWrite={() => handleStartProjectFromBeat(beat)}
-                                            onDelete={() => handleDeleteBeat(beat.id)}
-                                        />
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.05, duration: 0.2 }}
+                                        >
+                                            <SwipeableBeatCard
+                                                beat={beat}
+                                                isPlaying={playingBeatId === beat.id}
+                                                onPlay={() => handlePlayBeat(beat.id)}
+                                                onWrite={() => handleStartProjectFromBeat(beat)}
+                                                onDelete={() => handleDeleteBeat(beat.id)}
+                                            />
+                                        </motion.div>
                                     ))}
                                 </div>
                             )}
                             {libraryTab === 'songs' && (
                                 <div className="space-y-4">
-                                    {savedProjects.map(p => (
-                                        <SwipeableProjectCard key={p.id} project={p} onClick={() => loadProject(p)} onDelete={() => deleteProject(p.id)} />
+                                    {savedProjects.map((p, index) => (
+                                        <motion.div
+                                            key={p.id}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.05, duration: 0.2 }}
+                                        >
+                                            <SwipeableProjectCard project={p} onClick={() => loadProject(p)} onDelete={() => deleteProject(p.id)} />
+                                        </motion.div>
                                     ))}
                                 </div>
                             )}
@@ -1058,7 +1071,7 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                                 <button
                                     onClick={() => setFabOpen(!fabOpen)}
-                                    className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                                    className="w-14 h-14 bg-[var(--accent)] text-[var(--bg-main)] rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
                                 >
                                     {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
                                 </button>
