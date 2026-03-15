@@ -11,22 +11,26 @@ const COLOR_LOW = '#60A5FA';
 const COLOR_MID = '#FBBF24';
 const COLOR_HIGH = '#F472B6';
 const CURVE_POINTS = 100;
-const SWEEP_MIN = 80;
-const SWEEP_MAX = 16000;
+
+type BandKey = 'low' | 'mid' | 'high';
+
+const BAND_CONFIG = {
+  low:  { min: 40,   max: 1200,  defaultFreq: FREQ_LOW,         color: COLOR_LOW,  sweepLabel: 'LOW SWEEP',  ticks: [60, 100, 200, 400, 800] },
+  mid:  { min: 80,   max: 16000, defaultFreq: FREQ_MID_DEFAULT, color: COLOR_MID,  sweepLabel: 'MID SWEEP',  ticks: [100, 200, 500, 1000, 2000, 5000, 8000] },
+  high: { min: 2000, max: 20000, defaultFreq: FREQ_HIGH,        color: COLOR_HIGH, sweepLabel: 'HIGH SWEEP', ticks: [2000, 4000, 8000, 16000] },
+} as const;
 
 function freqToX(freq: number, width: number): number {
   return ((Math.log10(freq) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20))) * width;
 }
 
-/** Normalize frequency to 0..1 on a log scale across SWEEP_MIN–SWEEP_MAX */
-function freqToT(freq: number): number {
-  return Math.log(freq / SWEEP_MIN) / Math.log(SWEEP_MAX / SWEEP_MIN);
+function freqToTRange(freq: number, min: number, max: number): number {
+  return Math.max(0, Math.min(1, Math.log(freq / min) / Math.log(max / min)));
 }
 
-/** Map 0..1 back to frequency */
-function tToFreq(t: number): number {
+function tToFreqRange(t: number, min: number, max: number): number {
   const clamped = Math.max(0, Math.min(1, t));
-  return Math.round(SWEEP_MIN * Math.pow(SWEEP_MAX / SWEEP_MIN, clamped));
+  return Math.round(min * Math.pow(max / min, clamped));
 }
 
 function formatFreq(hz: number): string {
@@ -42,6 +46,12 @@ function buildCurveFreqs(): Float32Array {
 }
 
 interface GainState {
+  low: number;
+  mid: number;
+  high: number;
+}
+
+interface FreqState {
   low: number;
   mid: number;
   high: number;
@@ -67,13 +77,16 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   isActive = true,
 }) => {
   const [gains, setGains] = useState<GainState>({ low: 0, mid: 0, high: 0 });
-  const [midFreq, setMidFreq] = useState(FREQ_MID_DEFAULT);
+  const [freqs, setFreqs] = useState<FreqState>({ low: FREQ_LOW, mid: FREQ_MID_DEFAULT, high: FREQ_HIGH });
+  const [selectedBand, setSelectedBand] = useState<BandKey>('mid');
 
   // Stale-closure bridges (read inside rAF loop without stale closures)
   const gainsRef = useRef<GainState>(gains);
   gainsRef.current = gains;
-  const midFreqRef = useRef(FREQ_MID_DEFAULT);
-  midFreqRef.current = midFreq;
+  const freqsRef = useRef<FreqState>(freqs);
+  freqsRef.current = freqs;
+  const selectedBandRef = useRef<BandKey>('mid');
+  selectedBandRef.current = selectedBand;
 
   // Filter nodes
   const lowFilterRef = useRef<BiquadFilterNode | null>(null);
@@ -95,36 +108,35 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   const phaseRef = useRef<Float32Array>(new Float32Array(CURVE_POINTS));
 
   // Gain-drag state
-  const activeNodeRef = useRef<'low' | 'mid' | 'high' | null>(null);
+  const activeNodeRef = useRef<BandKey | null>(null);
   const dragStartYRef = useRef(0);
   const dragStartGainRef = useRef(0);
 
   // Frequency sweep knob state
   const sweepTrackRef = useRef<HTMLDivElement>(null);
   const [isSweeping, setIsSweeping] = useState(false);
-  const isSweepingRef = useRef(false);   // sync guard for move handler
+  const isSweepingRef = useRef(false);
   const sweepStartXRef = useRef(0);
   const sweepStartTRef = useRef(0);
 
   // --- Audio Graph ---
   const initializeAudio = useCallback((ctx: AudioContext, sourceNode: AudioNode) => {
-    // Disconnect previous chain if any
     try { audioSourceRef.current?.disconnect(lowFilterRef.current!); } catch {}
 
     const low = ctx.createBiquadFilter();
     low.type = 'lowshelf';
-    low.frequency.value = 100;
+    low.frequency.value = freqsRef.current.low;
     low.gain.value = gainsRef.current.low;
 
     const mid = ctx.createBiquadFilter();
     mid.type = 'peaking';
-    mid.frequency.value = midFreqRef.current;
+    mid.frequency.value = freqsRef.current.mid;
     mid.Q.value = 0.5;
     mid.gain.value = gainsRef.current.mid;
 
     const high = ctx.createBiquadFilter();
     high.type = 'highshelf';
-    high.frequency.value = 5000;
+    high.frequency.value = freqsRef.current.high;
     high.gain.value = gainsRef.current.high;
 
     sourceNode.connect(low);
@@ -190,11 +202,11 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   // --- Recompute EQ curve in place ---
   const recomputeCurve = useCallback(() => {
     if (!lowFilterRef.current || !midFilterRef.current || !highFilterRef.current) return;
-    const freqs = curveFreqsRef.current;
+    const freqArr = curveFreqsRef.current;
     const phase = phaseRef.current;
-    lowFilterRef.current.getFrequencyResponse(freqs as Float32Array<ArrayBuffer>, magLowRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
-    midFilterRef.current.getFrequencyResponse(freqs as Float32Array<ArrayBuffer>, magMidRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
-    highFilterRef.current.getFrequencyResponse(freqs as Float32Array<ArrayBuffer>, magHighRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
+    lowFilterRef.current.getFrequencyResponse(freqArr as Float32Array<ArrayBuffer>, magLowRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
+    midFilterRef.current.getFrequencyResponse(freqArr as Float32Array<ArrayBuffer>, magMidRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
+    highFilterRef.current.getFrequencyResponse(freqArr as Float32Array<ArrayBuffer>, magHighRef.current as Float32Array<ArrayBuffer>, phase as Float32Array<ArrayBuffer>);
     for (let i = 0; i < CURVE_POINTS; i++) {
       curveMagRef.current[i] = magLowRef.current[i] * magMidRef.current[i] * magHighRef.current[i];
     }
@@ -208,11 +220,13 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     recomputeCurve();
   }, [gains, recomputeCurve]);
 
-  // Sync mid filter frequency when sweep changes
+  // Sync all filter frequencies when freqs state changes
   useEffect(() => {
-    if (midFilterRef.current) midFilterRef.current.frequency.value = midFreq;
+    if (lowFilterRef.current) lowFilterRef.current.frequency.value = freqs.low;
+    if (midFilterRef.current) midFilterRef.current.frequency.value = freqs.mid;
+    if (highFilterRef.current) highFilterRef.current.frequency.value = freqs.high;
     recomputeCurve();
-  }, [midFreq, recomputeCurve]);
+  }, [freqs, recomputeCurve]);
 
   // --- Canvas Render Loop ---
   useEffect(() => {
@@ -275,8 +289,8 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
           else color = COLOR_HIGH;
 
           const grad = ctx2d.createLinearGradient(x, h, x, h - barHeight);
-          grad.addColorStop(0, color + 'CC');   // 80% opacity
-          grad.addColorStop(1, color + '33');   // 20% opacity
+          grad.addColorStop(0, color + 'CC');
+          grad.addColorStop(1, color + '33');
           ctx2d.fillStyle = grad;
           ctx2d.fillRect(x + 1, h - barHeight, barWidth - 2, barHeight);
         }
@@ -339,20 +353,34 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
       ctx2d.stroke();
 
       // --- Layer 3: Draggable nodes ---
-      const nodes: Array<{ key: keyof GainState; freq: number; color: string; label: string }> = [
-        { key: 'low', freq: FREQ_LOW, color: COLOR_LOW, label: 'L' },
-        { key: 'mid', freq: midFreqRef.current, color: COLOR_MID, label: 'M' },
-        { key: 'high', freq: FREQ_HIGH, color: COLOR_HIGH, label: 'H' },
+      const currentFreqs = freqsRef.current;
+      const nodes: Array<{ key: BandKey; freq: number; color: string; label: string }> = [
+        { key: 'low',  freq: currentFreqs.low,  color: COLOR_LOW,  label: 'L' },
+        { key: 'mid',  freq: currentFreqs.mid,  color: COLOR_MID,  label: 'M' },
+        { key: 'high', freq: currentFreqs.high, color: COLOR_HIGH, label: 'H' },
       ];
 
       const currentGains = gainsRef.current;
+      const currentSelected = selectedBandRef.current;
       nodes.forEach(({ key, freq, color, label }) => {
         const nx = freqToX(freq, w);
         const gain = currentGains[key];
         const ny = centerY - (gain / 12) * centerY * 0.85;
         const isNodeActive = activeNodeRef.current === key;
+        const isSelected = currentSelected === key;
 
-        // Glow ring when active
+        // Selected band (not dragging): dashed ring to indicate slider target
+        if (isSelected && !isNodeActive) {
+          ctx2d.beginPath();
+          ctx2d.arc(nx, ny, 18, 0, Math.PI * 2);
+          ctx2d.setLineDash([3, 3]);
+          ctx2d.strokeStyle = color + '66';
+          ctx2d.lineWidth = 1;
+          ctx2d.stroke();
+          ctx2d.setLineDash([]);
+        }
+
+        // Active drag: solid glow ring
         if (isNodeActive) {
           ctx2d.beginPath();
           ctx2d.arc(nx, ny, 18, 0, Math.PI * 2);
@@ -364,7 +392,7 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         // Node circle
         ctx2d.beginPath();
         ctx2d.arc(nx, ny, 10, 0, Math.PI * 2);
-        ctx2d.fillStyle = isNodeActive ? color : color + 'BB';
+        ctx2d.fillStyle = (isNodeActive || isSelected) ? color : color + 'BB';
         ctx2d.fill();
         ctx2d.strokeStyle = 'rgba(0,0,0,0.4)';
         ctx2d.lineWidth = 1;
@@ -377,8 +405,8 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         ctx2d.textBaseline = 'middle';
         ctx2d.fillText(label, nx, ny);
 
-        // dB readout
-        if (gain !== 0 || isNodeActive) {
+        // dB readout (always show for selected band so user knows which is active)
+        if (gain !== 0 || isNodeActive || isSelected) {
           const readout = `${gain > 0 ? '+' : ''}${gain.toFixed(1)}`;
           ctx2d.fillStyle = color;
           ctx2d.font = '8px monospace';
@@ -413,10 +441,11 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     const py = e.clientY - rect.top;
     const centerY = h / 2;
 
-    const nodes: Array<{ key: keyof GainState; freq: number }> = [
-      { key: 'low', freq: FREQ_LOW },
-      { key: 'mid', freq: midFreqRef.current },
-      { key: 'high', freq: FREQ_HIGH },
+    const currentFreqs = freqsRef.current;
+    const nodes: Array<{ key: BandKey; freq: number }> = [
+      { key: 'low',  freq: currentFreqs.low  },
+      { key: 'mid',  freq: currentFreqs.mid  },
+      { key: 'high', freq: currentFreqs.high },
     ];
 
     for (const { key, freq } of nodes) {
@@ -426,6 +455,7 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
       const dist = Math.sqrt((px - nx) ** 2 + (py - ny) ** 2);
       if (dist <= HIT_RADIUS) {
         activeNodeRef.current = key;
+        setSelectedBand(key);
         dragStartYRef.current = e.clientY;
         dragStartGainRef.current = gain;
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -442,7 +472,6 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     const dpr = window.devicePixelRatio || 1;
     const h = canvas.height / dpr;
     const centerY = h / 2;
-    // ±12dB spans centerY * 0.85 px each direction
     const pxPerDb = (centerY * 0.85) / 12;
     const deltaY = dragStartYRef.current - e.clientY;
     const newGain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, dragStartGainRef.current + deltaY / pxPerDb));
@@ -454,13 +483,15 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     activeNodeRef.current = null;
   };
 
-  // --- Sweep knob handlers ---
+  // --- Sweep knob handlers — target the currently selected band ---
   const handleSweepDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     isSweepingRef.current = true;
     setIsSweeping(true);
     sweepStartXRef.current = e.clientX;
-    sweepStartTRef.current = freqToT(midFreqRef.current);
+    const band = selectedBandRef.current;
+    const { min, max } = BAND_CONFIG[band];
+    sweepStartTRef.current = freqToTRange(freqsRef.current[band], min, max);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -470,7 +501,10 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     if (!track) return;
     const trackWidth = track.clientWidth;
     const deltaX = e.clientX - sweepStartXRef.current;
-    setMidFreq(tToFreq(sweepStartTRef.current + deltaX / trackWidth));
+    const band = selectedBandRef.current;
+    const { min, max } = BAND_CONFIG[band];
+    const newFreq = tToFreqRange(sweepStartTRef.current + deltaX / trackWidth, min, max);
+    setFreqs(prev => ({ ...prev, [band]: newFreq }));
   };
 
   const handleSweepUp = () => {
@@ -480,9 +514,17 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
 
   const resetAll = () => {
     setGains({ low: 0, mid: 0, high: 0 });
-    setMidFreq(FREQ_MID_DEFAULT);
+    setFreqs({ low: FREQ_LOW, mid: FREQ_MID_DEFAULT, high: FREQ_HIGH });
   };
-  const anyActive = gains.low !== 0 || gains.mid !== 0 || gains.high !== 0 || midFreq !== FREQ_MID_DEFAULT;
+  const anyActive =
+    gains.low !== 0 || gains.mid !== 0 || gains.high !== 0 ||
+    freqs.low !== FREQ_LOW || freqs.mid !== FREQ_MID_DEFAULT || freqs.high !== FREQ_HIGH;
+
+  // Derived sweep slider values for the selected band
+  const activeCfg = BAND_CONFIG[selectedBand];
+  const activeFreq = freqs[selectedBand];
+  const activeT = freqToTRange(activeFreq, activeCfg.min, activeCfg.max);
+  const activeColor = activeCfg.color;
 
   return (
     <div className="w-full flex flex-col gap-2 relative">
@@ -508,15 +550,20 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         />
       </div>
 
-      {/* Frequency sweep knob */}
+      {/* Band frequency sweep — label, color, and range follow the selected node */}
       <div className="px-2 flex flex-col gap-1.5 touch-none select-none">
         <div className="flex items-center justify-between">
-          <span className="text-[8px] font-mono uppercase tracking-[0.2em] text-white/25">MID SWEEP</span>
+          <span
+            className="text-[8px] font-mono uppercase tracking-[0.2em] transition-colors"
+            style={{ color: activeColor + '80' }}
+          >
+            {activeCfg.sweepLabel}
+          </span>
           <span
             className="text-[9px] font-mono tabular-nums transition-colors"
-            style={{ color: midFreq !== FREQ_MID_DEFAULT ? COLOR_MID : 'rgba(255,255,255,0.25)' }}
+            style={{ color: activeFreq !== activeCfg.defaultFreq ? activeColor : 'rgba(255,255,255,0.25)' }}
           >
-            {formatFreq(midFreq)}
+            {formatFreq(activeFreq)}
           </span>
         </div>
         <div
@@ -533,31 +580,31 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
           <div
             className="absolute left-0 h-px rounded-full transition-none"
             style={{
-              width: `${freqToT(midFreq) * 100}%`,
-              backgroundColor: COLOR_MID + '60',
+              width: `${activeT * 100}%`,
+              backgroundColor: activeColor + '60',
             }}
           />
           {/* Thumb */}
           <div
             className="absolute -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center transition-none"
             style={{
-              left: `${freqToT(midFreq) * 100}%`,
-              backgroundColor: COLOR_MID + '22',
-              border: `1.5px solid ${COLOR_MID}99`,
-              boxShadow: isSweeping ? `0 0 10px ${COLOR_MID}44` : 'none',
+              left: `${activeT * 100}%`,
+              backgroundColor: activeColor + '22',
+              border: `1.5px solid ${activeColor}99`,
+              boxShadow: isSweeping ? `0 0 10px ${activeColor}44` : 'none',
             }}
           >
             <div
               className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: COLOR_MID }}
+              style={{ backgroundColor: activeColor }}
             />
           </div>
-          {/* Freq tick marks at octave boundaries */}
-          {[100, 200, 500, 1000, 2000, 5000, 8000].map(f => (
+          {/* Freq tick marks for the active band */}
+          {activeCfg.ticks.map(f => (
             <div
               key={f}
               className="absolute bottom-0 w-px h-1.5 bg-white/10"
-              style={{ left: `${freqToT(f) * 100}%` }}
+              style={{ left: `${freqToTRange(f, activeCfg.min, activeCfg.max) * 100}%` }}
             />
           ))}
         </div>
