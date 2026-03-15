@@ -29,9 +29,9 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
   const getCardStyle = (type: SectionType) => {
     switch (type) {
       case 'chorus': return 'border-[var(--accent)] shadow-[0_0_15px_rgba(0,0,0,0.3)] shadow-[var(--accent)]/5';
-      case 'verse': return 'border-white/10';
-      case 'bridge': return 'border-white/20';
-      default: return 'border-dashed border-white/5 opacity-80';
+      case 'verse': return 'border-[var(--border-main)]';
+      case 'bridge': return 'border-[var(--border-focus)]';
+      default: return 'border-dashed border-[var(--border-main)] opacity-70';
     }
   };
 
@@ -40,19 +40,19 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
 
       {/* Header */}
       <div className="mb-6 px-2 flex items-end justify-between">
-        <h1 className="text-3xl font-bold tracking-tighter text-white">Muse</h1>
-        <Badge variant="outline" className="text-[10px] mono border-white/5 text-white/40 mb-1">{scraps.length} ITEMS</Badge>
+        <h1 className="text-3xl font-bold tracking-tighter text-[var(--text-main)] display">Muse</h1>
+        <Badge variant="outline" className="text-[10px] mono border-[var(--border-main)] text-[var(--text-tertiary)] mb-1">{scraps.length} ITEMS</Badge>
       </div>
 
       {/* Dynamic Input Area */}
-      <div className="mb-8 bg-white/5 border border-white/10 rounded-[1.5rem] p-4 shadow-xl z-10 relative group-focus-within:border-white/20 transition-all">
+      <div className="mb-8 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-[1.5rem] p-4 shadow-xl z-10 relative focus-within:border-[var(--border-focus)] transition-all">
         <textarea
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
           placeholder="Capture an idea..."
-          className="w-full bg-transparent p-2 text-sm font-sans text-white focus:outline-none min-h-[80px] resize-none placeholder:text-white/20"
+          className="w-full bg-transparent p-2 text-sm font-sans text-[var(--text-main)] focus:outline-none min-h-[80px] resize-none placeholder:text-[var(--text-tertiary)]"
         />
-        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/5">
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-main)]">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
             {['idea', 'verse', 'chorus', 'bridge'].map((t) => (
               <button
@@ -61,8 +61,8 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                 className={cn(
                   "px-3 py-1 rounded-full text-[9px] mono uppercase tracking-widest transition-all",
                   selectedType === t
-                    ? 'bg-white text-black font-bold'
-                    : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
+                    ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold'
+                    : 'bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-secondary)]'
                 )}
               >
                 {t}
@@ -86,18 +86,18 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
           <div
             key={scrap.id}
             className={cn(
-              "break-inside-avoid relative p-4 rounded-xl bg-white/5 border transition-all hover:scale-[1.02] shadow-sm group",
+              "break-inside-avoid relative p-4 rounded-xl bg-[var(--bg-card)] border transition-all hover:scale-[1.02] shadow-sm group",
               getCardStyle(scrap.type)
             )}
           >
             <div className="flex items-center justify-between mb-3">
-              <Badge variant="ghost" className="h-5 px-1.5 text-[8px] mono uppercase tracking-widest bg-white/5 text-white/40 group-hover:text-white transition-colors cursor-pointer gap-1">
+              <Badge variant="ghost" className="h-5 px-1.5 text-[8px] mono uppercase tracking-widest bg-[var(--bg-hover)] text-[var(--text-secondary)] group-hover:text-[var(--text-main)] transition-colors cursor-pointer gap-1">
                 <Hash size={8} className="opacity-40" /> {scrap.type}
               </Badge>
-              <GripVertical size={12} className="text-white/20 group-hover:text-white/40" />
+              <GripVertical size={12} className="text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]" />
             </div>
 
-            <p className="text-sm font-sans text-white/90 leading-relaxed whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-black">
+            <p className="text-sm font-sans text-[var(--text-main)] leading-relaxed whitespace-pre-wrap selection:bg-[var(--accent)] selection:text-[var(--bg-main)]">
               {scrap.text}
             </p>
 
@@ -127,7 +127,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                     if (e.key === 'Escape') { setEditingTagsId(null); setTagInput(""); }
                   }}
                   placeholder="Add tag..."
-                  className="h-7 text-[10px] bg-black/40 border-white/10 rounded-lg focus:ring-[var(--accent)]"
+                  className="h-7 text-[10px] bg-[var(--bg-secondary)] border-[var(--border-main)] rounded-lg focus:ring-[var(--accent)]"
                 />
               </div>
             )}
@@ -140,7 +140,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                     variant="ghost"
                     size="icon"
                     onClick={(e) => { e.stopPropagation(); setEditingTagsId(editingTagsId === scrap.id ? null : scrap.id); setTagInput(""); }}
-                    className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-white hover:bg-white/10"
+                    className="h-8 w-8 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
                   >
                     <Tag size={12} />
                   </Button>
@@ -155,7 +155,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                       variant="ghost"
                       size="icon"
                       onClick={(e) => { e.stopPropagation(); onSendToStudio(scrap.text); }}
-                      className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-[var(--accent)] hover:bg-[var(--accent)]/10"
+                      className="h-8 w-8 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10"
                     >
                       <Send size={12} />
                     </Button>
@@ -171,7 +171,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                       variant="ghost"
                       size="icon"
                       onClick={(e) => { e.stopPropagation(); onStartProject(scrap.text, scrap.type); }}
-                      className="h-8 w-8 rounded-full bg-black/40 text-white/40 hover:text-black hover:bg-[var(--accent)]"
+                      className="h-8 w-8 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--bg-main)] hover:bg-[var(--accent)]"
                     >
                       <FilePlus2 size={12} />
                     </Button>
@@ -184,7 +184,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
         ))}
 
         {scraps.length === 0 && (
-          <div className="break-inside-avoid flex flex-col items-center justify-center opacity-10 py-16 col-span-2">
+          <div className="break-inside-avoid flex flex-col items-center justify-center opacity-30 py-16 col-span-2 text-[var(--text-secondary)]">
             <Hash size={64} strokeWidth={1} />
             <p className="mt-4 text-[11px] mono uppercase tracking-[0.2em]">Board Empty</p>
           </div>

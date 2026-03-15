@@ -436,7 +436,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
             exit={{ y: 100, opacity: 0, x: '-50%' }}
             className="fixed bottom-28 left-1/2 z-[70] w-full max-w-[90%] sm:max-w-md"
           >
-            <div className="w-full glass rounded-full p-2 pl-3 shadow-2xl flex items-center justify-between gap-3 border border-white/10">
+            <div className="w-full glass rounded-full p-2 pl-3 shadow-2xl flex items-center justify-between gap-3 border border-[var(--border-main)]">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <button onClick={onMinimizeToggle} className="p-1.5 rounded-full hover:bg-white/10 text-[var(--text-secondary)] transition-colors">
                   <ChevronUp size={16} />
@@ -450,7 +450,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 </button>
 
                 {recordedBlob ? (
-                  <div className="flex-1 h-8 bg-black/20 rounded-md relative flex items-center px-2">
+                  <div className="flex-1 h-8 bg-[var(--bg-secondary)] rounded-md relative flex items-center px-2">
                     <Slider
                       disabled={isRecording}
                       max={1}
@@ -475,7 +475,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+              <div className="flex items-center gap-2 pl-2 border-l border-[var(--border-main)]">
                 {recordedBlob && !isRecording && (
                   <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 rounded-full hover:bg-white/10 text-[var(--text-main)]">
                     {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
@@ -499,7 +499,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       <Sheet open={!isMinimized} onOpenChange={(open) => { if (!open) onClose(); }}>
         <SheetContent
           side="bottom"
-          className="p-0 border-t border-white/10 bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[85vh] flex flex-col"
+          className="p-0 border-t border-[var(--border-main)] bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[85vh] flex flex-col"
         >
           <SheetHeader className="hidden">
             <SheetTitle>Recorder</SheetTitle>
@@ -508,7 +508,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             <div className={`p-6 pb-8 flex flex-col items-center gap-6 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.2)]' : ''}`}>
 
-              <div className="w-12 h-1.5 bg-white/10 rounded-full cursor-pointer hover:bg-white/20 transition-colors" onClick={onMinimizeToggle} />
+              <div className="w-12 h-1.5 bg-[var(--border-main)] rounded-full cursor-pointer hover:bg-[var(--border-focus)] transition-colors" onClick={onMinimizeToggle} />
 
               <div className="w-full flex items-center justify-between">
                 <Button variant="ghost" size="icon" onClick={onMinimizeToggle} className="text-[var(--text-secondary)] hover:text-[var(--text-main)]">
@@ -566,7 +566,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     <Button
                       variant={isMonitoring ? "default" : "outline"}
                       size="sm"
-                      className={`rounded-xl text-[10px] mono uppercase tracking-widest h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'border-white/10 hover:bg-white/5'}`}
+                      className={`rounded-xl text-[10px] mono uppercase tracking-widest h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-[var(--bg-main)]' : 'border-[var(--border-main)] hover:bg-[var(--bg-hover)]'}`}
                       onClick={async () => {
                         if (!isMonitoring) {
                           if (!streamRef.current) await initializeMic();
@@ -591,9 +591,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
               </div>
 
               <div className="w-full flex flex-col gap-4 mt-0">
-                <div className="h-28 bg-black/40 rounded-3xl relative overflow-hidden group border border-white/5 shadow-inner">
+                <div className="h-28 bg-[var(--bg-secondary)] rounded-3xl relative overflow-hidden group border border-[var(--border-main)] shadow-inner">
                   <canvas ref={canvasRef} className="w-full h-full cursor-pointer" />
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] mono text-white/40 border border-white/5">ANALYSER</div>
+                  <div className="absolute top-3 left-3 px-2 py-1 bg-[var(--glass)] backdrop-blur-md rounded-md text-[9px] mono text-[var(--text-tertiary)] border border-[var(--border-main)]">ANALYSER</div>
                 </div>
                 <SpectralEQ
                   analyserRef={analyserRef}
@@ -611,7 +611,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 <Button
                   disabled={!recordedBlob}
                   onClick={handleSave}
-                  className="flex-1 rounded-2xl py-7 font-bold bg-white text-black hover:bg-[var(--accent)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs shadow-xl"
+                  className="flex-1 rounded-2xl py-7 font-bold bg-[var(--accent)] text-[var(--bg-main)] hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs shadow-xl"
                 >
                   KEEP TAKE
                 </Button>

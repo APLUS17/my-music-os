@@ -47,7 +47,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
             <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
             <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
           </div>
-          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110 active:scale-90">
+          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-30 group-hover:opacity-100 hover:scale-110 active:scale-90">
             <X size={14} />
           </button>
         </div>

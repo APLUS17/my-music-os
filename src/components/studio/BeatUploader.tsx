@@ -216,7 +216,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 rounded-xl bg-white/5 border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-all uppercase tracking-widest text-[10px] font-mono gap-2"
+          className="h-8 rounded-xl bg-[var(--bg-hover)] border-[var(--border-main)] hover:bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-widest text-[10px] font-mono gap-2"
         >
           <Music size={12} />
           <span>Load Beat</span>
@@ -230,9 +230,9 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
   return (
     <div className="relative z-30">
       <Popover open={showControls} onOpenChange={setShowControls}>
-        <div className="group relative h-9 rounded-xl border border-white/10 bg-white/5 flex items-center overflow-hidden hover:border-white/20 transition-all shadow-sm">
+        <div className="group relative h-9 rounded-xl border border-[var(--border-main)] bg-[var(--bg-hover)] flex items-center overflow-hidden hover:border-[var(--border-focus)] transition-all shadow-sm">
           <div
-            className="absolute inset-0 bg-white opacity-5 pointer-events-none transition-all duration-200 ease-linear origin-left"
+            className="absolute inset-0 bg-[var(--accent)] opacity-10 pointer-events-none transition-all duration-200 ease-linear origin-left"
             style={{ transform: `scaleX(${progressPercent / 100})` }}
           />
 
@@ -240,19 +240,19 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-white/10 text-white active:scale-90 transition-all rounded-none"
+            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-main)] active:scale-90 transition-all rounded-none"
           >
             {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
           </Button>
 
-          <div className="w-[1px] h-3 bg-white/10 relative z-10" />
+          <div className="w-[1px] h-3 bg-[var(--border-main)] relative z-10" />
 
           <PopoverTrigger asChild>
             <button
               className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-white/5 transition-colors text-left"
             >
-              <span className="text-[10px] mono uppercase font-bold tracking-widest text-white/80 max-w-[100px] truncate">{beatName || 'Beat'}</span>
-              <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-white/40">BEAT</Badge>
+              <span className="text-[10px] mono uppercase font-bold tracking-widest text-[var(--text-main)] max-w-[100px] truncate">{beatName || 'Beat'}</span>
+              <Badge variant="outline" className="h-4 px-1 text-[8px] border-[var(--border-main)] text-[var(--text-secondary)]">BEAT</Badge>
             </button>
           </PopoverTrigger>
         </div>
@@ -261,8 +261,8 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] mono uppercase tracking-widest text-white/30">Backing Track</span>
-              <span className="text-sm font-bold text-white truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
+              <span className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)]">Backing Track</span>
+              <span className="text-sm font-bold text-[var(--text-main)] truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
             </div>
             <Button variant="ghost" size="icon" onClick={onClear} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
               <Trash2 size={14} />
@@ -271,7 +271,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
 
           {/* Timeline / Scrubber */}
           <div className="relative w-full h-12 flex items-center select-none touch-none">
-            <div className="relative w-full h-8 bg-black/40 rounded-xl cursor-pointer overflow-hidden border border-white/5"
+            <div className="relative w-full h-8 bg-[var(--bg-secondary)] rounded-xl cursor-pointer overflow-hidden border border-[var(--border-main)]"
               ref={progressRef}
               onMouseDown={handleSeek}
               onTouchStart={handleTouchSeek}
@@ -288,7 +288,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               )}
               {/* Progress fill */}
               <div
-                className="absolute top-0 bottom-0 bg-white opacity-20 pointer-events-none"
+                className="absolute top-0 bottom-0 bg-[var(--accent)] opacity-20 pointer-events-none"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -312,21 +312,21 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
               >
-                <div className="w-3 h-3 rounded-full bg-white shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
-                <div className="w-[1.5px] flex-1 bg-white opacity-60" />
+                <div className="w-3 h-3 rounded-full bg-[var(--text-secondary)] shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-[1.5px] flex-1 bg-[var(--text-secondary)] opacity-60" />
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[11px] mono tabular-nums text-white/40">
+            <span className="text-[11px] mono tabular-nums text-[var(--text-secondary)]">
               {formatTime(currentTime)} <span className="opacity-30">/</span> {formatTime(duration)}
             </span>
 
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="h-8 w-8 text-white/40 hover:text-white hover:bg-white/5">
+                  <Button variant="ghost" size="icon" onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="h-8 w-8 text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]">
                     <RotateCcw size={14} />
                   </Button>
                 </TooltipTrigger>
@@ -339,7 +339,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onClick={() => setIsLooping(!isLooping)}
                 className={cn(
                   "h-7 rounded-lg text-[10px] mono uppercase tracking-widest gap-2",
-                  isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-white/10 text-white/40"
+                  isLooping ? "bg-[var(--accent)] text-[var(--bg-main)] font-bold" : "border-[var(--border-main)] text-[var(--text-secondary)]"
                 )}
               >
                 <Repeat size={10} /> {isLooping ? 'Looping' : 'Loop'}
@@ -349,14 +349,14 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
 
           {isLooping && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setLoopStart(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set Start</Button>
-              <Button variant="outline" size="sm" onClick={() => setLoopEnd(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set End</Button>
+              <Button variant="outline" size="sm" onClick={() => setLoopStart(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-[var(--border-main)] bg-[var(--bg-hover)] hover:bg-[var(--bg-secondary)]">Set Start</Button>
+              <Button variant="outline" size="sm" onClick={() => setLoopEnd(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-[var(--border-main)] bg-[var(--bg-hover)] hover:bg-[var(--bg-secondary)]">Set End</Button>
             </div>
           )}
 
           {/* Volume */}
-          <div className="pt-4 border-t border-white/5 flex items-center gap-4">
-            <Volume2 size={14} className="text-white/20" />
+          <div className="pt-4 border-t border-[var(--border-main)] flex items-center gap-4">
+            <Volume2 size={14} className="text-[var(--text-tertiary)]" />
             <Slider
               min={0}
               max={1}

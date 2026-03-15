@@ -55,7 +55,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
             ))}
 
             {sortedSessions.length === 0 && (
-                <div className="flex flex-col items-center justify-center p-12 text-[var(--text-secondary)] border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
+                <div className="flex flex-col items-center justify-center p-12 text-[var(--text-secondary)] border border-dashed border-[var(--border-main)] rounded-2xl bg-[var(--bg-hover)]">
                     <Mic size={32} className="mb-4 opacity-40" />
                     <p className="text-center font-medium text-sm">No recordings yet</p>
                     <p className="text-center text-xs opacity-60 mt-1">Tap the record button to start session capturing</p>
@@ -256,8 +256,8 @@ const SessionCard = ({
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
                     "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden",
-                    "bg-[#111] border border-white/10",
-                    isActive ? "ring-1 ring-white/20 shadow-lg" : "opacity-90 hover:opacity-100 hover:border-white/15"
+                    "bg-[var(--bg-card)] border border-[var(--border-main)]",
+                    isActive ? "ring-1 ring-[var(--border-focus)] shadow-lg" : "opacity-90 hover:opacity-100 hover:border-[var(--border-focus)]"
                 )}
                 onClick={onSelect}
             >
@@ -274,10 +274,10 @@ const SessionCard = ({
                         onClick={togglePlayAll}
                         size="icon"
                         className={cn(
-                            "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-white/10",
+                            "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-[var(--border-main)]",
                             (isPlayingAll && !playingSectionId)
-                                ? "bg-white text-black hover:bg-white/90"
-                                : "bg-[#222] text-white hover:bg-[#333]"
+                                ? "bg-[var(--accent)] text-[var(--bg-main)] hover:brightness-110"
+                                : "bg-[var(--bg-secondary)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
                         )}
                     >
                         {(isPlayingAll && !playingSectionId) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
@@ -290,25 +290,25 @@ const SessionCard = ({
                                 value={session.name || 'Untitled Recording'}
                                 onChange={(e) => onUpdate({ name: e.target.value })}
                                 onClick={(e) => e.stopPropagation()}
-                                className="h-auto p-0 -ml-1 bg-transparent border-none text-lg font-semibold text-white outline-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-white/30"
+                                className="h-auto p-0 -ml-1 bg-transparent border-none text-lg font-semibold text-[var(--text-main)] outline-none shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-[var(--text-tertiary)]"
                             />
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
-                                className="w-6 h-6 rounded-full text-white/20 hover:text-white hover:bg-white/10 transition-transform duration-300"
+                                className="w-6 h-6 rounded-full text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-transform duration-300"
                                 style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }}
                             >
                                 <ChevronDown size={14} />
                             </Button>
                         </div>
                         <div className="flex items-center justify-between mt-1">
-                            <div className="flex items-center gap-2 text-xs text-white/50 font-medium">
+                            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] font-medium">
                                 <span>{new Date(session.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                <span className="w-1 h-1 rounded-full bg-white/20" />
+                                <span className="w-1 h-1 rounded-full bg-[var(--border-focus)]" />
                                 <span>{(session.duration || 0).toFixed(1)}s</span>
                                 {session.isLoopSession && (
-                                    <Badge variant="outline" className="h-5 px-1.5 ml-1 text-[9px] bg-white/5 text-white/80 border-white/10 uppercase tracking-wide">
+                                    <Badge variant="outline" className="h-5 px-1.5 ml-1 text-[9px] bg-[var(--bg-hover)] text-[var(--text-main)] border-[var(--border-main)] uppercase tracking-wide">
                                         LOOP
                                     </Badge>
                                 )}
@@ -331,9 +331,9 @@ const SessionCard = ({
                     className="overflow-hidden flex flex-col gap-4"
                 >
                     {/* Master Progress Bar */}
-                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
+                    <div className="w-full h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden mt-2">
                         <motion.div
-                            className="h-full bg-white/80 rounded-full"
+                            className="h-full bg-[var(--accent)] rounded-full"
                             initial={{ width: 0 }}
                             animate={{ width: `${progress * 100}%` }}
                             transition={{ duration: 0.1, ease: "linear" }}
@@ -341,14 +341,14 @@ const SessionCard = ({
                     </div>
 
                     {/* Threaded Sections */}
-                    <div className="mt-2 pl-[22px] border-l-2 border-white/[0.05] ml-[22px] flex flex-col gap-3 pb-2">
+                    <div className="mt-2 pl-[22px] border-l-2 border-[var(--border-main)] ml-[22px] flex flex-col gap-3 pb-2">
                         {session.sections.length > 0 ? session.sections.map((sec, idx) => {
                             const isThisSectionPlaying = playingSectionId === sec.id;
 
                             return (
                                 <div key={sec.id} className="relative flex items-center group/sec">
                                     {/* Emoji Node on thread line */}
-                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-[10px] shadow-sm z-10">
+                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[10px] shadow-sm z-10">
                                         {sec.emojiTag || getEmojiForType(sec.type)}
                                     </div>
 
@@ -358,21 +358,21 @@ const SessionCard = ({
                                         className={cn(
                                             "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer",
                                             isThisSectionPlaying
-                                                ? "bg-white/10 border-white/20 shadow-inner"
-                                                : "bg-black/20 border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10"
+                                                ? "bg-[var(--bg-hover)] border-[var(--border-focus)]"
+                                                : "bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-focus)]"
                                         )}
                                     >
                                         <div className="flex flex-col min-w-0 pr-4">
                                             <div className="flex items-center gap-2">
                                                 <span className={cn(
                                                     "text-sm font-semibold truncate transition-colors",
-                                                    isThisSectionPlaying ? "text-white" : "text-white/80 group-hover/sec:text-white"
+                                                    isThisSectionPlaying ? "text-[var(--text-main)]" : "text-[var(--text-secondary)] group-hover/sec:text-[var(--text-main)]"
                                                 )}>
                                                     {sec.label || sec.type}
                                                 </span>
                                                 {sec.isBest && <Heart size={10} className="text-white/60" />}
                                             </div>
-                                            <span className="text-[10px] text-white/40 font-mono tracking-tighter mt-0.5">
+                                            <span className="text-[10px] text-[var(--text-tertiary)] font-mono tracking-tighter mt-0.5">
                                                 {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
                                             </span>
                                         </div>
@@ -385,7 +385,7 @@ const SessionCard = ({
                                                     e.stopPropagation();
                                                     onUpdateSection(sec.id, { isBest: !sec.isBest });
                                                 }}
-                                                className={cn("w-8 h-8 rounded-full", sec.isBest ? "text-red-400 hover:text-red-300 hover:bg-red-400/10" : "text-white/30 hover:text-white hover:bg-white/10")}
+                                                className={cn("w-8 h-8 rounded-full", sec.isBest ? "text-red-500 hover:text-red-400 hover:bg-red-500/10" : "text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]")}
                                             >
                                                 <Heart size={14} fill={sec.isBest ? "currentColor" : "none"} />
                                             </Button>
@@ -393,8 +393,8 @@ const SessionCard = ({
                                             <div className={cn(
                                                 "flex justify-center items-center w-8 h-8 rounded-full border transition-all",
                                                 isThisSectionPlaying
-                                                    ? "bg-white text-black border-transparent"
-                                                    : "bg-[#222] text-white border-white/10 group-hover/sec:bg-[#333]"
+                                                    ? "bg-[var(--accent)] text-[var(--bg-main)] border-transparent"
+                                                    : "bg-[var(--bg-secondary)] text-[var(--text-main)] border-[var(--border-main)] group-hover/sec:bg-[var(--bg-hover)]"
                                             )}>
                                                 {isThisSectionPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                                             </div>
@@ -403,14 +403,14 @@ const SessionCard = ({
                                 </div>
                             );
                         }) : (
-                            <div className="text-xs text-white/30 italic py-2">
+                            <div className="text-xs text-[var(--text-tertiary)] italic py-2">
                                 Processing sections...
                             </div>
                         )}
 
                         {session.sections.length > 0 && (
                             <div className="relative mt-2">
-                                <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-white/20 bg-[#111] z-10" />
+                                <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-[var(--border-focus)] bg-[var(--bg-card)] z-10" />
                             </div>
                         )}
                     </div>
