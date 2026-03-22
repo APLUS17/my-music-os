@@ -249,7 +249,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       {lines.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40 gap-4 px-8 text-center">
           <span className="text-sm font-medium text-[var(--text-main)]">Start writing your lyrics</span>
-          <div className="space-y-1 text-[10px] mono text-[var(--text-secondary)]">
+          <div className="space-y-1 text-xs mono text-[var(--text-secondary)]">
             <p>Just type freely - no rules here</p>
             <p>Try rhyming the ends of lines</p>
             <p>Hit Enter twice to start a new section</p>

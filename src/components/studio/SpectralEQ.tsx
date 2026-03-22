@@ -529,11 +529,11 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   return (
     <div className="w-full flex flex-col gap-2 relative">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/40">EQ</span>
+        <span className="text-xs font-mono uppercase tracking-[0.2em] text-white/40">EQ</span>
         <button
           disabled={!anyActive}
           onClick={resetAll}
-          className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/30 hover:text-white/70 disabled:opacity-20 disabled:cursor-not-allowed transition-colors px-2 py-0.5 rounded border border-white/10 hover:border-white/20"
+          className="text-xs font-mono uppercase tracking-[0.2em] text-white/30 hover:text-white/70 disabled:opacity-20 disabled:cursor-not-allowed transition-colors px-2 py-0.5 rounded border border-white/10 hover:border-white/20"
         >
           RESET
         </button>

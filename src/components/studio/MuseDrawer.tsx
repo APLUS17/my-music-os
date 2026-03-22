@@ -155,7 +155,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors rounded-none min-w-[100px] justify-between text-[10px] mono uppercase tracking-wider font-medium text-[var(--text-main)]"
+                  className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors rounded-none min-w-[100px] justify-between text-xs mono uppercase tracking-wider font-medium text-[var(--text-main)]"
                 >
                   {activeMode.label}
                 </Button>
@@ -299,7 +299,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
         </div>
 
         <div className="p-3 text-center border-t border-[var(--border-main)]">
-          <p className="text-[9px] mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
+          <p className="text-xs mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
         </div>
       </SheetContent>
     </Sheet>

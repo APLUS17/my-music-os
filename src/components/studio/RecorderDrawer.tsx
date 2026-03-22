@@ -29,6 +29,8 @@ interface RecorderDrawerProps {
   isMinimized?: boolean;
   onMinimizeToggle?: () => void;
   autoStart?: boolean;
+  latencyCompensation?: number;
+  beatVolume?: number;
 }
 
 export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
@@ -38,7 +40,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   backingAudioRef,
   isMinimized = false,
   onMinimizeToggle,
-  autoStart = false
+  autoStart = false,
+  latencyCompensation = 0,
+  beatVolume = 1
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -183,7 +187,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
       } else {
         ctx.beginPath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.strokeStyle = `rgba(128, 128, 128, 0.3)`;
         ctx.lineWidth = 1;
         ctx.moveTo(0, centerY);
         ctx.lineTo(width, centerY);
@@ -256,7 +260,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (isPlaying) {
         audioRef.current.play().catch(() => setIsPlaying(false));
         if (backingAudioRef?.current && backingTrackSrc) {
-          backingAudioRef.current.currentTime = audioRef.current.currentTime + recordingStartOffsetRef.current;
+          const compensatedStartOffset = Math.max(0, recordingStartOffsetRef.current - (latencyCompensation / 1000));
+          backingAudioRef.current.currentTime = audioRef.current.currentTime + compensatedStartOffset;
+          backingAudioRef.current.volume = beatVolume;
           backingAudioRef.current.play().catch(console.error);
         }
       } else {
@@ -267,7 +273,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         }
       }
     }
-  }, [isPlaying, backingTrackSrc, recordedBlob]);
+  }, [isPlaying, backingTrackSrc, recordedBlob, beatVolume]);
 
   // Handle live monitoring connection
   useEffect(() => {
@@ -362,7 +368,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (backingAudioRef?.current && backingTrackSrc) {
         const backingAudio = backingAudioRef.current;
         recordingStartOffsetRef.current = backingAudio.currentTime;
-        backingAudio.volume = 1.0;
+        backingAudio.volume = beatVolume;
         backingAudio.play().catch(console.error);
       } else {
         recordingStartOffsetRef.current = 0;
@@ -464,13 +470,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   </div>
                 ) : (
                   <div className="flex-1 h-8 rounded-md relative flex items-center justify-center px-2">
-                    <div className="text-[10px] mono text-[var(--text-secondary)] uppercase tracking-widest opacity-50">
+                    <div className="text-xs mono text-[var(--text-secondary)] uppercase tracking-wide opacity-50">
                       {isRecording ? "Recording..." : "Ready"}
                     </div>
                   </div>
                 )}
 
-                <div className="text-[10px] mono tabular-nums text-[var(--text-secondary)] w-10 text-right">
+                <div className="text-xs mono tabular-nums text-[var(--text-secondary)] w-10 text-right">
                   {formatTime(isRecording ? duration : (progress * duration))}
                 </div>
               </div>
@@ -499,14 +505,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       <Sheet open={!isMinimized} onOpenChange={(open) => { if (!open) onClose(); }}>
         <SheetContent
           side="bottom"
-          className="p-0 border-t border-white/10 bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[85vh] flex flex-col"
+          className="p-0 border-t border-[var(--border-main)] bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[80vh] flex flex-col"
         >
           <SheetHeader className="hidden">
             <SheetTitle>Recorder</SheetTitle>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
-            <div className={`p-6 pb-8 flex flex-col items-center gap-6 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.2)]' : ''}`}>
+            <div className={`p-4 pb-6 flex flex-col items-center gap-4 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.15)]' : ''}`}>
 
               <div className="w-12 h-1.5 bg-white/10 rounded-full cursor-pointer hover:bg-white/20 transition-colors" onClick={onMinimizeToggle} />
 
@@ -538,7 +544,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
               <div className="w-full grid grid-cols-3 items-center">
                 <div className="justify-self-start">
                   {(recordedBlob && !isRecording) ? (
-                    <Button variant="default" size="sm" onClick={handleSave} className="rounded-xl text-[10px] mono uppercase tracking-widest gap-2 h-10 bg-[var(--text-main)] text-[var(--bg-main)] hover:bg-[var(--text-main)]/90 hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                    <Button variant="default" size="sm" onClick={handleSave} className="rounded-xl text-xs mono uppercase tracking-wide gap-2 h-10 bg-[var(--text-main)] text-[var(--bg-main)] hover:bg-[var(--text-main)]/90 hover:scale-105 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                       <Check size={14} strokeWidth={3} />
                       <span className="font-bold">Keep</span>
                     </Button>
@@ -566,7 +572,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     <Button
                       variant={isMonitoring ? "default" : "outline"}
                       size="sm"
-                      className={`rounded-xl text-[10px] mono uppercase tracking-widest h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'border-white/10 hover:bg-white/5'}`}
+                      className={`rounded-xl text-xs mono uppercase tracking-wide h-10 px-4 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'border-white/10 hover:bg-white/5'}`}
                       onClick={async () => {
                         if (!isMonitoring) {
                           if (!streamRef.current) await initializeMic();
@@ -590,10 +596,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 </div>
               </div>
 
-              <div className="w-full flex flex-col gap-4 mt-0">
-                <div className="h-28 bg-black/40 rounded-3xl relative overflow-hidden group border border-white/5 shadow-inner">
+              <div className="w-full flex flex-col gap-3 mt-0">
+                <div className="h-20 bg-[var(--bg-secondary)] rounded-2xl relative overflow-hidden group border border-[var(--border-main)] shadow-inner">
                   <canvas ref={canvasRef} className="w-full h-full cursor-pointer" />
-                  <div className="absolute top-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] mono text-white/40 border border-white/5">ANALYSER</div>
+                  <div className="absolute top-2 left-2.5 px-2 py-0.5 bg-[var(--bg-card)]/80 backdrop-blur-md rounded-md text-[10px] mono text-[var(--text-tertiary)] border border-[var(--border-main)]">ANALYSER</div>
                 </div>
                 <SpectralEQ
                   analyserRef={analyserRef}
@@ -606,12 +612,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 />
               </div>
 
-              <div className="w-full flex gap-4 mt-4">
-                <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-7 font-bold text-[var(--text-secondary)] hover:text-white transition-colors uppercase tracking-widest text-xs">CANCEL</Button>
+              <div className="w-full flex gap-3 mt-2">
+                <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-5 font-bold text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors uppercase tracking-wide text-xs">CANCEL</Button>
                 <Button
                   disabled={!recordedBlob}
                   onClick={handleSave}
-                  className="flex-1 rounded-2xl py-7 font-bold bg-white text-black hover:bg-[var(--accent)] hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs shadow-xl"
+                  className="flex-1 rounded-2xl py-5 font-bold bg-[var(--accent)] text-[var(--bg-main)] hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-wide text-xs shadow-xl"
                 >
                   KEEP TAKE
                 </Button>

@@ -41,7 +41,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate })
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-[var(--text-main)]">
                  <Waves size={16} className="text-[var(--accent)]" />
-                 <span className="text-xs mono uppercase tracking-widest font-medium">Space</span>
+                 <span className="text-xs mono uppercase tracking-wide font-medium">Space</span>
               </div>
               <span className="text-xs mono tabular-nums text-[var(--text-tertiary)]">{settings.space}%</span>
            </div>
@@ -60,7 +60,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate })
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-[var(--text-main)]">
                  <Zap size={16} className="text-[var(--accent)]" />
-                 <span className="text-xs mono uppercase tracking-widest font-medium">Echo</span>
+                 <span className="text-xs mono uppercase tracking-wide font-medium">Echo</span>
               </div>
               <span className="text-xs mono tabular-nums text-[var(--text-tertiary)]">{settings.echo}%</span>
            </div>
@@ -79,7 +79,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate })
            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-[var(--text-main)]">
                  <Power size={16} className="text-[var(--accent)]" />
-                 <span className="text-xs mono uppercase tracking-widest font-medium">Punch</span>
+                 <span className="text-xs mono uppercase tracking-wide font-medium">Punch</span>
               </div>
               <span className="text-xs mono tabular-nums text-[var(--text-tertiary)]">{settings.punch}%</span>
            </div>
@@ -97,7 +97,7 @@ export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate })
       
       {/* Footer Indicator */}
       <div className="border-t border-[var(--border-main)] pt-6 flex justify-center">
-         <p className="text-[10px] text-[var(--text-tertiary)] mono uppercase">Processing Chain Active</p>
+         <p className="text-xs text-[var(--text-tertiary)] mono uppercase">Processing Chain Active</p>
       </div>
     </div>
   );

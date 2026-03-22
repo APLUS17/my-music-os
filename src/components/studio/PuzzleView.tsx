@@ -41,7 +41,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
       {/* Header */}
       <div className="mb-6 px-2 flex items-end justify-between">
         <h1 className="text-3xl font-bold tracking-tighter text-white">Muse</h1>
-        <Badge variant="outline" className="text-[10px] mono border-white/5 text-white/40 mb-1">{scraps.length} ITEMS</Badge>
+        <Badge variant="outline" className="text-xs mono border-white/5 text-white/40 mb-1">{scraps.length} ITEMS</Badge>
       </div>
 
       {/* Dynamic Input Area */}
@@ -59,7 +59,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                 key={t}
                 onClick={() => setSelectedType(t as SectionType)}
                 className={cn(
-                  "px-3 py-1 rounded-full text-[9px] mono uppercase tracking-widest transition-all",
+                  "px-3 py-1 rounded-full text-xs mono uppercase tracking-wide transition-all",
                   selectedType === t
                     ? 'bg-white text-black font-bold'
                     : 'bg-white/5 text-white/40 hover:text-white hover:bg-white/10'
@@ -91,7 +91,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
             )}
           >
             <div className="flex items-center justify-between mb-3">
-              <Badge variant="ghost" className="h-5 px-1.5 text-[8px] mono uppercase tracking-widest bg-white/5 text-white/40 group-hover:text-white transition-colors cursor-pointer gap-1">
+              <Badge variant="ghost" className="h-5 px-1.5 text-[8px] mono uppercase tracking-wide bg-white/5 text-white/40 group-hover:text-white transition-colors cursor-pointer gap-1">
                 <Hash size={8} className="opacity-40" /> {scrap.type}
               </Badge>
               <GripVertical size={12} className="text-white/20 group-hover:text-white/40" />
@@ -127,7 +127,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
                     if (e.key === 'Escape') { setEditingTagsId(null); setTagInput(""); }
                   }}
                   placeholder="Add tag..."
-                  className="h-7 text-[10px] bg-black/40 border-white/10 rounded-lg focus:ring-[var(--accent)]"
+                  className="h-7 text-xs bg-black/40 border-white/10 rounded-lg focus:ring-[var(--accent)]"
                 />
               </div>
             )}
@@ -186,7 +186,7 @@ export const PuzzleView: React.FC<PuzzleViewProps> = ({ scraps, onAdd, onUpdateT
         {scraps.length === 0 && (
           <div className="break-inside-avoid flex flex-col items-center justify-center opacity-10 py-16 col-span-2">
             <Hash size={64} strokeWidth={1} />
-            <p className="mt-4 text-[11px] mono uppercase tracking-[0.2em]">Board Empty</p>
+            <p className="mt-4 text-xs mono uppercase tracking-[0.2em]">Board Empty</p>
           </div>
         )}
       </div>

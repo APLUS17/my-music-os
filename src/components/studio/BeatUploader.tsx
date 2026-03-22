@@ -216,7 +216,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 rounded-xl bg-white/5 border-white/10 hover:bg-white/10 text-white/60 hover:text-white transition-all uppercase tracking-widest text-[10px] font-mono gap-2"
+          className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
         >
           <Music size={12} />
           <span>Load Beat</span>
@@ -251,7 +251,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
             <button
               className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-white/5 transition-colors text-left"
             >
-              <span className="text-[10px] mono uppercase font-bold tracking-widest text-white/80 max-w-[100px] truncate">{beatName || 'Beat'}</span>
+              <span className="text-xs mono uppercase font-bold tracking-wide text-white/80 max-w-[100px] truncate">{beatName || 'Beat'}</span>
               <Badge variant="outline" className="h-4 px-1 text-[8px] border-white/10 text-white/40">BEAT</Badge>
             </button>
           </PopoverTrigger>
@@ -261,7 +261,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] mono uppercase tracking-widest text-white/30">Backing Track</span>
+              <span className="text-xs mono uppercase tracking-wide text-white/30">Backing Track</span>
               <span className="text-sm font-bold text-white truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
             </div>
             <Button variant="ghost" size="icon" onClick={onClear} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
@@ -319,7 +319,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[11px] mono tabular-nums text-white/40">
+            <span className="text-xs mono tabular-nums text-white/40">
               {formatTime(currentTime)} <span className="opacity-30">/</span> {formatTime(duration)}
             </span>
 
@@ -338,7 +338,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 size="sm"
                 onClick={() => setIsLooping(!isLooping)}
                 className={cn(
-                  "h-7 rounded-lg text-[10px] mono uppercase tracking-widest gap-2",
+                  "h-7 rounded-lg text-xs mono uppercase tracking-wide gap-2",
                   isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-white/10 text-white/40"
                 )}
               >
@@ -349,8 +349,8 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
 
           {isLooping && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setLoopStart(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set Start</Button>
-              <Button variant="outline" size="sm" onClick={() => setLoopEnd(currentTime)} className="flex-1 h-8 rounded-xl text-[10px] mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set End</Button>
+              <Button variant="outline" size="sm" onClick={() => setLoopStart(currentTime)} className="flex-1 h-8 rounded-xl text-xs mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set Start</Button>
+              <Button variant="outline" size="sm" onClick={() => setLoopEnd(currentTime)} className="flex-1 h-8 rounded-xl text-xs mono uppercase border-white/5 bg-white/5 hover:bg-white/10">Set End</Button>
             </div>
           )}
 

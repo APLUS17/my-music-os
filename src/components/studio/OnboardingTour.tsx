@@ -177,9 +177,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                 }}
             >
                 <div className="mb-6">
-                    <span className="text-[10px] mono uppercase tracking-widest text-[var(--accent)] mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
+                    <span className="text-xs mono uppercase tracking-wide text-[var(--accent)] mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
                     <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{params.title}</h3>
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-light">{params.content}</p>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">{params.content}</p>
                 </div>
 
                 <div className="flex items-center justify-between mt-2">
@@ -203,7 +203,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                         )}
                         <button
                             onClick={handleNext}
-                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
+                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wide hover:scale-105 active:scale-95 transition-all shadow-xl"
                         >
                             {currentStep === STEPS.length - 1 ? 'Start' : 'Next'}
                             {currentStep === STEPS.length - 1 ? <Check size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}

@@ -105,12 +105,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
     if (isPlaying) {
       vocalAudioCtxRef.current?.resume();
-      if (beat.paused && hasBeat) {
-        // Align beat to vocal's current position + the offset from when recording started
-        beat.currentTime = vocal.currentTime + beatOffset;
-        beat.play().catch(() => { });
+      
+      if (vocal.paused && hasVocals) {
+        vocal.play().catch(() => { });
+        
+        if (beat.paused && hasBeat) {
+          // Sync beat to vocal start position + offset
+          beat.currentTime = vocal.currentTime + beatOffset;
+          beat.play().catch(() => { });
+        }
       }
-      if (vocal.paused && hasVocals) vocal.play().catch(() => { });
     } else {
       if (!beat.paused && hasBeat) beat.pause();
       if (!vocal.paused && hasVocals) vocal.pause();
@@ -210,7 +214,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             onChange={(e) => handleProgressChange(parseFloat(e.target.value))}
             className="w-full h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
           />
-          <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] mt-2">
+          <div className="flex items-center justify-between text-xs tabular-nums mono text-[var(--text-tertiary)] mt-2">
             <span>{formatTime(progress)}</span>
             <span>{formatTime(duration)}</span>
           </div>

@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { List, Grid3X3, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -232,7 +233,7 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
             >
                 <div>
                     <h3 className="text-sm font-medium text-[var(--text-main)] mb-1">{project.name || "Untitled Project"}</h3>
-                    <p className="text-[10px] mono text-[var(--text-tertiary)]">{project.lastModified}</p>
+                    <p className="text-xs mono text-[var(--text-tertiary)]">{project.lastModified}</p>
                 </div>
                 <ChevronRight size={14} className="text-[var(--text-tertiary)]" />
             </div>
@@ -323,10 +324,10 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
                     </button>
                     <div className="min-w-0 pointer-events-none">
                         <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{beat.name}</h4>
-                        <p className="text-[10px] mono text-[var(--text-tertiary)]">{beat.duration}</p>
+                        <p className="text-xs mono text-[var(--text-tertiary)]">{beat.duration}</p>
                     </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); onWrite(); }} className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] text-[10px] mono uppercase tracking-wider text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-all">Write</button>
+                <button onClick={(e) => { e.stopPropagation(); onWrite(); }} className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] text-xs mono uppercase tracking-wider text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-all">Write</button>
             </div>
         </div>
     );
@@ -345,7 +346,8 @@ const MISSION_PROJECT: SavedProject = {
 };
 
 const StudioWorkspace: React.FC = () => {
-    const [theme, setTheme] = useState<Theme>('dark');
+    const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
+    const [theme, setTheme] = useState<Theme>('light');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
@@ -378,6 +380,8 @@ const StudioWorkspace: React.FC = () => {
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
+    const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
+    const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
@@ -409,8 +413,9 @@ const StudioWorkspace: React.FC = () => {
         localStorage.setItem('lyriq-tour-completed', 'true');
         setShowTour(false);
         setViewMode('studio');
-        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
+        setSections([]); // Blank canvas for new users
         setProjectTitle('');
+        setStudioMode('flow');
     };
 
     // Persistence Load
@@ -522,6 +527,8 @@ const StudioWorkspace: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const base64 = await blobToBase64(blob);
         const id = randomId().substring(0, 6).toUpperCase();
+
+        const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
         await saveAudioData(id, base64);
 
         const timestamp = new Date().toISOString();
@@ -547,7 +554,7 @@ const StudioWorkspace: React.FC = () => {
         }
 
         const newSession: RecordingSession = {
-            id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: beatOffset,
+            id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: compensatedOffset,
             isLoopSession: !!uploadedBeat && isBeatLooping,
             sections,
             loopStart: beatLoopStart || undefined,
@@ -604,11 +611,31 @@ const StudioWorkspace: React.FC = () => {
         if (!session) return;
         if (playingSessionId === sessionId) {
             globalAudioRef.current?.pause();
+            if (beatAudioRef.current) {
+                beatAudioRef.current.pause();
+                setIsBeatPlaying(false);
+            }
             setPlayingSessionId(null);
         } else {
             if (globalAudioRef.current) globalAudioRef.current.pause();
             const audio = new Audio(session.audioUrl || session.base64);
-            audio.onended = () => setPlayingSessionId(null);
+            audio.onended = () => {
+                setPlayingSessionId(null);
+                if (beatAudioRef.current) {
+                    beatAudioRef.current.pause();
+                    setIsBeatPlaying(false);
+                }
+            };
+            
+            // Sync with beat if available
+            if (uploadedBeat && session.beatOffset !== undefined && beatAudioRef.current) {
+                // Account for latency compensation already being in beatOffset
+                beatAudioRef.current.currentTime = session.beatOffset;
+                beatAudioRef.current.volume = beatVolume;
+                beatAudioRef.current.play().catch(console.error);
+                setIsBeatPlaying(true);
+            }
+            
             audio.play().catch(console.error);
             globalAudioRef.current = audio;
             setPlayingSessionId(sessionId);
@@ -765,21 +792,25 @@ const StudioWorkspace: React.FC = () => {
     };
 
     const handleNewProject = () => {
-        if (confirm("Start a clean project? Current work will be archived.")) {
+        if (window.confirm("Start a new project? Current work will be archived.")) {
             archiveCurrentProject();
-            setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
+            setSections([]); // Empty for Flow mode
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
+            setUploadedBeatName("");
             setActiveProjectId(null);
             setViewMode('studio');
+            setStudioMode('flow');
+            setFabOpen(false);
         }
     };
 
     const loadProject = (p: SavedProject) => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
+            const hasSections = p.sections && p.sections.length > 0;
             setSections(p.sections || []);
             setScraps(p.scraps || []);
             setSessions(p.sessions || []);
@@ -789,6 +820,7 @@ const StudioWorkspace: React.FC = () => {
             setUploadedBeatName(p.beats?.[0]?.name || "");
             setActiveProjectId(p.id);
             setViewMode('studio');
+            setStudioMode(hasSections ? 'write' : 'flow');
             setShowSearch(false);
         }
     };
@@ -797,7 +829,7 @@ const StudioWorkspace: React.FC = () => {
         if (globalAudioRef.current) globalAudioRef.current.pause();
         setPlayingBeatId(null);
         archiveCurrentProject();
-        setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
+        setSections([]); // Blank canvas for Flow mode
         setScraps([]);
         setSessions([]);
         setActiveSessionId(null);
@@ -806,6 +838,7 @@ const StudioWorkspace: React.FC = () => {
         setUploadedBeatName(beat.name);
         setActiveProjectId(null);
         setViewMode('studio');
+        setStudioMode('flow');
     };
 
     const handleLibraryBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -943,6 +976,7 @@ const StudioWorkspace: React.FC = () => {
             repeats: 1,
             text: ""
         }]);
+        if (studioMode === 'flow') setStudioMode('write');
     };
 
     const promoteToSection = (text: string) => {
@@ -970,7 +1004,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                         <div className="space-y-8 overflow-y-auto pb-20">
                             <section>
-                                <h2 className="text-[10px] mono uppercase tracking-widest text-[var(--text-secondary)] mb-4">Appearance</h2>
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Appearance</h2>
                                 <div className="grid grid-cols-1 gap-3">
                                     {['dark', 'light', 'midnight', 'matrix', 'sonar'].map((t) => (
                                         <button
@@ -984,8 +1018,34 @@ const StudioWorkspace: React.FC = () => {
                                     ))}
                                 </div>
                             </section>
+
                             <section className="pt-4">
-                                <h2 className="text-[10px] mono uppercase tracking-widest text-[var(--text-secondary)] mb-4">Help</h2>
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Audio Engineering</h2>
+                                <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Latency Compensation</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[200px]">Adjust if your recordings feel slightly delayed compared to the beat.</p>
+                                        </div>
+                                        <div className="text-sm font-bold text-[var(--accent)] mono">{latencyCompensation}ms</div>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="500"
+                                        step="5"
+                                        value={latencyCompensation}
+                                        onChange={(e) => setLatencyCompensation(parseInt(e.target.value))}
+                                        className="w-full h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+                                    />
+                                    <div className="flex justify-between text-xs mono text-[var(--text-tertiary)]">
+                                        <span>0ms</span>
+                                        <span>500ms</span>
+                                    </div>
+                                </div>
+                            </section>
+                            <section className="pt-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Help</h2>
                                 <div className="grid grid-cols-1 gap-3">
                                     <button
                                         onClick={() => {
@@ -1010,8 +1070,8 @@ const StudioWorkspace: React.FC = () => {
                             <div>
                                 <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
                                 <div className="flex border-b border-[var(--border-main)]">
-                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-[11px] mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
-                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-[11px] mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
+                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
+                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -1047,11 +1107,11 @@ const StudioWorkspace: React.FC = () => {
                             <div className="pointer-events-auto flex flex-col items-end gap-3">
                                 <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-out origin-bottom-right ${fabOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}>
                                     <button onClick={handleNewProject} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
+                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
                                         <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
                                     </button>
                                     <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-[10px] mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
+                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
                                         <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
                                         <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
                                     </button>
@@ -1088,17 +1148,91 @@ const StudioWorkspace: React.FC = () => {
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
-                                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                                        <div className="max-w-[240px] flex-1">
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <div className="group relative flex items-center">
                                             <input
                                                 value={projectTitle}
                                                 onChange={(e) => setProjectTitle(e.target.value)}
-                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate"
+                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate pr-8"
                                                 placeholder="Untitled Project"
                                             />
+                                            <button 
+                                                onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
+                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-white transition-colors"
+                                            >
+                                                <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
+                                            </button>
+
+                                            <AnimatePresence>
+                                                {isProjectSelectorOpen && (
+                                                    <motion.div 
+                                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                        className="absolute top-full left-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-2xl p-2 z-[60] backdrop-blur-xl"
+                                                    >
+                                                        <div className="max-h-60 overflow-y-auto scrollbar-hide py-1">
+                                                            <div className="px-3 py-2 text-[10px] mono uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-main)] mb-1">Your Projects</div>
+                                                            {savedProjects.length > 0 ? (
+                                                                savedProjects.map(p => (
+                                                                    <button
+                                                                        key={p.id}
+                                                                        onClick={() => {
+                                                                            loadProject(p);
+                                                                            setIsProjectSelectorOpen(false);
+                                                                        }}
+                                                                        className={cn(
+                                                                            "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between group",
+                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-white"
+                                                                        )}
+                                                                    >
+                                                                        <span className="truncate">{p.name || "Untitled"}</span>
+                                                                        {activeProjectId === p.id && <CheckCircle2 size={14} />}
+                                                                    </button>
+                                                                ))
+                                                            ) : (
+                                                                <div className="px-3 py-4 text-xs italic text-[var(--text-tertiary)] text-center">No saved projects</div>
+                                                            )}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    handleNewProject();
+                                                                    setIsProjectSelectorOpen(false);
+                                                                }}
+                                                                className="w-full mt-2 flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black rounded-lg transition-all"
+                                                            >
+                                                                <Plus size={14} /> New Project
+                                                            </button>
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
 
+                                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-2 hidden sm:block" />
 
+                                        {/* Studio Mode Toggle */}
+                                        <div className="flex bg-black/40 rounded-full p-1 border border-[var(--border-main)] px-1">
+                                            <button 
+                                                onClick={() => setStudioMode('flow')}
+                                                className={cn(
+                                                    "px-3 py-1 rounded-full text-[10px] mono uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                                    studioMode === 'flow' ? "bg-[var(--accent)] text-black shadow-lg" : "text-[var(--text-tertiary)] hover:text-white"
+                                                )}
+                                            >
+                                                <Grid3X3 size={12} />
+                                                <span className="hidden xs:inline">Flow</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => setStudioMode('write')}
+                                                className={cn(
+                                                    "px-3 py-1 rounded-full text-[10px] mono uppercase tracking-wider transition-all flex items-center gap-1.5",
+                                                    studioMode === 'write' ? "bg-[var(--accent)] text-black shadow-lg" : "text-[var(--text-tertiary)] hover:text-white"
+                                                )}
+                                            >
+                                                <List size={12} />
+                                                <span className="hidden xs:inline">Write</span>
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Right: Audio Controls */}
@@ -1153,32 +1287,118 @@ const StudioWorkspace: React.FC = () => {
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Toggle For Tabs */}
                             <div className="flex border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
-                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-[11px] mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-[11px] mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
+                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
+                                <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
                             </div>
 
                             <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] mt-12">
                                 <div className="max-w-2xl mx-auto space-y-12">
                                     {activeTab === 'lyrics' ? (
                                         <>
-                                            {sections.map((section, idx) => (
-                                                <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                                                    <LyricCard
-                                                        section={section}
-                                                        onUpdate={updateSection}
-                                                        onDelete={deleteSection}
-                                                        onMove={moveSection}
-                                                    />
-                                                </motion.div>
-                                            ))}
-                                            <button
-                                                onClick={addSection}
-                                                className="w-full py-6 flex items-center justify-center gap-4 text-[11px] mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                            >
-                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
-                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                            </button>
+                                            <AnimatePresence mode="wait">
+                                                {studioMode === 'flow' && sections.length === 0 ? (
+                                                    <motion.div 
+                                                        key="flow-canvas"
+                                                        initial={{ opacity: 0, scale: 0.95 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                        className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
+                                                    >
+                                                        {/* Abstract Background Shapes */}
+                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                        <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                        
+                                                        <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                            <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                            <div className="absolute inset-0 rounded-[40px] border border-white/5" />
+                                                            <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                            
+                                                            {/* Orbiting particles animation */}
+                                                            <motion.div 
+                                                                animate={{ rotate: 360 }}
+                                                                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                            />
+                                                        </div>
+
+                                                        <motion.h2 
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: 0.2 }}
+                                                            className="text-4xl font-bold tracking-tight text-white mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60"
+                                                        >
+                                                            Capture the Flow
+                                                        </motion.h2>
+                                                        
+                                                        <motion.p 
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: 0.3 }}
+                                                            className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                        >
+                                                            Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                        </motion.p>
+
+                                                        <motion.button
+                                                            initial={{ opacity: 0, y: 20 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            transition={{ delay: 0.4 }}
+                                                            onClick={addSection}
+                                                            className="px-10 h-14 bg-white text-black rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_50px_rgba(255,255,255,0.2)]"
+                                                        >
+                                                            <Plus size={20} strokeWidth={3} /> Start Writing
+                                                        </motion.button>
+                                                        
+                                                        {/* Optional quick start types */}
+                                                        <motion.div 
+                                                            initial={{ opacity: 0 }}
+                                                            animate={{ opacity: 1 }}
+                                                            transition={{ delay: 0.6 }}
+                                                            className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                        >
+                                                            <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                            <div className="flex gap-4">
+                                                                {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                    <button 
+                                                                        key={type}
+                                                                        onClick={addSection}
+                                                                        className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                    >
+                                                                        {type}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </motion.div>
+                                                    </motion.div>
+                                                ) : (
+                                                    <motion.div 
+                                                        key="write-mode"
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        className="space-y-12"
+                                                    >
+                                                        {sections.map((section, idx) => (
+                                                            <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                                <LyricCard
+                                                                    section={section}
+                                                                    onUpdate={updateSection}
+                                                                    onDelete={deleteSection}
+                                                                    onMove={moveSection}
+                                                                />
+                                                            </motion.div>
+                                                        ))}
+                                                        <button
+                                                            onClick={addSection}
+                                                            className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                                        >
+                                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                            <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
+                                                            <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </>
                                     ) : (
                                         <RecordingThread
@@ -1241,7 +1461,7 @@ const StudioWorkspace: React.FC = () => {
                                     <button
                                         key={f}
                                         onClick={() => setSearchFilter(f as SearchFilter)}
-                                        className={`px-4 py-1.5 rounded-full text-[10px] mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
+                                        className={`px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
                                     >{f}</button>
                                 ))}
                             </div>
@@ -1261,7 +1481,7 @@ const StudioWorkspace: React.FC = () => {
                                     >
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[9px] mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
+                                                <span className="text-xs mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
                                                 <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
                                             </div>
                                             <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>
@@ -1286,7 +1506,7 @@ const StudioWorkspace: React.FC = () => {
                                 setRecorderMinimized(true);
                                 setRecorderAutoStart(isBeatPlaying);
                             }}
-                            className="w-12 h-12 bg-[var(--accent)] text-[var(--bg-main)] rounded-xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all mx-1"
+                            className="w-12 h-12 bg-[var(--studio-red)] text-white rounded-xl flex items-center justify-center shadow-[0_0_20px_-5px_rgba(255,0,60,0.5)] hover:scale-105 active:scale-95 transition-all mx-1"
                         >
                             <div className="w-3 h-3 rounded-full bg-current" />
                         </button>
@@ -1306,6 +1526,8 @@ const StudioWorkspace: React.FC = () => {
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
                     autoStart={recorderAutoStart}
+                    latencyCompensation={latencyCompensation}
+                    beatVolume={beatVolume}
                 />
             )}
 
@@ -1345,7 +1567,7 @@ const StudioWorkspace: React.FC = () => {
                                 <button
                                     key={f}
                                     onClick={() => setSearchFilter(f as SearchFilter)}
-                                    className={`px-4 py-1.5 rounded-full text-[10px] mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
+                                    className={`px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
                                 >{f}</button>
                             ))}
                         </div>
@@ -1365,7 +1587,7 @@ const StudioWorkspace: React.FC = () => {
                                 >
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[9px] mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
+                                            <span className="text-xs mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
                                             <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
                                         </div>
                                         <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>

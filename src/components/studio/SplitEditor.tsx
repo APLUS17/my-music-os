@@ -94,7 +94,7 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
                 </div>
 
                 <div className="max-h-64 overflow-y-auto pr-2 mb-6 border border-white/5 rounded-xl p-2 bg-black/20">
-                    <div className="text-xs uppercase tracking-widest text-white/50 mb-2 font-bold px-2">Sections</div>
+                    <div className="text-xs uppercase tracking-wide text-white/50 mb-2 font-bold px-2">Sections</div>
                     {sections.map((sec, i) => (
                         <div key={sec.id} className="flex items-center justify-between bg-white/5 p-3 rounded-lg mb-2">
                             <span className="text-sm">{(sec.startTime).toFixed(2)}s - {(sec.endTime).toFixed(2)}s</span>

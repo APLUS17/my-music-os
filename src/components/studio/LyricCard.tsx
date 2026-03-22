@@ -11,6 +11,7 @@ interface LyricCardProps {
 
 export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelete, onMove }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -22,8 +23,14 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
   }, [section.text]);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 group relative pl-3 border-l-2 border-[var(--border-main)] hover:border-[var(--text-tertiary)] transition-colors">
-      <div className="flex items-center justify-between mb-1">
+    <div className={`
+      animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-4 py-3 rounded-xl border transition-all duration-300
+      ${isFocused 
+        ? 'bg-[var(--bg-secondary)] border-[var(--shark-blue-dim)] shadow-md' 
+        : 'bg-transparent border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]'
+      }
+    `}>
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -34,10 +41,20 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
           </button>
 
           <div className="flex items-center gap-1">
-            <span className="text-[10px] mono text-[var(--text-tertiary)] tabular-nums opacity-50">x{section.repeats}</span>
+            <span className="text-xs mono text-[var(--text-tertiary)] tabular-nums opacity-50 font-bold">x{section.repeats}</span>
             <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => onUpdate(section.id, { repeats: section.repeats + 1 })} className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"><Plus size={10} /></button>
-              <button onClick={() => onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) })} className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"><Minus size={10} /></button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: section.repeats + 1 }); }} 
+                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+              >
+                <Plus size={10} />
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) }); }} 
+                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+              >
+                <Minus size={10} />
+              </button>
             </div>
           </div>
         </div>
@@ -57,9 +74,11 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
         <textarea
           ref={textareaRef}
           value={section.text}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           onChange={(e) => onUpdate(section.id, { text: e.target.value })}
           className="w-full bg-transparent text-[var(--text-main)] text-base leading-relaxed font-sans focus:outline-none placeholder:text-[var(--text-tertiary)] placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
-          placeholder={section.text === '' ? "Write your lyrics here...\nTip: Try ending lines with similar sounds (rhyming)" : ""}
+          placeholder={section.text === '' ? "Write your lyrics here..." : ""}
           spellCheck={false}
         />
       </div>
@@ -72,7 +91,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
               <button
                 key={type}
                 onClick={() => { onUpdate(section.id, { type }); setIsDropdownOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-[10px] mono uppercase tracking-wider rounded-md hover:bg-[var(--bg-hover)] ${section.type === type ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)]'}`}
+                className={`w-full text-left px-3 py-2 text-xs mono uppercase tracking-wider rounded-md hover:bg-[var(--bg-hover)] ${section.type === type ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)]'}`}
               >
                 {type}
               </button>

@@ -308,7 +308,7 @@ const SessionCard = ({
                                 <span className="w-1 h-1 rounded-full bg-white/20" />
                                 <span>{(session.duration || 0).toFixed(1)}s</span>
                                 {session.isLoopSession && (
-                                    <Badge variant="outline" className="h-5 px-1.5 ml-1 text-[9px] bg-white/5 text-white/80 border-white/10 uppercase tracking-wide">
+                                    <Badge variant="outline" className="h-5 px-1.5 ml-1 text-xs bg-white/5 text-white/80 border-white/10 uppercase tracking-wide">
                                         LOOP
                                     </Badge>
                                 )}
@@ -348,7 +348,7 @@ const SessionCard = ({
                             return (
                                 <div key={sec.id} className="relative flex items-center group/sec">
                                     {/* Emoji Node on thread line */}
-                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-[10px] shadow-sm z-10">
+                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-xs shadow-sm z-10">
                                         {sec.emojiTag || getEmojiForType(sec.type)}
                                     </div>
 
@@ -372,7 +372,7 @@ const SessionCard = ({
                                                 </span>
                                                 {sec.isBest && <Heart size={10} className="text-white/60" />}
                                             </div>
-                                            <span className="text-[10px] text-white/40 font-mono tracking-tighter mt-0.5">
+                                            <span className="text-xs text-white/40 font-mono tracking-tighter mt-0.5">
                                                 {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
                                             </span>
                                         </div>
