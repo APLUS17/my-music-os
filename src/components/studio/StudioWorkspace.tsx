@@ -42,7 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { List, Grid3X3, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -1208,31 +1208,6 @@ const StudioWorkspace: React.FC = () => {
                                             </AnimatePresence>
                                         </div>
 
-                                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-2 hidden sm:block" />
-
-                                        {/* Studio Mode Toggle */}
-                                        <div className="flex bg-black/40 rounded-full p-1 border border-[var(--border-main)] px-1">
-                                            <button 
-                                                onClick={() => setStudioMode('flow')}
-                                                className={cn(
-                                                    "px-3 py-1 rounded-full text-[10px] mono uppercase tracking-wider transition-all flex items-center gap-1.5",
-                                                    studioMode === 'flow' ? "bg-[var(--accent)] text-black shadow-lg" : "text-[var(--text-tertiary)] hover:text-white"
-                                                )}
-                                            >
-                                                <Grid3X3 size={12} />
-                                                <span className="hidden xs:inline">Flow</span>
-                                            </button>
-                                            <button 
-                                                onClick={() => setStudioMode('write')}
-                                                className={cn(
-                                                    "px-3 py-1 rounded-full text-[10px] mono uppercase tracking-wider transition-all flex items-center gap-1.5",
-                                                    studioMode === 'write' ? "bg-[var(--accent)] text-black shadow-lg" : "text-[var(--text-tertiary)] hover:text-white"
-                                                )}
-                                            >
-                                                <List size={12} />
-                                                <span className="hidden xs:inline">Write</span>
-                                            </button>
-                                        </div>
                                     </div>
 
                                     {/* Right: Audio Controls */}
