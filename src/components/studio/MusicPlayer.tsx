@@ -32,15 +32,10 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   const hasVocals = vocalSessions.length > 0;
 
   // Route vocal audio through Web Audio API so mono recording plays in both ears
+  // Only run once since audio element is always rendered (just src changes)
   useEffect(() => {
     const audio = vocalAudioRef.current;
     if (!audio) return;
-
-    // Close any previous context for the old vocal element
-    if (vocalAudioCtxRef.current) {
-      vocalAudioCtxRef.current.close();
-      vocalAudioCtxRef.current = null;
-    }
 
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new AudioContextClass() as AudioContext;
@@ -56,7 +51,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       ctx.close();
       vocalAudioCtxRef.current = null;
     };
-  }, [currentTrackIndex]); // Re-run whenever the vocal track (and thus the audio element) changes
+  }, []); // Run once - audio element is stable, only src changes
 
   // Set duration from the vocal recording (progress bar represents vocal time, 0-based)
   useEffect(() => {
@@ -131,6 +126,14 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     if (beatAudioRef.current) beatAudioRef.current.volume = volume * 0.7;
     if (vocalAudioRef.current) vocalAudioRef.current.volume = volume * 0.8;
   }, [volume]);
+
+  // Cleanup: pause audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (beatAudioRef.current) beatAudioRef.current.pause();
+      if (vocalAudioRef.current) vocalAudioRef.current.pause();
+    };
+  }, []);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -272,9 +275,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           </div>
         </div>
 
-        {/* Audio Elements */}
+        {/* Audio Elements - always render to maintain Web Audio connection */}
         <audio ref={beatAudioRef} src={beatSrc || undefined} className="hidden" crossOrigin="anonymous" />
-        {currentVocal && <audio ref={vocalAudioRef} src={currentVocal.audioUrl || currentVocal.base64} className="hidden" crossOrigin="anonymous" />}
+        <audio ref={vocalAudioRef} src={currentVocal?.audioUrl || currentVocal?.base64 || undefined} className="hidden" crossOrigin="anonymous" />
 
         {/* Status Messages */}
         {!hasBeat && !hasVocals && (

@@ -22,6 +22,7 @@ interface RecordingThreadProps {
     onOpenSplitEditor: (sessionId: string) => void;
     beatSrc?: string | null;
     beatVolume?: number;
+    onBeatPlaybackChange?: (isPlaying: boolean) => void;
 }
 
 export const RecordingThread: React.FC<RecordingThreadProps> = ({
@@ -34,6 +35,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     onOpenSplitEditor,
     beatSrc,
     beatVolume = 1,
+    onBeatPlaybackChange,
 }) => {
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -51,6 +53,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
                     onOpenSplitEditor={() => onOpenSplitEditor(session.id)}
                     beatSrc={beatSrc}
                     beatVolume={beatVolume}
+                    onBeatPlaybackChange={onBeatPlaybackChange}
                 />
             ))}
 
@@ -78,7 +81,8 @@ const SessionCard = ({
     onUpdateSection,
     onOpenSplitEditor,
     beatSrc,
-    beatVolume = 1
+    beatVolume = 1,
+    onBeatPlaybackChange
 }: {
     session: RecordingSession;
     isActive: boolean;
@@ -89,6 +93,7 @@ const SessionCard = ({
     onOpenSplitEditor: () => void;
     beatSrc?: string | null;
     beatVolume?: number;
+    onBeatPlaybackChange?: (isPlaying: boolean) => void;
 }) => {
     const [isPlayingAll, setIsPlayingAll] = useState(false);
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
@@ -107,7 +112,10 @@ const SessionCard = ({
     }, [session.audioUrl]);
 
     // Route vocal audio through Web Audio API so mono recording plays in both ears
-    useEffect(() => {
+    // Create context lazily on first play to avoid hitting browser AudioContext limit
+    const initAudioContext = () => {
+        if (vocalAudioCtxRef.current) return; // Already initialized
+
         const audio = audioRef.current;
         if (!audio) return;
 
@@ -120,12 +128,17 @@ const SessionCard = ({
         source.connect(merger, 0, 0); // mono → left
         source.connect(merger, 0, 1); // mono → right
         merger.connect(ctx.destination);
+    };
 
+    // Cleanup on unmount
+    useEffect(() => {
         return () => {
-            ctx.close();
-            vocalAudioCtxRef.current = null;
+            if (vocalAudioCtxRef.current) {
+                vocalAudioCtxRef.current.close();
+                vocalAudioCtxRef.current = null;
+            }
         };
-    }, []); // Run once — audio element is stable for the lifetime of this card
+    }, []);
 
     // Sync beat and vocal playback (play/pause only, not constant time syncing)
     useEffect(() => {
@@ -135,6 +148,8 @@ const SessionCard = ({
         if (!vocal || !beat || !beatSrc) return;
 
         if (isPlayingAll || playingSectionId) {
+            // Initialize audio context lazily on first play
+            initAudioContext();
             vocalAudioCtxRef.current?.resume();
             vocal.play().catch(() => { });
             // If beat isn't already playing (e.g. this effect fires before the click handler),
@@ -143,11 +158,13 @@ const SessionCard = ({
                 beat.currentTime = vocal.currentTime + (session.beatOffset || 0);
             }
             beat.play().catch(() => { });
+            onBeatPlaybackChange?.(true);
         } else {
             vocal.pause();
             beat.pause();
+            onBeatPlaybackChange?.(false);
         }
-    }, [isPlayingAll, playingSectionId, beatSrc]);
+    }, [isPlayingAll, playingSectionId, beatSrc, onBeatPlaybackChange]);
 
     // Update beat volume when beatVolume changes
     useEffect(() => {
@@ -169,6 +186,7 @@ const SessionCard = ({
                 if (beatAudioRef.current) beatAudioRef.current.pause();
                 setPlayingSectionId(null);
                 setIsPlayingAll(false);
+                onBeatPlaybackChange?.(false);
             }
         }
     };

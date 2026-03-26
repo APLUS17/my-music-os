@@ -33,10 +33,6 @@ function tToFreqRange(t: number, min: number, max: number): number {
   return Math.round(min * Math.pow(max / min, clamped));
 }
 
-function formatFreq(hz: number): string {
-  return hz >= 1000 ? `${(hz / 1000).toFixed(1)}k` : `${hz}Hz`;
-}
-
 function buildCurveFreqs(): Float32Array {
   const arr = new Float32Array(CURVE_POINTS);
   for (let i = 0; i < CURVE_POINTS; i++) {
@@ -107,17 +103,12 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   const magHighRef = useRef<Float32Array>(new Float32Array(CURVE_POINTS));
   const phaseRef = useRef<Float32Array>(new Float32Array(CURVE_POINTS));
 
-  // Gain-drag state
+  // Node drag state (both gain and frequency)
   const activeNodeRef = useRef<BandKey | null>(null);
+  const dragStartXRef = useRef(0);
   const dragStartYRef = useRef(0);
   const dragStartGainRef = useRef(0);
-
-  // Frequency sweep knob state
-  const sweepTrackRef = useRef<HTMLDivElement>(null);
-  const [isSweeping, setIsSweeping] = useState(false);
-  const isSweepingRef = useRef(false);
-  const sweepStartXRef = useRef(0);
-  const sweepStartTRef = useRef(0);
+  const dragStartFreqRef = useRef(0);
 
   // --- Audio Graph ---
   const initializeAudio = useCallback((ctx: AudioContext, sourceNode: AudioNode) => {
@@ -428,7 +419,7 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioContext]);
 
-  // --- Pointer Handlers ---
+  // --- Pointer Handlers (drag nodes for both gain and frequency) ---
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -456,8 +447,10 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
       if (dist <= HIT_RADIUS) {
         activeNodeRef.current = key;
         setSelectedBand(key);
+        dragStartXRef.current = e.clientX;
         dragStartYRef.current = e.clientY;
         dragStartGainRef.current = gain;
+        dragStartFreqRef.current = freq;
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
         break;
       }
@@ -470,46 +463,30 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
     const h = canvas.height / dpr;
     const centerY = h / 2;
+    const key = activeNodeRef.current;
+    const { min, max } = BAND_CONFIG[key];
+
+    // Vertical drag controls gain
     const pxPerDb = (centerY * 0.85) / 12;
     const deltaY = dragStartYRef.current - e.clientY;
     const newGain = Math.max(GAIN_MIN, Math.min(GAIN_MAX, dragStartGainRef.current + deltaY / pxPerDb));
-    const key = activeNodeRef.current;
+
+    // Horizontal drag controls frequency (logarithmic scale)
+    const deltaX = e.clientX - dragStartXRef.current;
+    const startT = freqToTRange(dragStartFreqRef.current, min, max);
+    const sensitivity = 1.5; // Pixels per full range
+    const newT = startT + (deltaX / w) * sensitivity;
+    const newFreq = tToFreqRange(newT, min, max);
+
     setGains(prev => ({ ...prev, [key]: Math.round(newGain * 10) / 10 }));
+    setFreqs(prev => ({ ...prev, [key]: newFreq }));
   };
 
   const handlePointerUp = () => {
     activeNodeRef.current = null;
-  };
-
-  // --- Sweep knob handlers — target the currently selected band ---
-  const handleSweepDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    isSweepingRef.current = true;
-    setIsSweeping(true);
-    sweepStartXRef.current = e.clientX;
-    const band = selectedBandRef.current;
-    const { min, max } = BAND_CONFIG[band];
-    sweepStartTRef.current = freqToTRange(freqsRef.current[band], min, max);
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const handleSweepMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isSweepingRef.current) return;
-    const track = sweepTrackRef.current;
-    if (!track) return;
-    const trackWidth = track.clientWidth;
-    const deltaX = e.clientX - sweepStartXRef.current;
-    const band = selectedBandRef.current;
-    const { min, max } = BAND_CONFIG[band];
-    const newFreq = tToFreqRange(sweepStartTRef.current + deltaX / trackWidth, min, max);
-    setFreqs(prev => ({ ...prev, [band]: newFreq }));
-  };
-
-  const handleSweepUp = () => {
-    isSweepingRef.current = false;
-    setIsSweeping(false);
   };
 
   const resetAll = () => {
@@ -519,12 +496,6 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
   const anyActive =
     gains.low !== 0 || gains.mid !== 0 || gains.high !== 0 ||
     freqs.low !== FREQ_LOW || freqs.mid !== FREQ_MID_DEFAULT || freqs.high !== FREQ_HIGH;
-
-  // Derived sweep slider values for the selected band
-  const activeCfg = BAND_CONFIG[selectedBand];
-  const activeFreq = freqs[selectedBand];
-  const activeT = freqToTRange(activeFreq, activeCfg.min, activeCfg.max);
-  const activeColor = activeCfg.color;
 
   return (
     <div className="w-full flex flex-col gap-2 relative">
@@ -539,10 +510,10 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         </button>
       </div>
 
-      <div className="h-44 bg-black/40 rounded-3xl overflow-hidden border border-white/5 touch-none">
+      <div className="h-52 min-h-[13rem] bg-black/40 rounded-3xl overflow-hidden border border-white/5 touch-none">
         <canvas
           ref={canvasRef}
-          className="w-full h-full"
+          className="w-full h-full cursor-grab active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -550,65 +521,10 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         />
       </div>
 
-      {/* Band frequency sweep — label, color, and range follow the selected node */}
-      <div className="px-2 flex flex-col gap-1.5 touch-none select-none">
-        <div className="flex items-center justify-between">
-          <span
-            className="text-[8px] font-mono uppercase tracking-[0.2em] transition-colors"
-            style={{ color: activeColor + '80' }}
-          >
-            {activeCfg.sweepLabel}
-          </span>
-          <span
-            className="text-[9px] font-mono tabular-nums transition-colors"
-            style={{ color: activeFreq !== activeCfg.defaultFreq ? activeColor : 'rgba(255,255,255,0.25)' }}
-          >
-            {formatFreq(activeFreq)}
-          </span>
-        </div>
-        <div
-          ref={sweepTrackRef}
-          className="relative h-8 flex items-center cursor-ew-resize"
-          onPointerDown={handleSweepDown}
-          onPointerMove={handleSweepMove}
-          onPointerUp={handleSweepUp}
-          onPointerCancel={handleSweepUp}
-        >
-          {/* Track line */}
-          <div className="absolute inset-x-0 h-px bg-white/10 rounded-full" />
-          {/* Filled portion left of thumb */}
-          <div
-            className="absolute left-0 h-px rounded-full transition-none"
-            style={{
-              width: `${activeT * 100}%`,
-              backgroundColor: activeColor + '60',
-            }}
-          />
-          {/* Thumb */}
-          <div
-            className="absolute -translate-x-1/2 w-5 h-5 rounded-full flex items-center justify-center transition-none"
-            style={{
-              left: `${activeT * 100}%`,
-              backgroundColor: activeColor + '22',
-              border: `1.5px solid ${activeColor}99`,
-              boxShadow: isSweeping ? `0 0 10px ${activeColor}44` : 'none',
-            }}
-          >
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: activeColor }}
-            />
-          </div>
-          {/* Freq tick marks for the active band */}
-          {activeCfg.ticks.map(f => (
-            <div
-              key={f}
-              className="absolute bottom-0 w-px h-1.5 bg-white/10"
-              style={{ left: `${freqToTRange(f, activeCfg.min, activeCfg.max) * 100}%` }}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Hint text */}
+      <p className="text-[9px] font-mono text-white/30 text-center">
+        Drag nodes: vertical = gain, horizontal = frequency
+      </p>
     </div>
   );
 };

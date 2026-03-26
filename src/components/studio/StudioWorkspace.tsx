@@ -1389,6 +1389,14 @@ const StudioWorkspace: React.FC = () => {
                                             onDeleteSession={handleDeleteSession}
                                             beatSrc={uploadedBeat}
                                             beatVolume={beatVolume}
+                                            onBeatPlaybackChange={(isPlaying) => {
+                                                // When RecordingThread starts playing its own beat,
+                                                // stop the global beat to prevent double playback
+                                                if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                                    beatAudioRef.current.pause();
+                                                    setIsBeatPlaying(false);
+                                                }
+                                            }}
                                         />
                                     )}
                                 </div>
@@ -1503,6 +1511,9 @@ const StudioWorkspace: React.FC = () => {
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}
+                    loopStart={beatLoopStart}
+                    loopEnd={beatLoopEnd}
+                    isLooping={isBeatLooping}
                 />
             )}
 
