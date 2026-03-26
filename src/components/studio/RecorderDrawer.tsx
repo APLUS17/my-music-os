@@ -7,7 +7,8 @@ import {
   X,
   Timer,
   ChevronUp,
-  Headphones
+  Headphones,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SpectralEQ } from './SpectralEQ';
@@ -19,10 +20,11 @@ import {
 } from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { RecordingLayer } from '@/types';
 
 interface RecorderDrawerProps {
   onClose: () => void;
-  onSave: (blob: Blob, duration: number, beatOffset?: number) => void;
+  onSave: (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => void;
   backingTrackSrc?: string | null;
   backingAudioRef?: React.RefObject<HTMLAudioElement | null>;
   isMinimized?: boolean;
@@ -33,6 +35,10 @@ interface RecorderDrawerProps {
   loopStart?: number | null;
   loopEnd?: number | null;
   isLooping?: boolean;
+  // Layer mode props
+  layerMode?: boolean;
+  existingLayers?: RecordingLayer[];
+  parentAudioUrl?: string | null;
 }
 
 export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
@@ -47,7 +53,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   beatVolume = 1,
   loopStart = null,
   loopEnd = null,
-  isLooping = false
+  isLooping = false,
+  layerMode = false,
+  existingLayers = [],
+  parentAudioUrl = null,
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -69,6 +78,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const recordingStartOffsetRef = useRef<number>(0);
   const loopPassCountRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Layer playback refs - for playing existing layers while recording new one
+  const parentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const layerAudioRefs = useRef<HTMLAudioElement[]>([]);
 
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -360,6 +373,41 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Start playback of existing layers (parent + layers) for overdub recording
+  const startLayerPlayback = () => {
+    if (!layerMode) return;
+
+    // Play parent audio (main take)
+    if (parentAudioRef.current && parentAudioUrl) {
+      parentAudioRef.current.currentTime = 0;
+      parentAudioRef.current.play().catch(console.error);
+    }
+
+    // Play all unmuted existing layers
+    layerAudioRefs.current.forEach((audio, idx) => {
+      const layer = existingLayers[idx];
+      if (audio && layer && !layer.isMuted) {
+        audio.currentTime = 0;
+        audio.volume = layer.gain ?? 1;
+        audio.play().catch(console.error);
+      }
+    });
+  };
+
+  // Stop playback of all layers
+  const stopLayerPlayback = () => {
+    if (parentAudioRef.current) {
+      parentAudioRef.current.pause();
+      parentAudioRef.current.currentTime = 0;
+    }
+    layerAudioRefs.current.forEach(audio => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    });
+  };
+
   const initializeMic = async () => {
     if (streamRef.current && audioContext) return;
 
@@ -441,6 +489,11 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         loopPassCountRef.current = 0;
       }
 
+      // Start layer playback if in layer mode (overdubbing)
+      if (layerMode) {
+        startLayerPlayback();
+      }
+
       mediaRecorder.start();
       setIsRecording(true);
       setRecordedBlob(null);
@@ -462,6 +515,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
+      // Stop layer playback if in layer mode
+      if (layerMode) {
+        stopLayerPlayback();
+      }
       // Release mic immediately if not monitoring — kills the browser mic indicator
       if (!isMonitoring) stopMicStream();
     }
@@ -478,7 +535,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const handleSave = () => {
     if (recordedBlob) {
-      onSave(recordedBlob, duration, recordingStartOffsetRef.current);
+      onSave(recordedBlob, duration, recordingStartOffsetRef.current, layerMode);
       onClose();
     }
   };
@@ -499,6 +556,20 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   return (
     <>
       <audio ref={audioRef} className="hidden" preload="metadata" />
+
+      {/* Hidden audio elements for layer playback during overdub recording */}
+      {layerMode && parentAudioUrl && (
+        <audio ref={parentAudioRef} src={parentAudioUrl} className="hidden" preload="auto" />
+      )}
+      {layerMode && existingLayers.map((layer, idx) => (
+        <audio
+          key={layer.id}
+          ref={(el) => { if (el) layerAudioRefs.current[idx] = el; }}
+          src={layer.audioUrl}
+          className="hidden"
+          preload="auto"
+        />
+      ))}
 
       <AnimatePresence>
         {isMinimized && (
@@ -580,6 +651,19 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             <div className={`px-4 pt-2 pb-4 flex flex-col items-center gap-2 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.15)]' : ''}`}>
+
+              {/* Layer mode indicator */}
+              {layerMode && (
+                <div className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-xl mb-1">
+                  <Layers size={14} className="text-[var(--accent)]" />
+                  <span className="text-xs font-medium text-[var(--accent)]">
+                    Recording Layer {(existingLayers?.length || 0) + 2}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-secondary)]">
+                    ({existingLayers.length + 1} playing)
+                  </span>
+                </div>
+              )}
 
               {/* Drag handle */}
               <div className="w-10 h-1 bg-white/20 rounded-full cursor-pointer hover:bg-white/30 transition-colors" onClick={onMinimizeToggle} />
@@ -706,9 +790,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 <Button
                   disabled={!recordedBlob}
                   onClick={handleSave}
-                  className="flex-1 rounded-2xl py-4 font-bold bg-[var(--accent)] text-[var(--bg-main)] hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-wide text-xs shadow-xl"
+                  className={`flex-1 rounded-2xl py-4 font-bold hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-wide text-xs shadow-xl ${
+                    layerMode
+                      ? 'bg-[var(--accent)]/80 text-[var(--bg-main)]'
+                      : 'bg-[var(--accent)] text-[var(--bg-main)]'
+                  }`}
                 >
-                  KEEP TAKE
+                  {layerMode ? 'ADD LAYER' : 'KEEP TAKE'}
                 </Button>
               </div>
             </div>

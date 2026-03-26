@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject } from '../../types';
+import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
@@ -354,6 +354,7 @@ const StudioWorkspace: React.FC = () => {
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
+    const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
@@ -523,7 +524,7 @@ const StudioWorkspace: React.FC = () => {
         setShowRecorder(true);
     };
 
-    const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number) => {
+    const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => {
         const url = URL.createObjectURL(blob);
         const base64 = await blobToBase64(blob);
         const id = randomId().substring(0, 6).toUpperCase();
@@ -553,54 +554,80 @@ const StudioWorkspace: React.FC = () => {
             console.error("Failed to split recording automatically", err);
         }
 
-        const newSession: RecordingSession = {
-            id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: compensatedOffset,
-            isLoopSession: !!uploadedBeat && isBeatLooping,
-            sections,
-            loopStart: beatLoopStart || undefined,
-            loopEnd: beatLoopEnd || undefined
-        };
-        setSessions(prev => [newSession, ...prev]);
+        // If this is a layer being added to an existing session
+        if (isLayer && layerModeSessionId) {
+            const newLayer: RecordingLayer = {
+                id,
+                audioUrl: url,
+                base64,
+                duration,
+                isMuted: false,
+                gain: 0.8
+            };
 
-        if (recordingTargetLineId) {
-            setRecordingTargetLineId(null);
-        }
-
-        const hasApiKey = !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-
-        if (hasApiKey) {
-            toast.success('Recording saved! AI analyzing...');
-            // Background AI refinement
-            analyzeAudioWithGemini(base64).then(aiResult => {
-                if (aiResult) {
-                    setSessions(prev => prev.map(s => {
-                        if (s.id === id) {
-                            return {
-                                ...s,
-                                transcription: aiResult.transcription || s.transcription,
-                                sections: aiResult.sections.length > 0
-                                    ? aiResult.sections.map(ais => ({
-                                        id: randomId(),
-                                        startTime: ais.startTime,
-                                        endTime: ais.endTime,
-                                        type: ais.type,
-                                        label: ais.label,
-                                        emojiTag: ais.emojiTag,
-                                        isBest: false,
-                                        isFavorited: false
-                                    }))
-                                    : s.sections
-                            };
-                        }
-                        return s;
-                    }));
-                    toast.success('✨ AI refined your recording!');
+            setSessions(prev => prev.map(s => {
+                if (s.id === layerModeSessionId) {
+                    return {
+                        ...s,
+                        layers: [...(s.layers || []), newLayer]
+                    };
                 }
-            }).catch(err => {
-                console.error("AI refinement failed:", err);
-            });
+                return s;
+            }));
+
+            toast.success('Layer added!');
+            setLayerModeSessionId(null);
         } else {
-            // No toast message here anymore
+            // Create new session (original behavior)
+            const newSession: RecordingSession = {
+                id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: compensatedOffset,
+                isLoopSession: !!uploadedBeat && isBeatLooping,
+                sections,
+                loopStart: beatLoopStart || undefined,
+                loopEnd: beatLoopEnd || undefined
+            };
+            setSessions(prev => [newSession, ...prev]);
+
+            if (recordingTargetLineId) {
+                setRecordingTargetLineId(null);
+            }
+
+            const hasApiKey = !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+
+            if (hasApiKey) {
+                toast.success('Recording saved! AI analyzing...');
+                // Background AI refinement
+                analyzeAudioWithGemini(base64).then(aiResult => {
+                    if (aiResult) {
+                        setSessions(prev => prev.map(s => {
+                            if (s.id === id) {
+                                return {
+                                    ...s,
+                                    transcription: aiResult.transcription || s.transcription,
+                                    sections: aiResult.sections.length > 0
+                                        ? aiResult.sections.map(ais => ({
+                                            id: randomId(),
+                                            startTime: ais.startTime,
+                                            endTime: ais.endTime,
+                                            type: ais.type,
+                                            label: ais.label,
+                                            emojiTag: ais.emojiTag,
+                                            isBest: false,
+                                            isFavorited: false
+                                        }))
+                                        : s.sections
+                                };
+                            }
+                            return s;
+                        }));
+                        toast.success('✨ AI refined your recording!');
+                    }
+                }).catch(err => {
+                    console.error("AI refinement failed:", err);
+                });
+            } else {
+                // No toast message here anymore
+            }
         }
     };
 
@@ -1386,6 +1413,11 @@ const StudioWorkspace: React.FC = () => {
                                                 setRecordingToSplit(id);
                                                 setSplitEditorOpen(true);
                                             }}
+                                            onAddLayer={(sessionId) => {
+                                                // Open recorder in layer mode for this session
+                                                setLayerModeSessionId(sessionId);
+                                                setShowRecorder(true);
+                                            }}
                                             onDeleteSession={handleDeleteSession}
                                             beatSrc={uploadedBeat}
                                             beatVolume={beatVolume}
@@ -1502,7 +1534,7 @@ const StudioWorkspace: React.FC = () => {
 
             {showRecorder && (
                 <RecorderDrawer
-                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); }}
+                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); setLayerModeSessionId(null); }}
                     onSave={handleSaveRecordingSession}
                     isMinimized={recorderMinimized}
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
@@ -1514,6 +1546,9 @@ const StudioWorkspace: React.FC = () => {
                     loopStart={beatLoopStart}
                     loopEnd={beatLoopEnd}
                     isLooping={isBeatLooping}
+                    layerMode={!!layerModeSessionId}
+                    existingLayers={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.layers || [] : []}
+                    parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
                 />
             )}
 

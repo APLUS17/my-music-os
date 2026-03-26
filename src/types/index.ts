@@ -37,6 +37,17 @@ export interface AutoSection {
     sentToLyricsId?: string;     // links to a LyricSection if committed
 }
 
+// Vocal layer for multi-track recording (Ableton-style take lanes)
+export interface RecordingLayer {
+    id: string;
+    name?: string;
+    audioUrl?: string;
+    base64?: string;
+    duration?: number;
+    isMuted: boolean;
+    gain?: number;               // 0-1 volume level
+}
+
 export interface RecordingSession {
     id: string;
     name?: string;
@@ -52,6 +63,7 @@ export interface RecordingSession {
     sections: AutoSection[];
     duration?: number;
     beatOffset?: number; // The currentTime of the beat when recording started
+    layers?: RecordingLayer[]; // Additional vocal layers (harmonies, ad-libs, etc.)
 }
 
 export interface Beat {
