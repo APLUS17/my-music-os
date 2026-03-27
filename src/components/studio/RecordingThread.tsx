@@ -105,6 +105,7 @@ const SessionCard = ({
     const [isExpanded, setIsExpanded] = useState(true);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const beatAudioRef = useRef<HTMLAudioElement | null>(null);
+    const layerAudioRefs = useRef<(HTMLAudioElement | null)[]>([]);
     const [progress, setProgress] = useState(0);
     const vocalAudioCtxRef = useRef<AudioContext | null>(null);
 
@@ -145,29 +146,37 @@ const SessionCard = ({
         };
     }, []);
 
-    // Sync beat and vocal playback (play/pause only, not constant time syncing)
+    // Sync beat, vocal, and layer playback (play/pause only, not constant time syncing)
     useEffect(() => {
         const vocal = audioRef.current;
         const beat = beatAudioRef.current;
-
-        if (!vocal || !beat || !beatSrc) return;
 
         if (isPlayingAll || playingSectionId) {
             // Initialize audio context lazily on first play
             initAudioContext();
             vocalAudioCtxRef.current?.resume();
-            vocal.play().catch(() => { });
-            // If beat isn't already playing (e.g. this effect fires before the click handler),
-            // align its position to the vocal + beatOffset before starting it.
-            if (beat.paused) {
-                beat.currentTime = vocal.currentTime + (session.beatOffset || 0);
+            if (vocal) vocal.play().catch(() => { });
+            if (beat && beatSrc) {
+                // If beat isn't already playing (e.g. this effect fires before the click handler),
+                // align its position to the vocal + beatOffset before starting it.
+                if (beat.paused) {
+                    beat.currentTime = (vocal?.currentTime ?? 0) + (session.beatOffset || 0);
+                }
+                beat.play().catch(() => { });
+                onBeatPlaybackChange?.(true);
             }
-            beat.play().catch(() => { });
-            onBeatPlaybackChange?.(true);
+            // Play unmuted layers in sync with vocal
+            layerAudioRefs.current.forEach((audio, idx) => {
+                const layer = session.layers?.[idx];
+                if (!audio || !layer || layer.isMuted) return;
+                audio.currentTime = vocal?.currentTime ?? 0;
+                audio.volume = layer.gain ?? 0.8;
+                audio.play().catch(() => { });
+            });
         } else {
-            vocal.pause();
-            beat.pause();
-            onBeatPlaybackChange?.(false);
+            if (vocal) vocal.pause();
+            if (beat) { beat.pause(); onBeatPlaybackChange?.(false); }
+            layerAudioRefs.current.forEach(audio => audio?.pause());
         }
     }, [isPlayingAll, playingSectionId, beatSrc, onBeatPlaybackChange]);
 
@@ -189,6 +198,7 @@ const SessionCard = ({
             if (audio.currentTime >= activePlaybackSection.endTime) {
                 audio.pause();
                 if (beatAudioRef.current) beatAudioRef.current.pause();
+                layerAudioRefs.current.forEach(a => a?.pause());
                 setPlayingSectionId(null);
                 setIsPlayingAll(false);
                 onBeatPlaybackChange?.(false);
@@ -202,6 +212,7 @@ const SessionCard = ({
             if (isPlayingAll && !playingSectionId) {
                 audioRef.current.pause();
                 if (beatAudioRef.current) beatAudioRef.current.pause();
+                layerAudioRefs.current.forEach(audio => audio?.pause());
                 setIsPlayingAll(false);
             } else {
                 // If a section was playing, just reset to play all from current time, or from 0
@@ -225,6 +236,7 @@ const SessionCard = ({
             if (playingSectionId === sec.id && !audioRef.current.paused) {
                 audioRef.current.pause();
                 if (beatAudioRef.current) beatAudioRef.current.pause();
+                layerAudioRefs.current.forEach(audio => audio?.pause());
                 setPlayingSectionId(null);
                 setIsPlayingAll(false);
             } else {
@@ -287,9 +299,20 @@ const SessionCard = ({
                 <audio
                     ref={audioRef}
                     onTimeUpdate={handleTimeUpdate}
-                    onEnded={() => { setIsPlayingAll(false); setPlayingSectionId(null); setProgress(0); }}
+                    onEnded={() => {
+                        layerAudioRefs.current.forEach(audio => { if (audio) { audio.pause(); audio.currentTime = 0; } });
+                        setIsPlayingAll(false); setPlayingSectionId(null); setProgress(0);
+                    }}
                 />
                 {beatSrc && <audio ref={beatAudioRef} src={beatSrc} crossOrigin="anonymous" />}
+                {session.layers?.map((layer, i) => (
+                    <audio
+                        key={layer.id}
+                        ref={el => { layerAudioRefs.current[i] = el; }}
+                        src={layer.audioUrl || layer.base64}
+                        preload="auto"
+                    />
+                ))}
 
                 {/* Header: Master Controls & Metadata */}
                 <div className="flex items-start gap-4">
