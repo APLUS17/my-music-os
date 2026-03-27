@@ -439,22 +439,20 @@ const SessionCard = ({
                     </div>
 
                     {/* Layers Section */}
-                    {(session.layers && session.layers.length > 0) || true && (
-                        <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.05]">
-                            <div className="flex items-center gap-2 px-1">
-                                <Layers size={14} className="text-[var(--accent)]" />
-                                <span className="text-xs font-semibold text-white/70">
-                                    LAYERS
-                                </span>
-                                {session.layers && session.layers.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.05]">
+                        {session.layers && session.layers.length > 0 && (
+                            <>
+                                <div className="flex items-center gap-2 px-1">
+                                    <Layers size={14} className="text-[var(--accent)]" />
+                                    <span className="text-xs font-semibold text-white/70">
+                                        LAYERS
+                                    </span>
                                     <span className="text-[10px] text-white/40 ml-auto">
                                         {session.layers.filter(l => !l.isMuted).length} active
                                     </span>
-                                )}
-                            </div>
+                                </div>
 
-                            {/* Layer List */}
-                            {session.layers?.length ? (
+                                {/* Layer List */}
                                 <div className="flex flex-col gap-1.5">
                                     {session.layers.map((layer, layerIdx) => (
                                         <div
@@ -529,22 +527,22 @@ const SessionCard = ({
                                         </div>
                                     ))}
                                 </div>
-                            ) : null}
+                            </>
+                        )}
 
-                            {/* Add Layer Button */}
-                            <Button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onAddLayer();
-                                }}
-                                className="w-full mt-1 py-2 px-3 rounded-lg bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] transition-colors flex items-center justify-center gap-2"
-                                variant="ghost"
-                            >
-                                <Plus size={14} />
-                                <span className="text-xs font-semibold">ADD LAYER</span>
-                            </Button>
-                        </div>
-                    )}
+                        {/* Add Layer Button */}
+                        <Button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onAddLayer();
+                            }}
+                            className="w-full mt-1 py-2 px-3 rounded-lg bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] transition-colors flex items-center justify-center gap-2"
+                            variant="ghost"
+                        >
+                            <Plus size={14} />
+                            <span className="text-xs font-semibold">ADD LAYER</span>
+                        </Button>
+                    </div>
                 </motion.div>
 
             </motion.div>
