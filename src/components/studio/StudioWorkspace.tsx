@@ -43,7 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2, AlignJustify, Music2 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -384,7 +384,8 @@ const StudioWorkspace: React.FC = () => {
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings' | 'player'>('lyrics');
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
+    const [recordingsView, setRecordingsView] = useState<'thread' | 'player'>('thread');
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1289,14 +1290,31 @@ const StudioWorkspace: React.FC = () => {
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Toggle For Tabs */}
-                            <div className="flex border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
+                            <div className="flex items-center border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
                                 <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
                                 <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
-                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
+                                {activeTab === 'recordings' && (
+                                    <div className="ml-auto flex items-center gap-0.5 pb-1">
+                                        <button
+                                            onClick={() => setRecordingsView('thread')}
+                                            title="Thread view"
+                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'thread' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
+                                        >
+                                            <AlignJustify size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setRecordingsView('player')}
+                                            title="Player view"
+                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'player' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
+                                        >
+                                            <Music2 size={14} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className={`absolute inset-0 scrollbar-hide bg-[var(--bg-main)] mt-12 ${activeTab === 'player' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-6 py-8 pb-40'}`}>
-                                {activeTab === 'player' ? (
+                            <div className={`absolute inset-0 scrollbar-hide bg-[var(--bg-main)] mt-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-6 py-8 pb-40'}`}>
+                                {activeTab === 'recordings' && recordingsView === 'player' ? (
                                     <PlayerTab
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                         beatSrc={uploadedBeat}
@@ -1309,7 +1327,7 @@ const StudioWorkspace: React.FC = () => {
                                         }}
                                     />
                                 ) : null}
-                                <div className={`max-w-2xl mx-auto space-y-12 ${activeTab === 'player' ? 'hidden' : ''}`}>
+                                <div className={`max-w-2xl mx-auto space-y-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'hidden' : ''}`}>
                                     {activeTab === 'lyrics' ? (
                                         <>
                                             <AnimatePresence mode="wait">

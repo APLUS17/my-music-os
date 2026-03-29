@@ -193,13 +193,15 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         seekTo(((e.clientX - rect.left) / rect.width) * duration);
                     }}
                 >
-                    <div
+                    <motion.div
                         className="absolute left-0 top-0 h-full bg-white rounded-full"
-                        style={{ width: `${progress}%` }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.08, ease: 'linear' }}
                     />
-                    <div
+                    <motion.div
                         className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-white rounded-full shadow"
-                        style={{ left: `calc(${progress}% - 7px)` }}
+                        animate={{ left: `calc(${progress}% - 7px)` }}
+                        transition={{ duration: 0.08, ease: 'linear' }}
                     />
                 </div>
                 <div className="flex justify-between text-xs text-white/50 mt-2 font-medium">
