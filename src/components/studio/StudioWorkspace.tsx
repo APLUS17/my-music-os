@@ -14,7 +14,7 @@ import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioWithGemini, analyzeInstrumentalWithGemini } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -363,6 +363,7 @@ const StudioWorkspace: React.FC = () => {
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
     const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
+    const [uploadedBeatId, setUploadedBeatId] = useState<string | null>(null);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const [fabOpen, setFabOpen] = useState(false);
@@ -1265,6 +1266,7 @@ const StudioWorkspace: React.FC = () => {
                                                 // Also add to Library beats
                                                 const base64 = await blobToBase64(file);
                                                 const id = randomId();
+                                                setUploadedBeatId(id);
                                                 const audio = new Audio(url);
                                                 audio.onloadedmetadata = () => {
                                                     const dur = audio.duration;
@@ -1279,6 +1281,40 @@ const StudioWorkspace: React.FC = () => {
                                                         if (prev.some(b => b.name === name)) return prev;
                                                         return [newBeat, ...prev];
                                                     });
+
+                                                    // Background beat structure analysis — non-blocking
+                                                    (async () => {
+                                                        try {
+                                                            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                                            const arrayBuffer = await file.arrayBuffer();
+                                                            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                                                            const rawSections = await analyzeAudioAndSplit(audioBuffer);
+                                                            setBeats(prev => prev.map(b => b.id === id ? { ...b, sections: rawSections } : b));
+                                                            audioCtx.close();
+
+                                                            if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
+                                                                analyzeInstrumentalWithGemini(base64).then(result => {
+                                                                    if (result?.sections?.length) {
+                                                                        const aiSections: AutoSection[] = result.sections.map(s => ({
+                                                                            id: randomId(),
+                                                                            startTime: s.startTime,
+                                                                            endTime: s.endTime,
+                                                                            type: s.type,
+                                                                            label: s.label,
+                                                                            emojiTag: s.emojiTag,
+                                                                            isBest: false,
+                                                                            isFavorited: false,
+                                                                        }));
+                                                                        setBeats(prev => prev.map(b =>
+                                                                            b.id === id ? { ...b, sections: aiSections } : b
+                                                                        ));
+                                                                    }
+                                                                });
+                                                            }
+                                                        } catch (e) {
+                                                            console.error('Beat analysis failed', e);
+                                                        }
+                                                    })();
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
@@ -1317,6 +1353,7 @@ const StudioWorkspace: React.FC = () => {
                                 {activeTab === 'recordings' && recordingsView === 'player' ? (
                                     <PlayerTab
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                         beatSrc={uploadedBeat}
                                         beatVolume={beatVolume}
                                         onBeatPlaybackChange={(isPlaying) => {

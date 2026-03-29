@@ -73,6 +73,7 @@ export interface Beat {
     base64?: string;
     duration: string;
     date: string;
+    sections?: AutoSection[];
 }
 
 export interface SavedProject {

@@ -3,11 +3,12 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Play, Pause, Rewind, FastForward, MessageSquare, Grid2X2, Repeat2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RecordingSession } from '@/types';
+import { RecordingSession, Beat } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerTabProps {
     session: RecordingSession | null;
+    beat?: Beat | null;
     beatSrc: string | null;
     beatVolume: number;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
@@ -76,8 +77,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [isPlaying, beatSrc, beatVolume, session?.beatOffset, onBeatPlaybackChange]);
 
-    // Derived
-    const sections        = session?.sections ?? [];
+    // Derived — beat sections drive pills, fall back to session sections
+    const sections        = beat?.sections ?? session?.sections ?? [];
     const activeSectionIdx = sections.findIndex(s => currentTime >= s.startTime && currentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -114,7 +115,32 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end">
-                {sections.length > 0 ? (
+                {!session?.transcription ? (
+                    // Empty state: animated dots + helpful copy
+                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                        <div className="flex gap-2">
+                            <motion.div
+                                className="w-2 h-2 bg-white rounded-full"
+                                animate={{ opacity: [0.3, 1, 0.3] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                            />
+                            <motion.div
+                                className="w-2 h-2 bg-white rounded-full"
+                                animate={{ opacity: [0.3, 1, 0.3] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                            />
+                            <motion.div
+                                className="w-2 h-2 bg-white rounded-full"
+                                animate={{ opacity: [0.3, 1, 0.3] }}
+                                transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
+                            />
+                        </div>
+                        <p className="text-white/40 text-sm text-center max-w-xs">
+                            No lyrics to display yet. Record your vocal to see it transcribed here.
+                        </p>
+                    </div>
+                ) : (
+                    // Lyrics display: sections (beat or vocal) with transcription
                     <div className="flex flex-col gap-3">
                         {sections.map((sec, i) => {
                             const offset = i - (activeSectionIdx < 0 ? 0 : activeSectionIdx);
@@ -141,10 +167,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             );
                         })}
                     </div>
-                ) : session.transcription ? (
-                    <p className="text-4xl font-bold text-white leading-tight">{session.transcription}</p>
-                ) : (
-                    <p className="text-white/20 text-sm">No transcription yet</p>
                 )}
             </div>
 
