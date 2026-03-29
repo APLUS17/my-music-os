@@ -25,8 +25,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     beatVolume,
     onBeatPlaybackChange,
 }) => {
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const beatRef  = useRef<HTMLAudioElement | null>(null);
+    const audioRef  = useRef<HTMLAudioElement | null>(null);
+    const beatRef   = useRef<HTMLAudioElement | null>(null);
+    const pillRefs  = useRef<(HTMLDivElement | null)[]>([]);
 
     const [isPlaying, setIsPlaying]     = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -89,6 +90,17 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         s => currentTime >= s.startTime && currentTime < s.endTime
     );
 
+    // Auto-scroll active pill into centre of the scroll row
+    useEffect(() => {
+        if (activeSectionIdx >= 0) {
+            pillRefs.current[activeSectionIdx]?.scrollIntoView({
+                behavior: 'smooth',
+                inline: 'center',
+                block: 'nearest',
+            });
+        }
+    }, [activeSectionIdx]);
+
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     // No session state
@@ -127,38 +139,30 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 )}
             </div>
 
-            {/* Section pills with arrow indicator */}
+            {/* Section pills — arrow + pill in one scrollable row so they stay in sync */}
             {sections.length > 0 && (
-                <div className="mb-4">
-                    {/* Arrow row — invisible placeholders keep alignment, only active shows */}
-                    <div className="flex gap-3 px-4 mb-1">
-                        {sections.map((sec, i) => {
-                            const isActive = i === activeSectionIdx;
-                            return (
-                                <div key={sec.id} className="shrink-0 flex justify-center" style={{ minWidth: 80 }}>
-                                    <motion.span
-                                        className="text-[var(--accent)] text-sm font-bold"
-                                        animate={{ opacity: isActive ? 1 : 0 }}
-                                        transition={{ duration: 0.15 }}
-                                    >
-                                        →
-                                    </motion.span>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Pills row */}
-                    <div className="flex gap-3 overflow-x-auto px-4 pb-1 scrollbar-hide">
-                        {sections.map((sec, i) => {
-                            const isActive = i === activeSectionIdx;
-                            return (
+                <div className="flex gap-3 overflow-x-auto px-4 pb-3 scrollbar-hide mb-1">
+                    {sections.map((sec, i) => {
+                        const isActive = i === activeSectionIdx;
+                        return (
+                            <div
+                                key={sec.id}
+                                ref={el => { pillRefs.current[i] = el; }}
+                                className="flex flex-col items-center shrink-0"
+                                style={{ minWidth: 80 }}
+                            >
+                                {/* Arrow — visible only on active, hidden otherwise (keeps row height stable) */}
+                                <motion.span
+                                    className="text-[var(--accent)] text-sm font-bold mb-1 block"
+                                    animate={{ opacity: isActive ? 1 : 0 }}
+                                    transition={{ duration: 0.2 }}
+                                >
+                                    →
+                                </motion.span>
                                 <button
-                                    key={sec.id}
                                     onClick={() => seekTo(sec.startTime)}
-                                    style={{ minWidth: 80 }}
                                     className={cn(
-                                        'shrink-0 px-5 py-2.5 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap',
+                                        'w-full px-5 py-2.5 rounded-xl border text-sm font-semibold transition-all whitespace-nowrap',
                                         isActive
                                             ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
                                             : 'border-white/20 text-white bg-white/[0.07]'
@@ -166,9 +170,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 >
                                     {sec.label || sec.type}
                                 </button>
-                            );
-                        })}
-                    </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
