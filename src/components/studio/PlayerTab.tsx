@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Grid2X2, Repeat2 } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Grid2X2, Repeat2, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerTabProps {
     session: RecordingSession | null;
+    sessions?: RecordingSession[];
     beat?: Beat | null;
     beatSrc: string | null;
     beatVolume: number;
+    isBeatLooping?: boolean;
+    beatLoopStart?: number | null;
+    beatLoopEnd?: number | null;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
+    onSetLoopRegion?: (startTime: number, endTime: number) => void;
 }
 
 const formatTime = (secs: number): string => {
@@ -22,10 +27,15 @@ const formatTime = (secs: number): string => {
 
 export const PlayerTab: React.FC<PlayerTabProps> = ({
     session,
+    sessions,
     beat,
     beatSrc,
     beatVolume,
+    isBeatLooping,
+    beatLoopStart,
+    beatLoopEnd,
     onBeatPlaybackChange,
+    onSetLoopRegion,
 }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const beatRef  = useRef<HTMLAudioElement | null>(null);
@@ -34,6 +44,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const [isPlaying, setIsPlaying]     = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration]       = useState(0);
+    const [beatMuted, setBeatMuted]     = useState(false);
+    const [selectedSession, setSelectedSession] = useState<RecordingSession | null>(session);
 
     // Reset when session changes
     useEffect(() => {
@@ -45,17 +57,24 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         onBeatPlaybackChange?.(false);
     }, [session?.id]);
 
-    // Sync beat volume
+    // Sync selected session when parent session changes
     useEffect(() => {
-        if (beatRef.current) beatRef.current.volume = beatVolume;
-    }, [beatVolume]);
+        setSelectedSession(session);
+    }, [session?.id]);
+
+    // Sync beat volume and mute state
+    useEffect(() => {
+        if (beatRef.current) {
+            beatRef.current.volume = beatMuted ? 0 : beatVolume;
+        }
+    }, [beatMuted, beatVolume]);
 
     const seekTo = useCallback((time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
         if (audioRef.current) audioRef.current.currentTime = clamped;
-        if (beatRef.current)  beatRef.current.currentTime  = clamped + (session?.beatOffset ?? 0);
+        if (beatRef.current)  beatRef.current.currentTime  = clamped + (selectedSession?.beatOffset ?? 0);
         setCurrentTime(clamped);
-    }, [duration, session?.beatOffset]);
+    }, [duration, selectedSession?.beatOffset]);
 
     const skip = useCallback((delta: number) => seekTo(currentTime + delta), [currentTime, seekTo]);
 
@@ -69,17 +88,17 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         } else {
             audioRef.current.play().catch(console.error);
             if (beatRef.current && beatSrc) {
-                beatRef.current.currentTime = audioRef.current.currentTime + (session?.beatOffset ?? 0);
+                beatRef.current.currentTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
                 beatRef.current.volume = beatVolume;
                 beatRef.current.play().catch(console.error);
                 onBeatPlaybackChange?.(true);
             }
             setIsPlaying(true);
         }
-    }, [isPlaying, beatSrc, beatVolume, session?.beatOffset, onBeatPlaybackChange]);
+    }, [isPlaying, beatSrc, beatVolume, selectedSession?.beatOffset, onBeatPlaybackChange]);
 
-    // Derived — beat sections drive pills, fall back to session sections
-    const sections        = beat?.sections ?? session?.sections ?? [];
+    // Derived — beat sections drive pills, fall back to selected session sections
+    const sections        = beat?.sections ?? selectedSession?.sections ?? [];
     const activeSectionIdx = sections.findIndex(s => currentTime >= s.startTime && currentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -107,16 +126,28 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             {/* Hidden audio */}
             <audio
                 ref={audioRef}
-                src={session.audioUrl || session.base64}
+                src={selectedSession?.audioUrl || selectedSession?.base64}
                 onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
                 onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
                 onEnded={() => { setIsPlaying(false); beatRef.current?.pause(); onBeatPlaybackChange?.(false); }}
             />
-            {beatSrc && <audio ref={beatRef} src={beatSrc} />}
+            {beatSrc && (
+                <audio
+                    ref={beatRef}
+                    src={beatSrc}
+                    onTimeUpdate={e => {
+                        if (isBeatLooping && beatLoopStart != null && beatLoopEnd != null) {
+                            if (e.currentTarget.currentTime >= beatLoopEnd) {
+                                e.currentTarget.currentTime = beatLoopStart;
+                            }
+                        }
+                    }}
+                />
+            )}
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end">
-                {!session?.transcription ? (
+                {!selectedSession?.transcription ? (
                     // Empty state: animated dots + helpful copy
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
@@ -171,6 +202,26 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 )}
             </div>
 
+            {/* ── Take selector ──────────────────────────────────────── */}
+            {sessions && sessions.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto px-6 pb-1 pt-3 scrollbar-hide">
+                    {sessions.map((s, i) => (
+                        <button
+                            key={s.id}
+                            onClick={() => setSelectedSession(s)}
+                            className={cn(
+                                'shrink-0 px-3 py-1 rounded-full text-xs font-semibold border transition-all',
+                                selectedSession?.id === s.id
+                                    ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
+                                    : 'border-white/20 text-white/50 bg-white/[0.05]'
+                            )}
+                        >
+                            Take {i + 1}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* ── Section pills ──────────────────────────────────────── */}
             {sections.length > 0 && (
                 <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
@@ -191,7 +242,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     →
                                 </motion.span>
                                 <button
-                                    onClick={() => seekTo(sec.startTime)}
+                                    onClick={() => {
+                                        seekTo(sec.startTime);
+                                        onSetLoopRegion?.(sec.startTime, sec.endTime);
+                                    }}
                                     className={cn(
                                         'w-full px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
                                         isActive
@@ -264,8 +318,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
                     <MessageSquare size={20} className="text-[var(--accent)]" />
                 </button>
-                <button className="w-10 h-10 flex items-center justify-center">
-                    <Grid2X2 size={22} className="text-white/40" />
+                <button
+                    onClick={() => setBeatMuted(m => !m)}
+                    className="w-10 h-10 flex items-center justify-center"
+                >
+                    {beatMuted
+                        ? <VolumeX size={22} className="text-white/40" />
+                        : <Volume2 size={22} className="text-white/40" />}
                 </button>
                 <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
                     <Repeat2 size={20} className="text-[var(--accent)]" />

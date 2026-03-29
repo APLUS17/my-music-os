@@ -1354,14 +1354,23 @@ const StudioWorkspace: React.FC = () => {
                                 {activeTab === 'recordings' && recordingsView === 'player' ? (
                                     <PlayerTab
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        sessions={sessions}
                                         beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                         beatSrc={uploadedBeat}
                                         beatVolume={beatVolume}
+                                        isBeatLooping={isBeatLooping}
+                                        beatLoopStart={beatLoopStart}
+                                        beatLoopEnd={beatLoopEnd}
                                         onBeatPlaybackChange={(isPlaying) => {
                                             if (isPlaying && isBeatPlaying && beatAudioRef.current) {
                                                 beatAudioRef.current.pause();
                                                 setIsBeatPlaying(false);
                                             }
+                                        }}
+                                        onSetLoopRegion={(startTime, endTime) => {
+                                            setBeatLoopStart(startTime);
+                                            setBeatLoopEnd(endTime);
+                                            setIsBeatLooping(true);
                                         }}
                                     />
                                 ) : null}

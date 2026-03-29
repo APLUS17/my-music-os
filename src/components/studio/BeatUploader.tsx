@@ -230,7 +230,12 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
   return (
     <div className="relative z-30">
       <Popover open={showControls} onOpenChange={setShowControls}>
-        <div className="group relative h-9 rounded-xl border border-white/10 bg-white/5 flex items-center overflow-hidden hover:border-white/20 transition-all shadow-sm">
+        <div className={cn(
+          "group relative h-9 rounded-xl border bg-white/5 flex items-center overflow-hidden hover:border-white/20 transition-all shadow-sm",
+          isLooping && loopStart !== null && loopEnd !== null
+            ? "border-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
+            : "border-white/10"
+        )}>
           <div
             className="absolute inset-0 bg-white opacity-5 pointer-events-none transition-all duration-200 ease-linear origin-left"
             style={{ transform: `scaleX(${progressPercent / 100})` }}
