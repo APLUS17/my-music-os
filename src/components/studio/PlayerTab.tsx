@@ -22,6 +22,7 @@ const formatTime = (secs: number): string => {
 
 export const PlayerTab: React.FC<PlayerTabProps> = ({
     session,
+    beat,
     beatSrc,
     beatVolume,
     onBeatPlaybackChange,

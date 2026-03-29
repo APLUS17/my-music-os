@@ -1278,8 +1278,9 @@ const StudioWorkspace: React.FC = () => {
                                                         audioUrl: url, base64, date: new Date().toLocaleDateString()
                                                     };
                                                     setBeats(prev => {
-                                                        if (prev.some(b => b.name === name)) return prev;
-                                                        return [newBeat, ...prev];
+                                                        // Replace existing beat with same name so sections update correctly
+                                                        const filtered = prev.filter(b => b.name !== name);
+                                                        return [newBeat, ...filtered];
                                                     });
 
                                                     // Background beat structure analysis — non-blocking
