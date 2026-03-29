@@ -11,9 +11,10 @@ import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
+import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioWithGemini, analyzeInstrumentalWithGemini } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -42,7 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2, AlignJustify, Music2 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -362,6 +363,7 @@ const StudioWorkspace: React.FC = () => {
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
     const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
+    const [uploadedBeatId, setUploadedBeatId] = useState<string | null>(null);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const [fabOpen, setFabOpen] = useState(false);
@@ -384,6 +386,7 @@ const StudioWorkspace: React.FC = () => {
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
+    const [recordingsView, setRecordingsView] = useState<'thread' | 'player'>('thread');
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1263,6 +1266,7 @@ const StudioWorkspace: React.FC = () => {
                                                 // Also add to Library beats
                                                 const base64 = await blobToBase64(file);
                                                 const id = randomId();
+                                                setUploadedBeatId(id);
                                                 const audio = new Audio(url);
                                                 audio.onloadedmetadata = () => {
                                                     const dur = audio.duration;
@@ -1274,9 +1278,44 @@ const StudioWorkspace: React.FC = () => {
                                                         audioUrl: url, base64, date: new Date().toLocaleDateString()
                                                     };
                                                     setBeats(prev => {
-                                                        if (prev.some(b => b.name === name)) return prev;
-                                                        return [newBeat, ...prev];
+                                                        // Replace existing beat with same name so sections update correctly
+                                                        const filtered = prev.filter(b => b.name !== name);
+                                                        return [newBeat, ...filtered];
                                                     });
+
+                                                    // Background beat structure analysis — non-blocking
+                                                    (async () => {
+                                                        try {
+                                                            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                                                            const arrayBuffer = await file.arrayBuffer();
+                                                            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                                                            const rawSections = await analyzeAudioAndSplit(audioBuffer);
+                                                            setBeats(prev => prev.map(b => b.id === id ? { ...b, sections: rawSections } : b));
+                                                            audioCtx.close();
+
+                                                            if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
+                                                                analyzeInstrumentalWithGemini(base64).then(result => {
+                                                                    if (result?.sections?.length) {
+                                                                        const aiSections: AutoSection[] = result.sections.map(s => ({
+                                                                            id: randomId(),
+                                                                            startTime: s.startTime,
+                                                                            endTime: s.endTime,
+                                                                            type: s.type,
+                                                                            label: s.label,
+                                                                            emojiTag: s.emojiTag,
+                                                                            isBest: false,
+                                                                            isFavorited: false,
+                                                                        }));
+                                                                        setBeats(prev => prev.map(b =>
+                                                                            b.id === id ? { ...b, sections: aiSections } : b
+                                                                        ));
+                                                                    }
+                                                                });
+                                                            }
+                                                        } catch (e) {
+                                                            console.error('Beat analysis failed', e);
+                                                        }
+                                                    })();
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
@@ -1288,13 +1327,54 @@ const StudioWorkspace: React.FC = () => {
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Toggle For Tabs */}
-                            <div className="flex border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
+                            <div className="flex items-center border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
                                 <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
                                 <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
+                                {activeTab === 'recordings' && (
+                                    <div className="ml-auto flex items-center gap-0.5 pb-1">
+                                        <button
+                                            onClick={() => setRecordingsView('thread')}
+                                            title="Thread view"
+                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'thread' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
+                                        >
+                                            <AlignJustify size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => setRecordingsView('player')}
+                                            title="Player view"
+                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'player' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
+                                        >
+                                            <Music2 size={14} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] mt-12">
-                                <div className="max-w-2xl mx-auto space-y-12">
+                            <div className={`absolute inset-0 scrollbar-hide bg-[var(--bg-main)] mt-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-6 py-8 pb-40'}`}>
+                                {activeTab === 'recordings' && recordingsView === 'player' ? (
+                                    <PlayerTab
+                                        session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        sessions={sessions}
+                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
+                                        beatSrc={uploadedBeat}
+                                        beatVolume={beatVolume}
+                                        isBeatLooping={isBeatLooping}
+                                        beatLoopStart={beatLoopStart}
+                                        beatLoopEnd={beatLoopEnd}
+                                        onBeatPlaybackChange={(isPlaying) => {
+                                            if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                                beatAudioRef.current.pause();
+                                                setIsBeatPlaying(false);
+                                            }
+                                        }}
+                                        onSetLoopRegion={(startTime, endTime) => {
+                                            setBeatLoopStart(startTime);
+                                            setBeatLoopEnd(endTime);
+                                            setIsBeatLooping(true);
+                                        }}
+                                    />
+                                ) : null}
+                                <div className={`max-w-2xl mx-auto space-y-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'hidden' : ''}`}>
                                     {activeTab === 'lyrics' ? (
                                         <>
                                             <AnimatePresence mode="wait">

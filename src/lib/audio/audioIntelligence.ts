@@ -90,3 +90,70 @@ Return ONLY a JSON object with this exact structure:
         return null;
     }
 };
+
+/**
+ * Analyze instrumental/beat audio with Gemini AI for song structure identification.
+ * Identifies sections like Intro, Verse, Chorus, Bridge, Outro, Drop, Build, etc.
+ */
+export const analyzeInstrumentalWithGemini = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+    if (!apiKey) {
+        console.warn("[AudioIntelligence] No API key — skipping beat analysis");
+        return null;
+    }
+
+    const { mimeType, data } = stripDataUrlPrefix(audioBase64);
+
+    const prompt = `Analyze this instrumental music track and identify its song structure sections.
+Identify distinct musical sections with timestamps and classify each with standard music terminology:
+- Intro, Verse, Pre-Chorus, Chorus, Bridge, Outro, Drop, Build, Break, Hook, etc.
+
+For each section provide:
+1. startTime and endTime (in seconds)
+2. type: always "instrumental"
+3. label: standard section name (e.g., "Intro", "Verse 1", "Chorus", "Bridge", "Drop")
+4. emojiTag: relevant emoji for visual context (🎬 for Intro/Outro, 🎵 for Verse, 🔥 for Chorus/Drop, 🌉 for Bridge, ⚡ for Build, 🔇 for Break)
+
+Return ONLY a JSON object with this exact structure:
+{
+  "sections": [{"startTime": 0.0, "endTime": 8.0, "type": "instrumental", "label": "Intro", "emojiTag": "🎬"}],
+  "transcription": ""
+}`;
+
+    try {
+        const genAI = new GoogleGenAI({ apiKey });
+
+        const response = await genAI.models.generateContent({
+            model: "gemini-3.1-flash-lite-preview",
+            contents: [
+                { text: prompt },
+                {
+                    inlineData: {
+                        mimeType,
+                        data
+                    }
+                }
+            ],
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        const resultText = response.text;
+        if (resultText) {
+            const parsed = JSON.parse(resultText) as AudioAnalysisResult;
+            if (!parsed.sections || !Array.isArray(parsed.sections)) {
+                console.warn("[AudioIntelligence] Invalid beat analysis response");
+                return null;
+            }
+            console.log("[AudioIntelligence] Beat structure analysis complete:", {
+                sections: parsed.sections.length
+            });
+            return parsed;
+        }
+        return null;
+    } catch (error) {
+        console.error("[AudioIntelligence] Beat analysis failed:", error);
+        return null;
+    }
+};

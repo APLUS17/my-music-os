@@ -187,6 +187,22 @@ const SessionCard = ({
         }
     }, [beatVolume]);
 
+    // Live-apply layer mute/unmute during playback
+    useEffect(() => {
+        if (!session.layers) return;
+        session.layers.forEach((layer, idx) => {
+            const audio = layerAudioRefs.current[idx];
+            if (!audio) return;
+            if (layer.isMuted) {
+                audio.pause();
+            } else if (isPlayingAll || playingSectionId) {
+                // Only resume if something is actively playing
+                audio.volume = layer.gain ?? 0.8;
+                audio.play().catch(() => {});
+            }
+        });
+    }, [session.layers, isPlayingAll, playingSectionId]);
+
     // Handle Time Updates specifically for playing single sections
     const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
         const audio = e.currentTarget;
