@@ -11,6 +11,7 @@ import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
+import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
@@ -383,7 +384,7 @@ const StudioWorkspace: React.FC = () => {
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings' | 'player'>('lyrics');
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1291,10 +1292,24 @@ const StudioWorkspace: React.FC = () => {
                             <div className="flex border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
                                 <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
                                 <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
+                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
                             </div>
 
-                            <div className="absolute inset-0 overflow-y-auto px-6 py-8 pb-40 scrollbar-hide bg-[var(--bg-main)] mt-12">
-                                <div className="max-w-2xl mx-auto space-y-12">
+                            <div className={`absolute inset-0 scrollbar-hide bg-[var(--bg-main)] mt-12 ${activeTab === 'player' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-6 py-8 pb-40'}`}>
+                                {activeTab === 'player' ? (
+                                    <PlayerTab
+                                        session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        beatSrc={uploadedBeat}
+                                        beatVolume={beatVolume}
+                                        onBeatPlaybackChange={(isPlaying) => {
+                                            if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                                beatAudioRef.current.pause();
+                                                setIsBeatPlaying(false);
+                                            }
+                                        }}
+                                    />
+                                ) : null}
+                                <div className={`max-w-2xl mx-auto space-y-12 ${activeTab === 'player' ? 'hidden' : ''}`}>
                                     {activeTab === 'lyrics' ? (
                                         <>
                                             <AnimatePresence mode="wait">
