@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Grid2X2, Repeat2, Volume2, VolumeX } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, VolumeX } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { RecordingSession, Beat } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -62,6 +62,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         setSelectedSession(session);
     }, [session?.id]);
 
+    // Reset audio state when selected take changes
+    useEffect(() => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(0);
+        if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    }, [selectedSession?.id]);
+
     // Sync beat volume and mute state
     useEffect(() => {
         if (beatRef.current) {
@@ -89,7 +97,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             audioRef.current.play().catch(console.error);
             if (beatRef.current && beatSrc) {
                 beatRef.current.currentTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
-                beatRef.current.volume = beatVolume;
+                beatRef.current.volume = beatMuted ? 0 : beatVolume;
                 beatRef.current.play().catch(console.error);
                 onBeatPlaybackChange?.(true);
             }
