@@ -1361,6 +1361,7 @@ const StudioWorkspace: React.FC = () => {
                                         isBeatLooping={isBeatLooping}
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}
+                                        lyrics={sections}
                                         onBeatPlaybackChange={(isPlaying) => {
                                             if (isPlaying && isBeatPlaying && beatAudioRef.current) {
                                                 beatAudioRef.current.pause();

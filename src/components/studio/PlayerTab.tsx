@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, VolumeX } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { RecordingSession, Beat } from '@/types';
+import { RecordingSession, Beat, LyricSection } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerTabProps {
@@ -17,6 +17,7 @@ interface PlayerTabProps {
     beatLoopEnd?: number | null;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
     onSetLoopRegion?: (startTime: number, endTime: number) => void;
+    lyrics?: LyricSection[];
 }
 
 const formatTime = (secs: number): string => {
@@ -36,6 +37,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     beatLoopEnd,
     onBeatPlaybackChange,
     onSetLoopRegion,
+    lyrics,
 }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const beatRef  = useRef<HTMLAudioElement | null>(null);
@@ -110,6 +112,42 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const activeSectionIdx = sections.findIndex(s => currentTime >= s.startTime && currentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+    // Build flat lyric lines from project lyrics for auto-scroll display
+    interface LyricLine { text: string; sectionType: string; isHeader: boolean }
+    const lyricLines = useMemo((): LyricLine[] => {
+        if (!lyrics || lyrics.length === 0) return [] as LyricLine[];
+        const lines: LyricLine[] = [];
+        for (const section of lyrics) {
+            // Add section header
+            lines.push({ text: section.type.toUpperCase(), sectionType: section.type, isHeader: true });
+            // Add each non-empty line of lyrics
+            const textLines = section.text.split('\n').filter((l: string) => l.trim().length > 0);
+            for (const line of textLines) {
+                lines.push({ text: line, sectionType: section.type, isHeader: false });
+            }
+        }
+        return lines;
+    }, [lyrics]);
+
+    // Calculate which lyric line is active based on current time distributed across the duration
+    const contentLinesCount = lyricLines.filter((l: LyricLine) => !l.isHeader).length;
+    const activeLyricIdx = useMemo(() => {
+        if (contentLinesCount === 0 || duration <= 0) return -1;
+        const timePerLine = duration / contentLinesCount;
+        return Math.min(Math.floor(currentTime / timePerLine), contentLinesCount - 1);
+    }, [contentLinesCount, currentTime, duration]);
+
+    // Map activeLyricIdx (content-only) back to lyricLines index (includes headers)
+    const activeLyricLineIdx = useMemo(() => {
+        if (activeLyricIdx < 0) return -1;
+        let contentCount = -1;
+        for (let i = 0; i < lyricLines.length; i++) {
+            if (!lyricLines[i].isHeader) contentCount++;
+            if (contentCount === activeLyricIdx) return i;
+        }
+        return -1;
+    }, [activeLyricIdx, lyricLines]);
+
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
         if (activeSectionIdx >= 0) {
@@ -155,8 +193,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end">
-                {!selectedSession?.transcription ? (
-                    // Empty state: animated dots + helpful copy
+                {lyricLines.length === 0 ? (
+                    // Empty state: no lyrics written yet
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
                             <motion.div
@@ -176,33 +214,49 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             />
                         </div>
                         <p className="text-white/40 text-sm text-center max-w-xs">
-                            No lyrics to display yet. Record your vocal to see it transcribed here.
+                            No lyrics written yet. Write your lyrics in the Studio to see them scroll here.
                         </p>
                     </div>
                 ) : (
-                    // Lyrics display: sections (beat or vocal) with transcription
-                    <div className="flex flex-col gap-3">
-                        {sections.map((sec, i) => {
-                            const offset = i - (activeSectionIdx < 0 ? 0 : activeSectionIdx);
-                            // Only render ±2 from active
-                            if (Math.abs(offset) > 2) return null;
-                            const text = sec.transcription || sec.label || sec.type;
-                            const isActive = offset === 0;
+                    // Lyrics display: actual written lyrics, line by line with auto-scroll
+                    <div className="flex flex-col gap-2">
+                        {lyricLines.map((line, i) => {
+                            const offset = i - (activeLyricLineIdx < 0 ? 0 : activeLyricLineIdx);
+                            // Only render lines near the active one for performance
+                            if (Math.abs(offset) > 4) return null;
+
+                            if (line.isHeader) {
+                                // Section header (VERSE, CHORUS, etc.)
+                                const isNearActive = Math.abs(offset) <= 1;
+                                return (
+                                    <motion.p
+                                        key={`header-${i}`}
+                                        className="text-left text-[var(--accent)] uppercase tracking-widest"
+                                        style={{ fontSize: '0.65rem', letterSpacing: '0.2em' }}
+                                        animate={{ opacity: isNearActive ? 0.7 : 0.15 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        {line.text}
+                                    </motion.p>
+                                );
+                            }
+
+                            const isActive = i === activeLyricLineIdx;
                             const opacity = isActive
                                 ? 1
-                                : offset === 1 ? 0.45
-                                : offset === -1 ? 0.3
-                                : 0.18;
+                                : offset === 1 ? 0.5
+                                : offset === -1 ? 0.35
+                                : offset === 2 ? 0.25
+                                : 0.12;
                             return (
                                 <motion.p
-                                    key={sec.id}
-                                    onClick={() => seekTo(sec.startTime)}
+                                    key={`line-${i}`}
                                     className="text-left font-bold text-white leading-tight cursor-pointer"
-                                    style={{ fontSize: isActive ? '2rem' : '1.5rem', lineHeight: 1.15 }}
+                                    style={{ fontSize: isActive ? '1.75rem' : '1.25rem', lineHeight: 1.2 }}
                                     animate={{ opacity }}
                                     transition={{ duration: 0.3 }}
                                 >
-                                    {text}
+                                    {line.text}
                                 </motion.p>
                             );
                         })}
