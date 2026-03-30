@@ -43,7 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2, AlignJustify, Music2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2 } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -385,8 +385,7 @@ const StudioWorkspace: React.FC = () => {
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'lyrics' | 'recordings'>('lyrics');
-    const [recordingsView, setRecordingsView] = useState<'thread' | 'player'>('thread');
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'takes' | 'player'>('lyrics');
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1329,29 +1328,13 @@ const StudioWorkspace: React.FC = () => {
                             {/* Toggle For Tabs */}
                             <div className="flex items-center border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
                                 <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                <button onClick={() => setActiveTab('recordings')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'recordings' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Recordings</button>
-                                {activeTab === 'recordings' && (
-                                    <div className="ml-auto flex items-center gap-0.5 pb-1">
-                                        <button
-                                            onClick={() => setRecordingsView('thread')}
-                                            title="Thread view"
-                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'thread' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
-                                        >
-                                            <AlignJustify size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => setRecordingsView('player')}
-                                            title="Player view"
-                                            className={`p-1.5 rounded transition-colors ${recordingsView === 'player' ? 'text-white' : 'text-white/25 hover:text-white/60'}`}
-                                        >
-                                            <Music2 size={14} />
-                                        </button>
-                                    </div>
-                                )}
+                                <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
+                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
                             </div>
 
-                            <div className={`absolute inset-0 scrollbar-hide bg-[var(--bg-main)] mt-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto px-6 py-8 pb-40'}`}>
-                                {activeTab === 'recordings' && recordingsView === 'player' ? (
+                            {/* Player Tab — full height, no scroll padding */}
+                            {activeTab === 'player' && (
+                                <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
                                     <PlayerTab
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                         sessions={sessions}
@@ -1374,146 +1357,152 @@ const StudioWorkspace: React.FC = () => {
                                             setIsBeatLooping(true);
                                         }}
                                     />
-                                ) : null}
-                                <div className={`max-w-2xl mx-auto space-y-12 ${activeTab === 'recordings' && recordingsView === 'player' ? 'hidden' : ''}`}>
-                                    {activeTab === 'lyrics' ? (
-                                        <>
-                                            <AnimatePresence mode="wait">
-                                                {studioMode === 'flow' && sections.length === 0 ? (
-                                                    <motion.div 
-                                                        key="flow-canvas"
-                                                        initial={{ opacity: 0, scale: 0.95 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
-                                                        exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-                                                        className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
-                                                    >
-                                                        {/* Abstract Background Shapes */}
-                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                        <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                        
-                                                        <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                            <div className="absolute inset-0 rounded-[40px] border border-white/5" />
-                                                            <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                            
-                                                            {/* Orbiting particles animation */}
-                                                            <motion.div 
-                                                                animate={{ rotate: 360 }}
-                                                                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                            />
-                                                        </div>
+                                </div>
+                            )}
 
-                                                        <motion.h2 
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: 0.2 }}
-                                                            className="text-4xl font-bold tracking-tight text-white mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60"
-                                                        >
-                                                            Capture the Flow
-                                                        </motion.h2>
-                                                        
-                                                        <motion.p 
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: 0.3 }}
-                                                            className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
-                                                        >
-                                                            Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
-                                                        </motion.p>
-
-                                                        <motion.button
-                                                            initial={{ opacity: 0, y: 20 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            transition={{ delay: 0.4 }}
-                                                            onClick={addSection}
-                                                            className="px-10 h-14 bg-white text-black rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_50px_rgba(255,255,255,0.2)]"
-                                                        >
-                                                            <Plus size={20} strokeWidth={3} /> Start Writing
-                                                        </motion.button>
-                                                        
-                                                        {/* Optional quick start types */}
+                            {/* Lyrics & Takes tabs — scrollable content */}
+                            {activeTab !== 'player' && (
+                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-40">
+                                    <div className="max-w-2xl mx-auto space-y-12">
+                                        {activeTab === 'lyrics' ? (
+                                            <>
+                                                <AnimatePresence mode="wait">
+                                                    {studioMode === 'flow' && sections.length === 0 ? (
                                                         <motion.div 
+                                                            key="flow-canvas"
+                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                            className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
+                                                        >
+                                                            {/* Abstract Background Shapes */}
+                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                            <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                            
+                                                            <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                                <div className="absolute inset-0 rounded-[40px] border border-white/5" />
+                                                                <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                                
+                                                                {/* Orbiting particles animation */}
+                                                                <motion.div 
+                                                                    animate={{ rotate: 360 }}
+                                                                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                    className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                />
+                                                            </div>
+
+                                                            <motion.h2 
+                                                                initial={{ opacity: 0, y: 10 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                transition={{ delay: 0.2 }}
+                                                                className="text-4xl font-bold tracking-tight text-white mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60"
+                                                            >
+                                                                Capture the Flow
+                                                            </motion.h2>
+                                                            
+                                                            <motion.p 
+                                                                initial={{ opacity: 0, y: 10 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                transition={{ delay: 0.3 }}
+                                                                className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                            >
+                                                                Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                            </motion.p>
+
+                                                            <motion.button
+                                                                initial={{ opacity: 0, y: 20 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                transition={{ delay: 0.4 }}
+                                                                onClick={addSection}
+                                                                className="px-10 h-14 bg-white text-black rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_50px_rgba(255,255,255,0.2)]"
+                                                            >
+                                                                <Plus size={20} strokeWidth={3} /> Start Writing
+                                                            </motion.button>
+                                                            
+                                                            {/* Optional quick start types */}
+                                                            <motion.div 
+                                                                initial={{ opacity: 0 }}
+                                                                animate={{ opacity: 1 }}
+                                                                transition={{ delay: 0.6 }}
+                                                                className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                            >
+                                                                <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                                <div className="flex gap-4">
+                                                                    {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                        <button 
+                                                                            key={type}
+                                                                            onClick={addSection}
+                                                                            className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                        >
+                                                                            {type}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </motion.div>
+                                                        </motion.div>
+                                                    ) : (
+                                                        <motion.div 
+                                                            key="write-mode"
                                                             initial={{ opacity: 0 }}
                                                             animate={{ opacity: 1 }}
-                                                            transition={{ delay: 0.6 }}
-                                                            className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                            exit={{ opacity: 0 }}
+                                                            className="space-y-12"
                                                         >
-                                                            <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                            <div className="flex gap-4">
-                                                                {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                    <button 
-                                                                        key={type}
-                                                                        onClick={addSection}
-                                                                        className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                    >
-                                                                        {type}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
+                                                            {sections.map((section, idx) => (
+                                                                <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                                    <LyricCard
+                                                                        section={section}
+                                                                        onUpdate={updateSection}
+                                                                        onDelete={deleteSection}
+                                                                        onMove={moveSection}
+                                                                    />
+                                                                </motion.div>
+                                                            ))}
+                                                            <button
+                                                                onClick={addSection}
+                                                                className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                                            >
+                                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
+                                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                            </button>
                                                         </motion.div>
-                                                    </motion.div>
-                                                ) : (
-                                                    <motion.div 
-                                                        key="write-mode"
-                                                        initial={{ opacity: 0 }}
-                                                        animate={{ opacity: 1 }}
-                                                        exit={{ opacity: 0 }}
-                                                        className="space-y-12"
-                                                    >
-                                                        {sections.map((section, idx) => (
-                                                            <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                                                                <LyricCard
-                                                                    section={section}
-                                                                    onUpdate={updateSection}
-                                                                    onDelete={deleteSection}
-                                                                    onMove={moveSection}
-                                                                />
-                                                            </motion.div>
-                                                        ))}
-                                                        <button
-                                                            onClick={addSection}
-                                                            className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                                        >
-                                                            <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                            <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
-                                                            <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                        </button>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-                                        </>
-                                    ) : (
-                                        <RecordingThread
-                                            sessions={sessions}
-                                            activeSessionId={activeSessionId}
-                                            onSelectSession={(id) => setActiveSessionId(prev => prev === id ? null : id)}
-                                            onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
-                                            onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
-                                            onOpenSplitEditor={(id) => {
-                                                setRecordingToSplit(id);
-                                                setSplitEditorOpen(true);
-                                            }}
-                                            onAddLayer={(sessionId) => {
-                                                // Open recorder in layer mode for this session
-                                                setLayerModeSessionId(sessionId);
-                                                setShowRecorder(true);
-                                            }}
-                                            onDeleteSession={handleDeleteSession}
-                                            beatSrc={uploadedBeat}
-                                            beatVolume={beatVolume}
-                                            onBeatPlaybackChange={(isPlaying) => {
-                                                // When RecordingThread starts playing its own beat,
-                                                // stop the global beat to prevent double playback
-                                                if (isPlaying && isBeatPlaying && beatAudioRef.current) {
-                                                    beatAudioRef.current.pause();
-                                                    setIsBeatPlaying(false);
-                                                }
-                                            }}
-                                        />
-                                    )}
+                                                    )}
+                                                </AnimatePresence>
+                                            </>
+                                        ) : activeTab === 'takes' ? (
+                                            <RecordingThread
+                                                sessions={sessions}
+                                                activeSessionId={activeSessionId}
+                                                onSelectSession={(id) => setActiveSessionId(prev => prev === id ? null : id)}
+                                                onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
+                                                onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
+                                                onOpenSplitEditor={(id) => {
+                                                    setRecordingToSplit(id);
+                                                    setSplitEditorOpen(true);
+                                                }}
+                                                onAddLayer={(sessionId) => {
+                                                    // Open recorder in layer mode for this session
+                                                    setLayerModeSessionId(sessionId);
+                                                    setShowRecorder(true);
+                                                }}
+                                                onDeleteSession={handleDeleteSession}
+                                                beatSrc={uploadedBeat}
+                                                beatVolume={beatVolume}
+                                                onBeatPlaybackChange={(isPlaying) => {
+                                                    // When RecordingThread starts playing its own beat,
+                                                    // stop the global beat to prevent double playback
+                                                    if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                                        beatAudioRef.current.pause();
+                                                        setIsBeatPlaying(false);
+                                                    }
+                                                }}
+                                            />
+                                        ) : null}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 );
