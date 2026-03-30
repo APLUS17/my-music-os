@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection } from '@/types';
 import { cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration]       = useState(0);
     const [beatMuted, setBeatMuted]     = useState(false);
+    const [localVolume, setLocalVolume] = useState(beatVolume);
     const [selectedSession, setSelectedSession] = useState<RecordingSession | null>(session);
 
     // Reset when session changes
@@ -75,9 +76,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     // Sync beat volume and mute state
     useEffect(() => {
         if (beatRef.current) {
-            beatRef.current.volume = beatMuted ? 0 : beatVolume;
+            beatRef.current.volume = beatMuted ? 0 : localVolume;
         }
-    }, [beatMuted, beatVolume]);
+    }, [beatMuted, localVolume]);
 
     const seekTo = useCallback((time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
@@ -99,7 +100,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             audioRef.current.play().catch(console.error);
             if (beatRef.current && beatSrc) {
                 beatRef.current.currentTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
-                beatRef.current.volume = beatMuted ? 0 : beatVolume;
+                beatRef.current.volume = beatMuted ? 0 : localVolume;
                 beatRef.current.play().catch(console.error);
                 onBeatPlaybackChange?.(true);
             }
@@ -375,21 +376,59 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </button>
             </div>
 
-            {/* ── Bottom action bar ──────────────────────────────────── */}
-            <div className="flex items-center justify-center gap-10 pb-8 pt-1">
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                    <MessageSquare size={20} className="text-[var(--accent)]" />
-                </button>
+            {/* ── Volume slider — iOS style with speaker icons ─────── */}
+            <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button
-                    onClick={() => setBeatMuted(m => !m)}
-                    className="w-10 h-10 flex items-center justify-center"
+                    onClick={() => {
+                        if (beatMuted) { setBeatMuted(false); }
+                        else { setLocalVolume(Math.max(0, localVolume - 0.1)); }
+                    }}
+                    className="text-white/40 shrink-0 active:opacity-60 transition-opacity"
                 >
-                    {beatMuted
-                        ? <VolumeX size={22} className="text-white/40" />
-                        : <Volume2 size={22} className="text-white/40" />}
+                    <Volume1 size={16} />
                 </button>
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center">
-                    <Repeat2 size={20} className="text-[var(--accent)]" />
+                <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={beatMuted ? 0 : localVolume}
+                    onChange={e => {
+                        const v = parseFloat(e.target.value);
+                        setLocalVolume(v);
+                        if (v > 0 && beatMuted) setBeatMuted(false);
+                        if (v === 0) setBeatMuted(true);
+                    }}
+                    className="flex-1 h-[3px] accent-white appearance-none bg-white/20 rounded-full cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px]
+                        [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow
+                        [&::-moz-range-thumb]:w-[14px] [&::-moz-range-thumb]:h-[14px]
+                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
+                    style={{
+                        background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : localVolume) * 100}%, rgba(255,255,255,0.2) ${(beatMuted ? 0 : localVolume) * 100}%, rgba(255,255,255,0.2) 100%)`
+                    }}
+                />
+                <button
+                    onClick={() => {
+                        if (beatMuted) { setBeatMuted(false); setLocalVolume(1); }
+                        else { setLocalVolume(Math.min(1, localVolume + 0.1)); }
+                    }}
+                    className="text-white/40 shrink-0 active:opacity-60 transition-opacity"
+                >
+                    <Volume2 size={16} />
+                </button>
+            </div>
+
+            {/* ── Bottom action bar — matches reference layout ────── */}
+            <div className="flex items-center justify-evenly pb-8 pt-3">
+                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform">
+                    <MessageSquare size={20} className="text-white/60" />
+                </button>
+                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform">
+                    <Languages size={20} className="text-white/60" />
+                </button>
+                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform">
+                    <List size={20} className="text-white/60" />
                 </button>
             </div>
         </div>
