@@ -226,16 +226,25 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             // Only render lines near the active one for performance
                             if (Math.abs(offset) > 4) return null;
 
+                            // Count content lines up to index i to get the seek time
+                            let contentIdx = 0;
+                            for (let j = 0; j < i; j++) {
+                                if (!lyricLines[j].isHeader) contentIdx++;
+                            }
+                            const timePerLine = contentLinesCount > 0 ? duration / contentLinesCount : 0;
+                            const lineTime = contentIdx * timePerLine;
+
                             if (line.isHeader) {
                                 // Section header (VERSE, CHORUS, etc.)
                                 const isNearActive = Math.abs(offset) <= 1;
                                 return (
                                     <motion.p
                                         key={`header-${i}`}
-                                        className="text-left text-[var(--accent)] uppercase tracking-widest"
+                                        className="text-left text-[var(--accent)] uppercase tracking-widest cursor-pointer"
                                         style={{ fontSize: '0.65rem', letterSpacing: '0.2em' }}
                                         animate={{ opacity: isNearActive ? 0.7 : 0.15 }}
                                         transition={{ duration: 0.3 }}
+                                        onClick={() => seekTo(lineTime)}
                                     >
                                         {line.text}
                                     </motion.p>
@@ -252,10 +261,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             return (
                                 <motion.p
                                     key={`line-${i}`}
-                                    className="text-left font-bold text-white leading-tight cursor-pointer"
+                                    className="text-left font-bold text-white leading-tight cursor-pointer active:opacity-60"
                                     style={{ fontSize: isActive ? '1.75rem' : '1.25rem', lineHeight: 1.2 }}
                                     animate={{ opacity }}
                                     transition={{ duration: 0.3 }}
+                                    onClick={() => seekTo(lineTime)}
                                 >
                                     {line.text}
                                 </motion.p>
