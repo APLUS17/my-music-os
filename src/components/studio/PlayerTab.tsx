@@ -111,10 +111,21 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     // Auto-scroll active lyric
     useEffect(() => {
         if (activeLyricIdx >= 0) {
-            lyricRefs.current[activeLyricIdx]?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'center',
-            });
+            const element = lyricRefs.current[activeLyricIdx];
+            if (element) {
+                const parent = element.parentElement;
+                if (parent) {
+                    const elementTop = element.offsetTop;
+                    const elementHeight = element.offsetHeight;
+                    const parentHeight = parent.clientHeight;
+                    const scrollTarget = elementTop - (parentHeight / 2) + (elementHeight / 2);
+
+                    parent.scrollTo({
+                        top: scrollTarget,
+                        behavior: 'smooth',
+                    });
+                }
+            }
         }
     }, [activeLyricIdx]);
 
@@ -309,7 +320,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
                 <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
-                    className="flex-1 h-[3px] accent-white appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow"
+                    className="flex-1 h-10 appearance-none bg-transparent rounded-full cursor-pointer accent-white touch-none [&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-white/20 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:bg-white/20 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
                     style={{ background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) 100%)` }}
                 />
                 <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
