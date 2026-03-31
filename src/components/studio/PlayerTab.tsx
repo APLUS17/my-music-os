@@ -66,10 +66,15 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const [selectedSession, setSelectedSession] = useState<RecordingSession | null>(session);
 
-    // Sync selected session when parent session changes
+    // Sync selected session when parent session changes or auto-select latest if null
     useEffect(() => {
-        setSelectedSession(session);
-    }, [session?.id]);
+        if (session) {
+            setSelectedSession(session);
+        } else if (sessions && sessions.length > 0) {
+            // Auto-select the most recent take if none is active
+            setSelectedSession(sessions[0]);
+        }
+    }, [session?.id, sessions?.length]);
 
     const skip = (delta: number) => onSeek(currentTime + delta);
 
@@ -77,29 +82,30 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     // Derived — beat sections drive pills ONLY
     const beatCurrentTime = currentTime + (selectedSession?.beatOffset ?? 0);
-    const sections = beat?.sections ?? [];
-    const activeSectionIdx = sections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
+    const beatSections = beat?.sections ?? [];
+    const activeSectionIdx = beatSections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-    // Real transcription lines
-    const transcriptionLines = selectedSession?.lines || [];
+    // Transcription Lines from the active session ONLY (no fallback to typed lyrics)
+    const displayLines = selectedSession?.lines || [];
+
     const activeLyricIdx = useMemo(() => {
-        if (transcriptionLines.length === 0) return -1;
+        if (displayLines.length === 0) return -1;
         
         // Add a small 100ms lookahead to make the transition feel "snappy"
         const lookaheadTime = currentTime + 0.1;
 
         // Find line where current time falls within bounds
-        const idx = transcriptionLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
+        const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
 
         // If we passed the last line, keep the last one active
-        if (lookaheadTime >= transcriptionLines[transcriptionLines.length - 1].endTime) {
-            return transcriptionLines.length - 1;
+        if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
+            return displayLines.length - 1;
         }
 
         return -1;
-    }, [transcriptionLines, currentTime]);
+    }, [displayLines, currentTime]);
 
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
@@ -122,19 +128,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [activeLyricIdx]);
 
-    if (!session) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full text-center px-8">
-                <p className="text-white/30 text-sm">Select a recording to use the player</p>
-            </div>
-        );
-    }
-
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end relative">
-                {transcriptionLines.length === 0 ? (
+                {displayLines.length === 0 ? (
                     // Loading / Empty state
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
@@ -154,8 +152,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
                             />
                         </div>
-                        <p className="text-white/40 text-sm text-center max-w-xs">
-                            {selectedSession?.transcription ? "Processing lyrics..." : "No lyrics detected in this recording."}
+                        <p className="text-white/40 text-sm text-center max-w-xs uppercase tracking-widest font-mono text-[10px]">
+                            {selectedSession ? "Analyzing transcription..." : "No recording selected"}
                         </p>
                     </div>
                 ) : (
@@ -164,24 +162,22 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[35vh] mask-fade-edges"
                         style={{ scrollBehavior: 'smooth' }}
                     >
-                        {transcriptionLines.map((line, i) => {
+                        {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
                             const isFuture = i > activeLyricIdx;
                             const distance = Math.abs(i - activeLyricIdx);
                             
                             // Visual properties based on distance and state
-                            let opacity = 0.08; // Very faint default (for distant future)
+                            let opacity = 0.08; 
                             let scale = 0.94;
                             let blur = '3px';
-                            let translateY = 0;
 
                             if (isActive) {
                                 opacity = 1;
                                 scale = 1.05;
                                 blur = '0px';
                             } else if (isPast) {
-                                // Past lines stay somewhat readable but dimmed
                                 if (distance === 1) {
                                     opacity = 0.35;
                                     scale = 0.98;
@@ -192,7 +188,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     blur = '2px';
                                 }
                             } else if (isFuture) {
-                                // Future lines are more aggressively blurred/hidden
                                 if (distance === 1) {
                                     opacity = 0.25;
                                     scale = 1;
@@ -208,7 +203,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 }
                             }
 
-                            // If we haven't reached any lyrics yet, make the first one ready
                             if (activeLyricIdx === -1 && i === 0) {
                                 opacity = 0.25;
                                 blur = '2px';
@@ -230,7 +224,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     }}
                                     transition={{
                                         duration: 0.8,
-                                        ease: [0.4, 0, 0.2, 1] // Smoother, more cinematic easing
+                                        ease: [0.4, 0, 0.2, 1]
                                     }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
@@ -246,13 +240,12 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     </div>
                 )}
                 
-                {/* Visual gradient overlays for the scroll area */}
                 <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
             </div>
 
             {/* ── Take selector ──────────────────────────────────────── */}
-            {sessions && sessions.length > 1 && (
+            {sessions && sessions.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto px-6 pb-1 pt-3 scrollbar-hide">
                     {sessions.map((s, i) => (
                         <button
@@ -271,10 +264,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </div>
             )}
 
-            {/* ── Section pills — Beat Mode Only ────────────────────── */}
-            {beat && sections.length > 0 && (
+            {/* ── Section pills ────────────────────── */}
+            {beat && beatSections.length > 0 && (
                 <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
-                    {sections.map((sec, i) => {
+                    {beatSections.map((sec, i) => {
                         const isActive = i === activeSectionIdx;
                         return (
                             <div
@@ -355,11 +348,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
                 <button
                     onClick={togglePlay}
-                    className="text-white active:opacity-60 transition-opacity"
+                    className="w-20 h-20 bg-white rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl"
                 >
-                    {isPlaying
-                        ? <Pause size={38} fill="white" />
-                        : <Play  size={38} fill="white" className="ml-0.5" />}
+                    {isPlaying ? (
+                        <Pause size={40} className="text-black" fill="black" />
+                    ) : (
+                        <Play size={40} className="text-black ml-1" fill="black" />
+                    )}
                 </button>
 
                 <button
@@ -374,7 +369,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         if (isBeatLooping) {
                             onClearLoop?.();
                         } else {
-                            const sec = activeSectionIdx >= 0 ? sections[activeSectionIdx] : null;
+                            const sec = activeSectionIdx >= 0 ? beatSections[activeSectionIdx] : null;
                             if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime);
                         }
                     }}
@@ -384,7 +379,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </button>
             </div>
 
-            {/* ── Volume slider — iOS style with speaker icons ─────── */}
+            {/* ── Volume slider ─────── */}
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button
                     onClick={() => {
@@ -427,7 +422,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </button>
             </div>
 
-            {/* ── Bottom action bar — matches reference layout ────── */}
+            {/* ── Bottom action bar ────── */}
             <div className="flex items-center justify-evenly pb-8 pt-3">
                 <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform">
                     <MessageSquare size={20} className="text-white/60" />

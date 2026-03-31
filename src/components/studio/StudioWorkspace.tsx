@@ -649,17 +649,16 @@ const StudioWorkspace: React.FC = () => {
                 loopEnd: beatLoopEnd || undefined
             };
             setSessions(prev => [newSession, ...prev]);
+            setActiveSessionId(id); // Auto-select the latest take
 
             if (recordingTargetLineId) {
                 setRecordingTargetLineId(null);
             }
 
-            const hasApiKey = !!process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-
-            if (hasApiKey) {
-                toast.success('Recording saved! AI analyzing...');
-                // Background AI refinement
-                analyzeAudioWithGemini(base64).then(aiResult => {
+            toast.success('Recording saved! AI analyzing...');
+            
+            // Background AI refinement
+            analyzeAudioWithGemini(base64).then(aiResult => {
                     if (aiResult) {
                         setSessions(prev => prev.map(s => {
                             if (s.id === id) {
