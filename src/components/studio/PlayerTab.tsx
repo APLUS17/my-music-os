@@ -19,6 +19,13 @@ interface PlayerTabProps {
     onSetLoopRegion?: (startTime: number, endTime: number) => void;
     onClearLoop?: () => void;
     lyrics?: LyricSection[];
+    
+    // Lifted State Props
+    isPlaying: boolean;
+    currentTime: number;
+    duration: number;
+    onTogglePlay: (play?: boolean) => void;
+    onSeek: (time: number) => void;
 }
 
 const formatTime = (secs: number): string => {
@@ -40,113 +47,30 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     onSetLoopRegion,
     onClearLoop,
     lyrics,
+    
+    // Lifted
+    isPlaying,
+    currentTime,
+    duration,
+    onTogglePlay,
+    onSeek,
 }) => {
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const beatRef  = useRef<HTMLAudioElement | null>(null);
     const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
     const lyricRefs = useRef<(HTMLParagraphElement | null)[]>([]);
 
-    const [isPlaying, setIsPlaying]     = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [beatCurrentTime, setBeatCurrentTime] = useState(0);
-    const [duration, setDuration]       = useState(0);
-    const [beatMuted, setBeatMuted]     = useState(false);
-    const [localVolume, setLocalVolume] = useState(beatVolume);
     const [selectedSession, setSelectedSession] = useState<RecordingSession | null>(session);
-
-    // Reset when session changes
-    useEffect(() => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setBeatCurrentTime(0);
-        setDuration(0);
-        if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
-        if (beatRef.current)  { beatRef.current.pause();  beatRef.current.currentTime  = 0; }
-        onBeatPlaybackChange?.(false);
-    }, [session?.id]);
 
     // Sync selected session when parent session changes
     useEffect(() => {
         setSelectedSession(session);
     }, [session?.id]);
 
-    // Reset audio state when selected take changes
-    useEffect(() => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setBeatCurrentTime(0);
-        setDuration(0);
-        if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
-    }, [selectedSession?.id]);
+    const skip = (delta: number) => onSeek(currentTime + delta);
 
-    // Sync beat volume and mute state
-    useEffect(() => {
-        if (beatRef.current) {
-            beatRef.current.volume = beatMuted ? 0 : localVolume;
-        }
-    }, [beatMuted, localVolume]);
-
-    const seekTo = useCallback((time: number) => {
-        const clamped = Math.max(0, Math.min(duration || 0, time));
-        if (audioRef.current) audioRef.current.currentTime = clamped;
-        
-        if (beatRef.current)  {
-            let beatTime = clamped + (selectedSession?.beatOffset ?? 0);
-            
-            // Handle loop wrap-around if looping is active
-            if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
-                const loopDuration = beatLoopEnd - beatLoopStart;
-                if (loopDuration > 0) {
-                    const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
-                    beatTime = beatLoopStart + (offsetInLoop < 0 ? offsetInLoop + loopDuration : offsetInLoop);
-                }
-            }
-            
-            beatRef.current.currentTime = beatTime;
-            setBeatCurrentTime(beatTime);
-        }
-        setCurrentTime(clamped);
-    }, [duration, selectedSession?.beatOffset, isBeatLooping, beatLoopStart, beatLoopEnd]);
-
-    const skip = useCallback((delta: number) => seekTo(currentTime + delta), [currentTime, seekTo]);
-
-    const togglePlay = useCallback(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        // Use the actual audio property to determine state, avoiding React state race conditions
-        const isActuallyPaused = audio.paused;
-
-        if (!isActuallyPaused) {
-            audio.pause();
-            beatRef.current?.pause();
-            onBeatPlaybackChange?.(false);
-            setIsPlaying(false);
-        } else {
-            audio.play().catch(console.error);
-            if (beatRef.current && beatSrc) {
-                let beatTime = audio.currentTime + (selectedSession?.beatOffset ?? 0);
-                
-                // Handle loop wrap-around if looping is active
-                if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
-                    const loopDuration = beatLoopEnd - beatLoopStart;
-                    if (loopDuration > 0) {
-                        const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
-                        beatTime = beatLoopStart + (offsetInLoop < 0 ? offsetInLoop + loopDuration : offsetInLoop);
-                    }
-                }
-
-                beatRef.current.currentTime = beatTime;
-                setBeatCurrentTime(beatTime);
-                beatRef.current.volume = beatMuted ? 0 : localVolume;
-                beatRef.current.play().catch(console.error);
-                onBeatPlaybackChange?.(true);
-            }
-            setIsPlaying(true);
-        }
-    }, [beatSrc, beatMuted, localVolume, selectedSession?.beatOffset, onBeatPlaybackChange, isBeatLooping, beatLoopStart, beatLoopEnd]);
+    const togglePlay = () => onTogglePlay();
 
     // Derived — beat sections drive pills ONLY
+    const beatCurrentTime = currentTime + (selectedSession?.beatOffset ?? 0);
     const sections = beat?.sections ?? [];
     const activeSectionIdx = sections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -202,30 +126,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
-            {/* Hidden audio */}
-            <audio
-                ref={audioRef}
-                src={selectedSession?.audioUrl || selectedSession?.base64}
-                onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
-                onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
-                onEnded={() => { setIsPlaying(false); beatRef.current?.pause(); onBeatPlaybackChange?.(false); }}
-            />
-            {beatSrc && (
-                <audio
-                    ref={beatRef}
-                    src={beatSrc}
-                    onTimeUpdate={e => {
-                        const time = e.currentTarget.currentTime;
-                        setBeatCurrentTime(time);
-                        if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
-                            if (time >= beatLoopEnd) {
-                                e.currentTarget.currentTime = beatLoopStart;
-                            }
-                        }
-                    }}
-                />
-            )}
-
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end relative">
                 {transcriptionLines.length === 0 ? (
@@ -313,18 +213,18 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
                                     className={cn(
-                                        "text-left cursor-pointer transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] origin-left",
+                                        "text-left cursor-pointer origin-left",
                                         isActive ? "text-white" : "text-white/80"
                                     )}
+                                    initial={false}
                                     animate={{ 
                                         opacity, 
                                         scale, 
                                         filter: `blur(${blur})`,
-                                        y: translateY
                                     }}
                                     transition={{
-                                        duration: 0.6,
-                                        ease: [0.2, 0, 0, 1]
+                                        duration: 0.8,
+                                        ease: [0.4, 0, 0.2, 1] // Smoother, more cinematic easing
                                     }}
                                     onClick={() => seekTo(line.startTime)}
                                 >
@@ -417,12 +317,12 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     <motion.div
                         className="absolute left-0 top-0 h-full bg-white rounded-full"
                         animate={{ width: `${progress}%` }}
-                        transition={{ duration: 0.08, ease: 'linear' }}
+                        transition={{ duration: 0.1, ease: 'linear' }}
                     />
                     <motion.div
                         className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-white rounded-full shadow"
                         animate={{ left: `calc(${progress}% - 7px)` }}
-                        transition={{ duration: 0.08, ease: 'linear' }}
+                        transition={{ duration: 0.1, ease: 'linear' }}
                     />
                 </div>
                 <div className="flex justify-between text-xs text-white/50 mt-2 font-medium">

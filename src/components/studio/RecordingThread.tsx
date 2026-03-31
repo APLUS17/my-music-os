@@ -24,6 +24,12 @@ interface RecordingThreadProps {
     beatSrc?: string | null;
     beatVolume?: number;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
+
+    // Shared State
+    isPlaying: boolean;
+    currentTime: number;
+    onTogglePlay: (play?: boolean) => void;
+    onSeek: (time: number) => void;
 }
 
 export const RecordingThread: React.FC<RecordingThreadProps> = ({
@@ -38,6 +44,10 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     beatSrc,
     beatVolume = 1,
     onBeatPlaybackChange,
+    isPlaying,
+    currentTime,
+    onTogglePlay,
+    onSeek,
 }) => {
     const sortedSessions = [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -57,6 +67,10 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
                     beatSrc={beatSrc}
                     beatVolume={beatVolume}
                     onBeatPlaybackChange={onBeatPlaybackChange}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    onTogglePlay={onTogglePlay}
+                    onSeek={onSeek}
                 />
             ))}
 
@@ -86,7 +100,11 @@ const SessionCard = ({
     onAddLayer,
     beatSrc,
     beatVolume = 1,
-    onBeatPlaybackChange
+    onBeatPlaybackChange,
+    isPlaying,
+    currentTime,
+    onTogglePlay,
+    onSeek,
 }: {
     session: RecordingSession;
     isActive: boolean;
@@ -99,174 +117,78 @@ const SessionCard = ({
     beatSrc?: string | null;
     beatVolume?: number;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
+    isPlaying: boolean;
+    currentTime: number;
+    onTogglePlay: (play?: boolean) => void;
+    onSeek: (time: number) => void;
 }) => {
-    const [isPlayingAll, setIsPlayingAll] = useState(false);
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
-    const beatAudioRef = useRef<HTMLAudioElement | null>(null);
     const layerAudioRefs = useRef<(HTMLAudioElement | null)[]>([]);
-    const [progress, setProgress] = useState(0);
-    const vocalAudioCtxRef = useRef<AudioContext | null>(null);
 
-    const activePlaybackSection = session.sections.find(s => s.id === playingSectionId);
+    const progress = (session.duration || 0) > 0 ? (isActive ? currentTime / (session.duration || 0) : 0) : 0;
+    const isThisSessionPlaying = isActive && isPlaying;
 
+    // Handle section auto-stop
     useEffect(() => {
-        if (session.audioUrl && audioRef.current) {
-            audioRef.current.src = session.audioUrl;
+        if (playingSectionId && isActive) {
+            const sec = session.sections.find(s => s.id === playingSectionId);
+            if (sec && currentTime >= sec.endTime) {
+                onTogglePlay(false);
+                setPlayingSectionId(null);
+            }
         }
-    }, [session.audioUrl]);
+    }, [currentTime, playingSectionId, isActive, onTogglePlay, session.sections]);
 
-    // Route vocal audio through Web Audio API so mono recording plays in both ears
-    // Create context lazily on first play to avoid hitting browser AudioContext limit
-    const initAudioContext = () => {
-        if (vocalAudioCtxRef.current) return; // Already initialized
-
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioContextClass() as AudioContext;
-        vocalAudioCtxRef.current = ctx;
-
-        const source = ctx.createMediaElementSource(audio);
-        const merger = ctx.createChannelMerger(2);
-        source.connect(merger, 0, 0); // mono → left
-        source.connect(merger, 0, 1); // mono → right
-        merger.connect(ctx.destination);
-    };
-
-    // Cleanup on unmount
+    // Handle Layer Sync
     useEffect(() => {
-        return () => {
-            if (vocalAudioCtxRef.current) {
-                vocalAudioCtxRef.current.close();
-                vocalAudioCtxRef.current = null;
-            }
-        };
-    }, []);
-
-    // Sync beat, vocal, and layer playback (play/pause only, not constant time syncing)
-    useEffect(() => {
-        const vocal = audioRef.current;
-        const beat = beatAudioRef.current;
-
-        if (isPlayingAll || playingSectionId) {
-            // Initialize audio context lazily on first play
-            initAudioContext();
-            vocalAudioCtxRef.current?.resume();
-            if (vocal) vocal.play().catch(() => { });
-            if (beat && beatSrc) {
-                // If beat isn't already playing (e.g. this effect fires before the click handler),
-                // align its position to the vocal + beatOffset before starting it.
-                if (beat.paused) {
-                    beat.currentTime = (vocal?.currentTime ?? 0) + (session.beatOffset || 0);
-                }
-                beat.play().catch(() => { });
-                onBeatPlaybackChange?.(true);
-            }
-            // Play unmuted layers in sync with vocal
+        if (isThisSessionPlaying) {
             layerAudioRefs.current.forEach((audio, idx) => {
                 const layer = session.layers?.[idx];
                 if (!audio || !layer || layer.isMuted) return;
-                audio.currentTime = vocal?.currentTime ?? 0;
+
+                // Keep layers in sync with main clock
+                if (Math.abs(audio.currentTime - currentTime) > 0.1) {
+                    audio.currentTime = currentTime;
+                }
+
                 audio.volume = layer.gain ?? 0.8;
                 audio.play().catch(() => { });
             });
         } else {
-            if (vocal) vocal.pause();
-            if (beat) { beat.pause(); onBeatPlaybackChange?.(false); }
             layerAudioRefs.current.forEach(audio => audio?.pause());
         }
-    }, [isPlayingAll, playingSectionId, beatSrc, onBeatPlaybackChange]);
-
-    // Update beat volume when beatVolume changes
-    useEffect(() => {
-        if (beatAudioRef.current) {
-            beatAudioRef.current.volume = beatVolume;
-        }
-    }, [beatVolume]);
-
-    // Live-apply layer mute/unmute during playback
-    useEffect(() => {
-        if (!session.layers) return;
-        session.layers.forEach((layer, idx) => {
-            const audio = layerAudioRefs.current[idx];
-            if (!audio) return;
-            if (layer.isMuted) {
-                audio.pause();
-            } else if (isPlayingAll || playingSectionId) {
-                // Only resume if something is actively playing
-                audio.volume = layer.gain ?? 0.8;
-                audio.play().catch(() => {});
-            }
-        });
-    }, [session.layers, isPlayingAll, playingSectionId]);
-
-    // Handle Time Updates specifically for playing single sections
-    const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>) => {
-        const audio = e.currentTarget;
-        const dur = session.duration || 0;
-
-        if (dur > 0) setProgress(audio.currentTime / dur);
-
-        if (playingSectionId && activePlaybackSection) {
-            if (audio.currentTime >= activePlaybackSection.endTime) {
-                audio.pause();
-                if (beatAudioRef.current) beatAudioRef.current.pause();
-                layerAudioRefs.current.forEach(a => a?.pause());
-                setPlayingSectionId(null);
-                setIsPlayingAll(false);
-                onBeatPlaybackChange?.(false);
-            }
-        }
-    };
+    }, [isThisSessionPlaying, currentTime, session.layers]);
 
     const togglePlayAll = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (audioRef.current) {
-            if (isPlayingAll && !playingSectionId) {
-                audioRef.current.pause();
-                if (beatAudioRef.current) beatAudioRef.current.pause();
-                layerAudioRefs.current.forEach(audio => audio?.pause());
-                setIsPlayingAll(false);
-            } else {
-                // If a section was playing, just reset to play all from current time, or from 0
-                setPlayingSectionId(null);
-                vocalAudioCtxRef.current?.resume();
-                audioRef.current.play();
-                if (beatAudioRef.current) {
-                    // Align beat to vocal's position + the offset captured at recording start
-                    beatAudioRef.current.currentTime = audioRef.current.currentTime + (session.beatOffset || 0);
-                    beatAudioRef.current.play().catch(() => { });
-                }
-                onSelect();
-                setIsPlayingAll(true);
-            }
+        if (!isActive) {
+            onSelect();
+            // Need a tiny delay for StudioWorkspace to update the src of vocalAudioRef
+            setTimeout(() => onTogglePlay(true), 50);
+        } else {
+            onTogglePlay();
         }
+        setPlayingSectionId(null);
     };
 
     const playSection = (sec: AutoSection, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (audioRef.current) {
-            if (playingSectionId === sec.id && !audioRef.current.paused) {
-                audioRef.current.pause();
-                if (beatAudioRef.current) beatAudioRef.current.pause();
-                layerAudioRefs.current.forEach(audio => audio?.pause());
-                setPlayingSectionId(null);
-                setIsPlayingAll(false);
-            } else {
-                audioRef.current.currentTime = sec.startTime;
-                vocalAudioCtxRef.current?.resume();
-                audioRef.current.play();
-                if (beatAudioRef.current) {
-                    // Section time is vocal-relative; beat must be offset by beatOffset
-                    beatAudioRef.current.currentTime = sec.startTime + (session.beatOffset || 0);
-                    beatAudioRef.current.play().catch(() => { });
-                }
+        if (!isActive) {
+            onSelect();
+            setTimeout(() => {
+                onSeek(sec.startTime);
+                onTogglePlay(true);
                 setPlayingSectionId(sec.id);
-                setIsPlayingAll(false);
-                onSelect();
+            }, 50);
+        } else {
+            if (playingSectionId === sec.id && isPlaying) {
+                onTogglePlay(false);
+                setPlayingSectionId(null);
+            } else {
+                onSeek(sec.startTime);
+                onTogglePlay(true);
+                setPlayingSectionId(sec.id);
             }
         }
     };
@@ -277,7 +199,7 @@ const SessionCard = ({
 
     return (
         <div className="relative">
-            {/* Delete Background Layer - Only visible after entry animation to prevent initial red flash */}
+            {/* Delete Background Layer */}
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -312,15 +234,6 @@ const SessionCard = ({
                 )}
                 onClick={onSelect}
             >
-                <audio
-                    ref={audioRef}
-                    onTimeUpdate={handleTimeUpdate}
-                    onEnded={() => {
-                        layerAudioRefs.current.forEach(audio => { if (audio) { audio.pause(); audio.currentTime = 0; } });
-                        setIsPlayingAll(false); setPlayingSectionId(null); setProgress(0);
-                    }}
-                />
-                {beatSrc && <audio ref={beatAudioRef} src={beatSrc} crossOrigin="anonymous" />}
                 {session.layers?.map((layer, i) => (
                     <audio
                         key={layer.id}
@@ -337,12 +250,12 @@ const SessionCard = ({
                         size="icon"
                         className={cn(
                             "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-white/10",
-                            (isPlayingAll && !playingSectionId)
+                            (isThisSessionPlaying && !playingSectionId)
                                 ? "bg-white text-black hover:bg-white/90"
                                 : "bg-[#222] text-white hover:bg-[#333]"
                         )}
                     >
-                        {(isPlayingAll && !playingSectionId) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                        {(isThisSessionPlaying && !playingSectionId) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
                     </Button>
 
                     <div className="flex flex-col flex-1 min-w-0 pt-1">
@@ -377,10 +290,6 @@ const SessionCard = ({
                             </div>
                         </div>
                     </div>
-
-                    <div className="flex items-center gap-1 shrink-0 transition-opacity">
-                        {/* Icons removed as per request (Scissors non-functional, Trash replaced by swipe) */}
-                    </div>
                 </div>
 
                 <motion.div
@@ -388,7 +297,7 @@ const SessionCard = ({
                     animate={{
                         height: isExpanded ? 'auto' : 0,
                         opacity: isExpanded ? 1 : 0,
-                        marginTop: isExpanded ? 0 : -16 // Reduce gap when collapsed
+                        marginTop: isExpanded ? 0 : -16
                     }}
                     className="overflow-hidden flex flex-col gap-4"
                 >
@@ -405,16 +314,14 @@ const SessionCard = ({
                     {/* Threaded Sections */}
                     <div className="mt-2 pl-[22px] border-l-2 border-white/[0.05] ml-[22px] flex flex-col gap-3 pb-2">
                         {session.sections.length > 0 ? session.sections.map((sec, idx) => {
-                            const isThisSectionPlaying = playingSectionId === sec.id;
+                            const isThisSectionPlaying = playingSectionId === sec.id && isPlaying;
 
                             return (
                                 <div key={sec.id} className="relative flex items-center group/sec">
-                                    {/* Emoji Node on thread line */}
                                     <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-xs shadow-sm z-10">
                                         {sec.emojiTag || getEmojiForType(sec.type)}
                                     </div>
 
-                                    {/* Section Content Card */}
                                     <div
                                         onClick={(e) => playSection(sec, e)}
                                         className={cn(
@@ -469,12 +376,6 @@ const SessionCard = ({
                                 Processing sections...
                             </div>
                         )}
-
-                        {session.sections.length > 0 && (
-                            <div className="relative mt-2">
-                                <div className="absolute -left-[27px] w-2 h-2 rounded-full border border-white/20 bg-[#111] z-10" />
-                            </div>
-                        )}
                     </div>
 
                     {/* Layers Section */}
@@ -491,7 +392,6 @@ const SessionCard = ({
                                     </span>
                                 </div>
 
-                                {/* Layer List */}
                                 <div className="flex flex-col gap-1.5">
                                     {session.layers.map((layer, layerIdx) => (
                                         <div
@@ -503,7 +403,6 @@ const SessionCard = ({
                                                     : "bg-white/[0.05] border-white/10 hover:bg-white/[0.08]"
                                             )}
                                         >
-                                            {/* Layer waveform bars - stable heights */}
                                             <div className="flex items-center gap-0.5 flex-1 h-4">
                                                 {[...Array(8)].map((_, i) => {
                                                     const seed = 12345 + layerIdx;
@@ -529,7 +428,6 @@ const SessionCard = ({
                                                 })}
                                             </div>
 
-                                            {/* Layer name and duration */}
                                             <div className="flex flex-col items-end min-w-0">
                                                 <span className={cn(
                                                     "text-xs font-medium truncate",
@@ -544,7 +442,6 @@ const SessionCard = ({
                                                 )}
                                             </div>
 
-                                            {/* Mute Toggle Button */}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -569,7 +466,6 @@ const SessionCard = ({
                             </>
                         )}
 
-                        {/* Add Layer Button */}
                         <Button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -583,13 +479,11 @@ const SessionCard = ({
                         </Button>
                     </div>
                 </motion.div>
-
             </motion.div>
         </div>
     );
 };
 
-// Helper for default emojis based on type
 function getEmojiForType(type: string): string {
     switch (type) {
         case 'vocal': return '🎤';

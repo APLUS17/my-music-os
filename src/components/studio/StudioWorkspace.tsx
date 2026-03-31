@@ -396,6 +396,12 @@ const StudioWorkspace: React.FC = () => {
     const [playingBeatId, setPlayingBeatId] = useState<string | null>(null);
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
+    const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Persistent Audio State
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
 
     // Persistent Beat Playback State (Lifted from BeatUploader)
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
@@ -405,6 +411,40 @@ const StudioWorkspace: React.FC = () => {
     const [isBeatLooping, setIsBeatLooping] = useState(true);
 
     const [showTour, setShowTour] = useState(false);
+
+    // Sync Vocal and Beat
+    const togglePlayback = (play?: boolean) => {
+        const shouldPlay = play !== undefined ? play : !isPlaying;
+        
+        if (shouldPlay) {
+            vocalAudioRef.current?.play().catch(console.error);
+            if (uploadedBeat && beatAudioRef.current) {
+                const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
+                const offset = session?.beatOffset || 0;
+                beatAudioRef.current.currentTime = (vocalAudioRef.current?.currentTime || 0) + offset;
+                beatAudioRef.current.play().catch(console.error);
+                setIsBeatPlaying(true);
+            }
+            setIsPlaying(true);
+        } else {
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsBeatPlaying(false);
+            setIsPlaying(false);
+        }
+    };
+
+    const seekTo = (time: number) => {
+        const clamped = Math.max(0, Math.min(duration || 0, time));
+        if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
+        
+        if (beatAudioRef.current) {
+            const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
+            const offset = session?.beatOffset || 0;
+            beatAudioRef.current.currentTime = clamped + offset;
+        }
+        setCurrentTime(clamped);
+    };
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
@@ -1370,8 +1410,16 @@ const StudioWorkspace: React.FC = () => {
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}
                                         lyrics={sections}
-                                        onBeatPlaybackChange={(isPlaying) => {
-                                            if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                        
+                                        // Shared Audio State
+                                        isPlaying={isPlaying}
+                                        currentTime={currentTime}
+                                        duration={duration}
+                                        onTogglePlay={togglePlayback}
+                                        onSeek={seekTo}
+
+                                        onBeatPlaybackChange={(isP) => {
+                                            if (isP && isBeatPlaying && beatAudioRef.current) {
                                                 beatAudioRef.current.pause();
                                                 setIsBeatPlaying(false);
                                             }
@@ -1520,14 +1568,18 @@ const StudioWorkspace: React.FC = () => {
                                                 onDeleteSession={handleDeleteSession}
                                                 beatSrc={uploadedBeat}
                                                 beatVolume={beatVolume}
-                                                onBeatPlaybackChange={(isPlaying) => {
-                                                    // When RecordingThread starts playing its own beat,
-                                                    // stop the global beat to prevent double playback
-                                                    if (isPlaying && isBeatPlaying && beatAudioRef.current) {
+                                                onBeatPlaybackChange={(isP) => {
+                                                    if (isP && isBeatPlaying && beatAudioRef.current) {
                                                         beatAudioRef.current.pause();
                                                         setIsBeatPlaying(false);
                                                     }
                                                 }}
+
+                                                // Shared Audio State
+                                                isPlaying={isPlaying}
+                                                currentTime={currentTime}
+                                                onTogglePlay={togglePlayback}
+                                                onSeek={seekTo}
                                             />
                                         ) : null}
                                     </div>
@@ -1548,6 +1600,16 @@ const StudioWorkspace: React.FC = () => {
             >
                 {/* Persistent Studio Beat Audio */}
                 <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" />
+                
+                {/* Persistent Vocal Session Audio */}
+                <audio 
+                    ref={vocalAudioRef} 
+                    src={sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64}
+                    onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
+                    onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
+                    onEnded={() => { setIsPlaying(false); setIsBeatPlaying(false); beatAudioRef.current?.pause(); }}
+                    className="hidden"
+                />
 
                 {getActiveView()}
 
