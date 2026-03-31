@@ -224,7 +224,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             )}
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end">
+            <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end relative">
                 {transcriptionLines.length === 0 ? (
                     // Loading / Empty state
                     <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -251,49 +251,77 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     </div>
                 ) : (
                     // Apple Music Style Lyrics
-                    <div className="flex flex-col gap-6 overflow-y-auto scrollbar-hide py-[20vh]">
+                    <div 
+                        className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[35vh] mask-fade-edges"
+                        style={{ scrollBehavior: 'smooth' }}
+                    >
                         {transcriptionLines.map((line, i) => {
-                            const offset = i - activeLyricIdx;
-                            // Only render near lines
-                            if (Math.abs(offset) > 5) return null;
-
                             const isActive = i === activeLyricIdx;
+                            const isPast = i < activeLyricIdx;
+                            const isFuture = i > activeLyricIdx;
+                            const distance = Math.abs(i - activeLyricIdx);
                             
-                            // Visual properties based on offset
-                            let opacity = 0.08;
-                            let fontSize = '1rem';
-                            let fontWeight = 400;
+                            // Visual properties based on distance and state
+                            let opacity = 0.15;
+                            let scale = 0.95;
+                            let blur = '2px';
+                            let translateY = 0;
 
                             if (isActive) {
                                 opacity = 1;
-                                fontSize = '1.75rem';
-                                fontWeight = 600;
-                            } else if (offset === -1) { // Just sang
-                                opacity = 0.45;
-                                fontSize = '1.2rem';
-                            } else if (offset === 1) { // Coming next
-                                opacity = 0.35;
-                                fontSize = '1.1rem';
-                            } else if (Math.abs(offset) === 2) {
-                                opacity = 0.18;
-                                fontSize = '1rem';
+                                scale = 1.05;
+                                blur = '0px';
+                            } else if (distance === 1) {
+                                opacity = 0.4;
+                                scale = 1;
+                                blur = '1px';
+                            } else if (distance === 2) {
+                                opacity = 0.25;
+                                scale = 0.98;
+                                blur = '1.5px';
+                            }
+
+                            // If we haven't reached any lyrics yet, make the first one slightly more visible
+                            if (activeLyricIdx === -1 && i === 0) {
+                                opacity = 0.4;
+                                blur = '1px';
                             }
 
                             return (
-                                <motion.p
+                                <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
-                                    className="text-left text-white leading-tight cursor-pointer transition-all duration-500"
-                                    style={{ fontSize, fontWeight }}
-                                    animate={{ opacity }}
+                                    className={cn(
+                                        "text-left cursor-pointer transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] origin-left",
+                                        isActive ? "text-white" : "text-white/80"
+                                    )}
+                                    animate={{ 
+                                        opacity, 
+                                        scale, 
+                                        filter: `blur(${blur})`,
+                                        y: translateY
+                                    }}
+                                    transition={{
+                                        duration: 0.6,
+                                        ease: [0.2, 0, 0, 1]
+                                    }}
                                     onClick={() => seekTo(line.startTime)}
                                 >
-                                    {line.text}
-                                </motion.p>
+                                    <p className={cn(
+                                        "text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight",
+                                        isActive ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : ""
+                                    )}>
+                                        {line.text}
+                                    </p>
+                                </motion.div>
                             );
                         })}
                     </div>
                 )}
+                
+                {/* Visual gradient overlays for the scroll area */}
+                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
             </div>
 
             {/* ── Take selector ──────────────────────────────────────── */}
