@@ -870,35 +870,27 @@ const StudioWorkspace: React.FC = () => {
         setViewMode('studio');
         setStudioMode('flow');
 
-        // If this beat has no sections yet, analyze it now
-        if (!beat.sections?.length) {
+        // If this beat has no sections yet, analyze it with Gemini for song structure
+        if (!beat.sections?.length && process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
             (async () => {
                 try {
                     const b64 = beat.base64 || await getAudioData(beat.id);
                     if (!b64) return;
-                    const blob = await base64ToBlob(b64);
-                    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                    const audioBuffer = await audioCtx.decodeAudioData(await blob.arrayBuffer());
-                    const rawSections = await analyzeAudioAndSplit(audioBuffer);
-                    setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: rawSections } : b));
-                    audioCtx.close();
-                    if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && b64) {
-                        analyzeInstrumentalWithGemini(b64).then(result => {
-                            if (result?.sections?.length) {
-                                const aiSections: AutoSection[] = result.sections.map(s => ({
-                                    id: randomId(),
-                                    startTime: s.startTime,
-                                    endTime: s.endTime,
-                                    type: s.type,
-                                    label: s.label,
-                                    emojiTag: s.emojiTag,
-                                    isBest: false,
-                                    isFavorited: false,
-                                }));
-                                setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
-                            }
-                        });
-                    }
+                    analyzeInstrumentalWithGemini(b64).then(result => {
+                        if (result?.sections?.length) {
+                            const aiSections: AutoSection[] = result.sections.map(s => ({
+                                id: randomId(),
+                                startTime: s.startTime,
+                                endTime: s.endTime,
+                                type: s.type,
+                                label: s.label,
+                                emojiTag: s.emojiTag,
+                                isBest: false,
+                                isFavorited: false,
+                            }));
+                            setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
+                        }
+                    });
                 } catch (e) {
                     console.error('Beat analysis failed', e);
                 }
@@ -1318,39 +1310,26 @@ const StudioWorkspace: React.FC = () => {
                                                         return [newBeat, ...filtered];
                                                     });
 
-                                                    // Background beat structure analysis — non-blocking
-                                                    (async () => {
-                                                        try {
-                                                            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-                                                            const arrayBuffer = await file.arrayBuffer();
-                                                            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                                                            const rawSections = await analyzeAudioAndSplit(audioBuffer);
-                                                            setBeats(prev => prev.map(b => b.id === id ? { ...b, sections: rawSections } : b));
-                                                            audioCtx.close();
-
-                                                            if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
-                                                                analyzeInstrumentalWithGemini(base64).then(result => {
-                                                                    if (result?.sections?.length) {
-                                                                        const aiSections: AutoSection[] = result.sections.map(s => ({
-                                                                            id: randomId(),
-                                                                            startTime: s.startTime,
-                                                                            endTime: s.endTime,
-                                                                            type: s.type,
-                                                                            label: s.label,
-                                                                            emojiTag: s.emojiTag,
-                                                                            isBest: false,
-                                                                            isFavorited: false,
-                                                                        }));
-                                                                        setBeats(prev => prev.map(b =>
-                                                                            b.id === id ? { ...b, sections: aiSections } : b
-                                                                        ));
-                                                                    }
-                                                                });
+                                                    // Background beat structure analysis via Gemini — non-blocking
+                                                    if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
+                                                        analyzeInstrumentalWithGemini(base64).then(result => {
+                                                            if (result?.sections?.length) {
+                                                                const aiSections: AutoSection[] = result.sections.map(s => ({
+                                                                    id: randomId(),
+                                                                    startTime: s.startTime,
+                                                                    endTime: s.endTime,
+                                                                    type: s.type,
+                                                                    label: s.label,
+                                                                    emojiTag: s.emojiTag,
+                                                                    isBest: false,
+                                                                    isFavorited: false,
+                                                                }));
+                                                                setBeats(prev => prev.map(b =>
+                                                                    b.id === id ? { ...b, sections: aiSections } : b
+                                                                ));
                                                             }
-                                                        } catch (e) {
-                                                            console.error('Beat analysis failed', e);
-                                                        }
-                                                    })();
+                                                        }).catch(e => console.error('Beat analysis failed', e));
+                                                    }
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
