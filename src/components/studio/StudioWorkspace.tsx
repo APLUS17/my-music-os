@@ -406,6 +406,7 @@ const StudioWorkspace: React.FC = () => {
     // Persistent Beat Playback State (Lifted from BeatUploader)
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
+    const [beatMuted, setBeatMuted] = useState(false);
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
     const [isBeatLooping, setIsBeatLooping] = useState(true);
@@ -445,6 +446,13 @@ const StudioWorkspace: React.FC = () => {
         }
         setCurrentTime(clamped);
     };
+
+    // Update Beat Volume
+    useEffect(() => {
+        if (beatAudioRef.current) {
+            beatAudioRef.current.volume = beatMuted ? 0 : beatVolume;
+        }
+    }, [beatVolume, beatMuted]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
@@ -1406,6 +1414,9 @@ const StudioWorkspace: React.FC = () => {
                                         beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                         beatSrc={uploadedBeat}
                                         beatVolume={beatVolume}
+                                        beatMuted={beatMuted}
+                                        onVolumeChange={setBeatVolume}
+                                        onMuteChange={setBeatMuted}
                                         isBeatLooping={isBeatLooping}
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}

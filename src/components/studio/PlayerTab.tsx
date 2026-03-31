@@ -12,6 +12,9 @@ interface PlayerTabProps {
     beat?: Beat | null;
     beatSrc: string | null;
     beatVolume: number;
+    beatMuted: boolean;
+    onVolumeChange: (v: number) => void;
+    onMuteChange: (m: boolean) => void;
     isBeatLooping?: boolean;
     beatLoopStart?: number | null;
     beatLoopEnd?: number | null;
@@ -40,6 +43,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     beat,
     beatSrc,
     beatVolume,
+    beatMuted,
+    onVolumeChange,
+    onMuteChange,
     isBeatLooping,
     beatLoopStart,
     beatLoopEnd,
@@ -226,7 +232,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                         duration: 0.8,
                                         ease: [0.4, 0, 0.2, 1] // Smoother, more cinematic easing
                                     }}
-                                    onClick={() => seekTo(line.startTime)}
+                                    onClick={() => onSeek(line.startTime)}
                                 >
                                     <p className={cn(
                                         "text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight",
@@ -287,7 +293,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 <button
                                     onClick={() => {
                                         const vocalTime = sec.startTime - (selectedSession?.beatOffset ?? 0);
-                                        seekTo(Math.max(0, vocalTime));
+                                        onSeek(Math.max(0, vocalTime));
                                         onSetLoopRegion?.(sec.startTime, sec.endTime);
                                     }}
                                     className={cn(
@@ -311,7 +317,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     className="relative w-full h-[2px] bg-white/20 rounded-full cursor-pointer"
                     onClick={e => {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        seekTo(((e.clientX - rect.left) / rect.width) * duration);
+                        onSeek(((e.clientX - rect.left) / rect.width) * duration);
                     }}
                 >
                     <motion.div
@@ -382,8 +388,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button
                     onClick={() => {
-                        if (beatMuted) { setBeatMuted(false); }
-                        else { setLocalVolume(Math.max(0, localVolume - 0.1)); }
+                        if (beatMuted) { onMuteChange(false); }
+                        else { onVolumeChange(Math.max(0, beatVolume - 0.1)); }
                     }}
                     className="text-white/40 shrink-0 active:opacity-60 transition-opacity"
                 >
@@ -394,12 +400,12 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     min={0}
                     max={1}
                     step={0.01}
-                    value={beatMuted ? 0 : localVolume}
+                    value={beatMuted ? 0 : beatVolume}
                     onChange={e => {
                         const v = parseFloat(e.target.value);
-                        setLocalVolume(v);
-                        if (v > 0 && beatMuted) setBeatMuted(false);
-                        if (v === 0) setBeatMuted(true);
+                        onVolumeChange(v);
+                        if (v > 0 && beatMuted) onMuteChange(false);
+                        if (v === 0) onMuteChange(true);
                     }}
                     className="flex-1 h-[3px] accent-white appearance-none bg-white/20 rounded-full cursor-pointer
                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[14px] [&::-webkit-slider-thumb]:h-[14px]
@@ -407,13 +413,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         [&::-moz-range-thumb]:w-[14px] [&::-moz-range-thumb]:h-[14px]
                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
                     style={{
-                        background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : localVolume) * 100}%, rgba(255,255,255,0.2) ${(beatMuted ? 0 : localVolume) * 100}%, rgba(255,255,255,0.2) 100%)`
+                        background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) 100%)`
                     }}
                 />
                 <button
                     onClick={() => {
-                        if (beatMuted) { setBeatMuted(false); setLocalVolume(1); }
-                        else { setLocalVolume(Math.min(1, localVolume + 0.1)); }
+                        if (beatMuted) { onMuteChange(false); onVolumeChange(1); }
+                        else { onVolumeChange(Math.min(1, beatVolume + 0.1)); }
                     }}
                     className="text-white/40 shrink-0 active:opacity-60 transition-opacity"
                 >
