@@ -1392,6 +1392,11 @@ const StudioWorkspace: React.FC = () => {
                                             setBeatLoopEnd(endTime);
                                             setIsBeatLooping(true);
                                         }}
+                                        onClearLoop={() => {
+                                            setIsBeatLooping(false);
+                                            setBeatLoopStart(null);
+                                            setBeatLoopEnd(null);
+                                        }}
                                     />
                                 </div>
                             )}

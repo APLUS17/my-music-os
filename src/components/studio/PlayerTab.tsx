@@ -17,6 +17,7 @@ interface PlayerTabProps {
     beatLoopEnd?: number | null;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
     onSetLoopRegion?: (startTime: number, endTime: number) => void;
+    onClearLoop?: () => void;
     lyrics?: LyricSection[];
 }
 
@@ -37,6 +38,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     beatLoopEnd,
     onBeatPlaybackChange,
     onSetLoopRegion,
+    onClearLoop,
     lyrics,
 }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -350,8 +352,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </div>
             </div>
 
-            {/* ── Controls — 3 equal-weight filled icons, no circle ──── */}
-            <div className="flex items-center justify-center gap-16 py-5">
+            {/* ── Controls ──────────────────────────────────────────── */}
+            <div className="flex items-center justify-center gap-10 py-5">
                 <button
                     onClick={() => skip(-10)}
                     className="text-white active:opacity-60 transition-opacity"
@@ -373,6 +375,20 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     className="text-white active:opacity-60 transition-opacity"
                 >
                     <FastForward size={34} fill="white" />
+                </button>
+
+                <button
+                    onClick={() => {
+                        if (isBeatLooping) {
+                            onClearLoop?.();
+                        } else {
+                            const sec = activeSectionIdx >= 0 ? sections[activeSectionIdx] : null;
+                            if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime);
+                        }
+                    }}
+                    className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-white/40')}
+                >
+                    <Repeat2 size={28} />
                 </button>
             </div>
 
