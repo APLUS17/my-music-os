@@ -156,12 +156,15 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const activeLyricIdx = useMemo(() => {
         if (transcriptionLines.length === 0) return -1;
         
+        // Add a small 100ms lookahead to make the transition feel "snappy"
+        const lookaheadTime = currentTime + 0.1;
+
         // Find line where current time falls within bounds
-        const idx = transcriptionLines.findIndex(l => currentTime >= l.startTime && currentTime < l.endTime);
+        const idx = transcriptionLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
 
         // If we passed the last line, keep the last one active
-        if (currentTime >= transcriptionLines[transcriptionLines.length - 1].endTime) {
+        if (lookaheadTime >= transcriptionLines[transcriptionLines.length - 1].endTime) {
             return transcriptionLines.length - 1;
         }
 
@@ -262,29 +265,47 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             const distance = Math.abs(i - activeLyricIdx);
                             
                             // Visual properties based on distance and state
-                            let opacity = 0.15;
-                            let scale = 0.95;
-                            let blur = '2px';
+                            let opacity = 0.08; // Very faint default (for distant future)
+                            let scale = 0.94;
+                            let blur = '3px';
                             let translateY = 0;
 
                             if (isActive) {
                                 opacity = 1;
                                 scale = 1.05;
                                 blur = '0px';
-                            } else if (distance === 1) {
-                                opacity = 0.4;
-                                scale = 1;
-                                blur = '1px';
-                            } else if (distance === 2) {
-                                opacity = 0.25;
-                                scale = 0.98;
-                                blur = '1.5px';
+                            } else if (isPast) {
+                                // Past lines stay somewhat readable but dimmed
+                                if (distance === 1) {
+                                    opacity = 0.35;
+                                    scale = 0.98;
+                                    blur = '1px';
+                                } else {
+                                    opacity = 0.15;
+                                    scale = 0.96;
+                                    blur = '2px';
+                                }
+                            } else if (isFuture) {
+                                // Future lines are more aggressively blurred/hidden
+                                if (distance === 1) {
+                                    opacity = 0.25;
+                                    scale = 1;
+                                    blur = '2px';
+                                } else if (distance === 2) {
+                                    opacity = 0.12;
+                                    scale = 0.98;
+                                    blur = '2.5px';
+                                } else {
+                                    opacity = 0.05;
+                                    scale = 0.95;
+                                    blur = '4px';
+                                }
                             }
 
-                            // If we haven't reached any lyrics yet, make the first one slightly more visible
+                            // If we haven't reached any lyrics yet, make the first one ready
                             if (activeLyricIdx === -1 && i === 0) {
-                                opacity = 0.4;
-                                blur = '1px';
+                                opacity = 0.25;
+                                blur = '2px';
                             }
 
                             return (
