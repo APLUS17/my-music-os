@@ -348,7 +348,7 @@ const MISSION_PROJECT: SavedProject = {
 
 const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
-    const [theme, setTheme] = useState<Theme>('light');
+    const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
