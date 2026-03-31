@@ -17,6 +17,7 @@ interface PlayerTabProps {
     beatLoopEnd?: number | null;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
     onSetLoopRegion?: (startTime: number, endTime: number) => void;
+    onClearLoop?: () => void;
     lyrics?: LyricSection[];
 }
 
@@ -37,6 +38,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     beatLoopEnd,
     onBeatPlaybackChange,
     onSetLoopRegion,
+    onClearLoop,
     lyrics,
 }) => {
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -226,25 +228,16 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             // Only render lines near the active one for performance
                             if (Math.abs(offset) > 4) return null;
 
-                            // Count content lines up to index i to get the seek time
-                            let contentIdx = 0;
-                            for (let j = 0; j < i; j++) {
-                                if (!lyricLines[j].isHeader) contentIdx++;
-                            }
-                            const timePerLine = contentLinesCount > 0 ? duration / contentLinesCount : 0;
-                            const lineTime = contentIdx * timePerLine;
-
                             if (line.isHeader) {
                                 // Section header (VERSE, CHORUS, etc.)
                                 const isNearActive = Math.abs(offset) <= 1;
                                 return (
                                     <motion.p
                                         key={`header-${i}`}
-                                        className="text-left text-[var(--accent)] uppercase tracking-widest cursor-pointer"
+                                        className="text-left text-[var(--accent)] uppercase tracking-widest"
                                         style={{ fontSize: '0.65rem', letterSpacing: '0.2em' }}
                                         animate={{ opacity: isNearActive ? 0.7 : 0.15 }}
                                         transition={{ duration: 0.3 }}
-                                        onClick={() => seekTo(lineTime)}
                                     >
                                         {line.text}
                                     </motion.p>
@@ -261,11 +254,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             return (
                                 <motion.p
                                     key={`line-${i}`}
-                                    className="text-left font-bold text-white leading-tight cursor-pointer active:opacity-60"
+                                    className="text-left font-bold text-white leading-tight"
                                     style={{ fontSize: isActive ? '1.75rem' : '1.25rem', lineHeight: 1.2 }}
                                     animate={{ opacity }}
                                     transition={{ duration: 0.3 }}
-                                    onClick={() => seekTo(lineTime)}
                                 >
                                     {line.text}
                                 </motion.p>
@@ -360,8 +352,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </div>
             </div>
 
-            {/* ── Controls — 3 equal-weight filled icons, no circle ──── */}
-            <div className="flex items-center justify-center gap-16 py-5">
+            {/* ── Controls ──────────────────────────────────────────── */}
+            <div className="flex items-center justify-center gap-10 py-5">
                 <button
                     onClick={() => skip(-10)}
                     className="text-white active:opacity-60 transition-opacity"
@@ -383,6 +375,20 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     className="text-white active:opacity-60 transition-opacity"
                 >
                     <FastForward size={34} fill="white" />
+                </button>
+
+                <button
+                    onClick={() => {
+                        if (isBeatLooping) {
+                            onClearLoop?.();
+                        } else {
+                            const sec = activeSectionIdx >= 0 ? sections[activeSectionIdx] : null;
+                            if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime);
+                        }
+                    }}
+                    className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-white/40')}
+                >
+                    <Repeat2 size={28} />
                 </button>
             </div>
 
