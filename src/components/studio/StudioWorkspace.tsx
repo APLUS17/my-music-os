@@ -424,6 +424,10 @@ const StudioWorkspace: React.FC = () => {
     // Persistence Load
     useEffect(() => {
         if (typeof window === 'undefined') return;
+        
+        // Keep track of object URLs created to revoke them later
+        const createdUrls: string[] = [];
+
         const loadState = async () => {
             const savedData = localStorage.getItem('studio-pro-data-v2');
             if (savedData) {
@@ -466,7 +470,10 @@ const StudioWorkspace: React.FC = () => {
                         const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
                             try {
                                 const b64 = await getAudioData(t.id);
-                                const url = b64 ? URL.createObjectURL(await base64ToBlob(b64)) : undefined;
+                                if (!b64) return t;
+                                const blob = await base64ToBlob(b64);
+                                const url = URL.createObjectURL(blob);
+                                createdUrls.push(url);
                                 return { ...t, base64: b64, audioUrl: url };
                             } catch (e) {
                                 console.error(`Failed to load audio for session ${t.id}`, e);
@@ -474,16 +481,16 @@ const StudioWorkspace: React.FC = () => {
                             }
                         }));
                         setSessions(loadedSessions);
-                    } else if (parsed.takes) {
-                        // Migration handle
-                        setSessions([]);
                     }
 
                     if (parsed.beats) {
                         const loadedBeats = await Promise.all(parsed.beats.map(async (b: Beat) => {
                             try {
                                 const b64 = await getAudioData(b.id);
-                                const url = b64 ? URL.createObjectURL(await base64ToBlob(b64)) : undefined;
+                                if (!b64) return b;
+                                const blob = await base64ToBlob(b64);
+                                const url = URL.createObjectURL(blob);
+                                createdUrls.push(url);
                                 return { ...b, base64: b64, audioUrl: url };
                             } catch (e) {
                                 console.error(`Failed to load audio for beat ${b.id}`, e);
@@ -497,6 +504,10 @@ const StudioWorkspace: React.FC = () => {
             }
         };
         loadState();
+
+        return () => {
+            createdUrls.forEach(url => URL.revokeObjectURL(url));
+        };
     }, []);
 
     // Persistence Save with indicator
@@ -628,6 +639,7 @@ const StudioWorkspace: React.FC = () => {
     const handlePlaySession = (sessionId: string) => {
         const session = sessions.find(s => s.id === sessionId);
         if (!session) return;
+        
         if (playingSessionId === sessionId) {
             globalAudioRef.current?.pause();
             if (beatAudioRef.current) {
@@ -637,13 +649,21 @@ const StudioWorkspace: React.FC = () => {
             setPlayingSessionId(null);
         } else {
             if (globalAudioRef.current) globalAudioRef.current.pause();
+            
             const audio = new Audio(session.audioUrl || session.base64);
+            
             audio.onended = () => {
-                setPlayingSessionId(null);
-                if (beatAudioRef.current) {
-                    beatAudioRef.current.pause();
-                    setIsBeatPlaying(false);
-                }
+                // Only clear if this specific session is still the one marked as playing
+                setPlayingSessionId(prev => {
+                    if (prev === sessionId) {
+                        if (beatAudioRef.current) {
+                            beatAudioRef.current.pause();
+                            setIsBeatPlaying(false);
+                        }
+                        return null;
+                    }
+                    return prev;
+                });
             };
             
             // Sync with beat if available

@@ -111,16 +111,21 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const skip = useCallback((delta: number) => seekTo(currentTime + delta), [currentTime, seekTo]);
 
     const togglePlay = useCallback(() => {
-        if (!audioRef.current) return;
-        if (isPlaying) {
-            audioRef.current.pause();
+        const audio = audioRef.current;
+        if (!audio) return;
+
+        // Use the actual audio property to determine state, avoiding React state race conditions
+        const isActuallyPaused = audio.paused;
+
+        if (!isActuallyPaused) {
+            audio.pause();
             beatRef.current?.pause();
             onBeatPlaybackChange?.(false);
             setIsPlaying(false);
         } else {
-            audioRef.current.play().catch(console.error);
+            audio.play().catch(console.error);
             if (beatRef.current && beatSrc) {
-                let beatTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
+                let beatTime = audio.currentTime + (selectedSession?.beatOffset ?? 0);
                 
                 // Handle loop wrap-around if looping is active
                 if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
@@ -139,7 +144,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             }
             setIsPlaying(true);
         }
-    }, [isPlaying, beatSrc, beatMuted, localVolume, selectedSession?.beatOffset, onBeatPlaybackChange, isBeatLooping, beatLoopStart, beatLoopEnd]);
+    }, [beatSrc, beatMuted, localVolume, selectedSession?.beatOffset, onBeatPlaybackChange, isBeatLooping, beatLoopStart, beatLoopEnd]);
 
     // Derived — beat sections drive pills ONLY
     const sections = beat?.sections ?? [];
