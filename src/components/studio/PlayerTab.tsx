@@ -110,8 +110,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [isPlaying, beatSrc, beatVolume, selectedSession?.beatOffset, onBeatPlaybackChange]);
 
-    // Derived — beat sections drive pills, fall back to selected session sections
-    const sections        = beat?.sections ?? selectedSession?.sections ?? [];
+    // Derived — session sections drive pills (vocal splits), fall back to beat sections
+    const sections        = selectedSession?.sections ?? beat?.sections ?? [];
     const activeSectionIdx = sections.findIndex(s => currentTime >= s.startTime && currentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
