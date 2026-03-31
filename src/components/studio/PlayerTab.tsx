@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
@@ -412,6 +412,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
             {/* ── Controls ──────────────────────────────────────────── */}
             <div className="flex items-center justify-center gap-10 py-5">
+                <button
+                    onClick={() => {}}
+                    className="text-white/40 active:opacity-60 transition-opacity"
+                >
+                    <SlidersHorizontal size={26} />
+                </button>
+
                 <button
                     onClick={() => skip(-10)}
                     className="text-white active:opacity-60 transition-opacity"
