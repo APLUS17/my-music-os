@@ -2,8 +2,8 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { RecordingSession, Beat, LyricSection } from '@/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface PlayerTabProps {
@@ -44,9 +44,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const beatRef  = useRef<HTMLAudioElement | null>(null);
     const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const lyricRefs = useRef<(HTMLParagraphElement | null)[]>([]);
 
     const [isPlaying, setIsPlaying]     = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
+    const [beatCurrentTime, setBeatCurrentTime] = useState(0);
     const [duration, setDuration]       = useState(0);
     const [beatMuted, setBeatMuted]     = useState(false);
     const [localVolume, setLocalVolume] = useState(beatVolume);
@@ -56,6 +58,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     useEffect(() => {
         setIsPlaying(false);
         setCurrentTime(0);
+        setBeatCurrentTime(0);
         setDuration(0);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
         if (beatRef.current)  { beatRef.current.pause();  beatRef.current.currentTime  = 0; }
@@ -71,6 +74,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     useEffect(() => {
         setIsPlaying(false);
         setCurrentTime(0);
+        setBeatCurrentTime(0);
         setDuration(0);
         if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
     }, [selectedSession?.id]);
@@ -85,9 +89,24 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const seekTo = useCallback((time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
         if (audioRef.current) audioRef.current.currentTime = clamped;
-        if (beatRef.current)  beatRef.current.currentTime  = clamped + (selectedSession?.beatOffset ?? 0);
+        
+        if (beatRef.current)  {
+            let beatTime = clamped + (selectedSession?.beatOffset ?? 0);
+            
+            // Handle loop wrap-around if looping is active
+            if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+                const loopDuration = beatLoopEnd - beatLoopStart;
+                if (loopDuration > 0) {
+                    const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
+                    beatTime = beatLoopStart + (offsetInLoop < 0 ? offsetInLoop + loopDuration : offsetInLoop);
+                }
+            }
+            
+            beatRef.current.currentTime = beatTime;
+            setBeatCurrentTime(beatTime);
+        }
         setCurrentTime(clamped);
-    }, [duration, selectedSession?.beatOffset]);
+    }, [duration, selectedSession?.beatOffset, isBeatLooping, beatLoopStart, beatLoopEnd]);
 
     const skip = useCallback((delta: number) => seekTo(currentTime + delta), [currentTime, seekTo]);
 
@@ -101,55 +120,48 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         } else {
             audioRef.current.play().catch(console.error);
             if (beatRef.current && beatSrc) {
-                beatRef.current.currentTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
+                let beatTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
+                
+                // Handle loop wrap-around if looping is active
+                if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+                    const loopDuration = beatLoopEnd - beatLoopStart;
+                    if (loopDuration > 0) {
+                        const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
+                        beatTime = beatLoopStart + (offsetInLoop < 0 ? offsetInLoop + loopDuration : offsetInLoop);
+                    }
+                }
+
+                beatRef.current.currentTime = beatTime;
+                setBeatCurrentTime(beatTime);
                 beatRef.current.volume = beatMuted ? 0 : localVolume;
                 beatRef.current.play().catch(console.error);
                 onBeatPlaybackChange?.(true);
             }
             setIsPlaying(true);
         }
-    }, [isPlaying, beatSrc, beatVolume, selectedSession?.beatOffset, onBeatPlaybackChange]);
+    }, [isPlaying, beatSrc, beatMuted, localVolume, selectedSession?.beatOffset, onBeatPlaybackChange, isBeatLooping, beatLoopStart, beatLoopEnd]);
 
-    // Derived — beat sections drive pills, fall back to selected session sections
-    const sections        = beat?.sections ?? selectedSession?.sections ?? [];
-    const activeSectionIdx = sections.findIndex(s => currentTime >= s.startTime && currentTime < s.endTime);
+    // Derived — beat sections drive pills ONLY
+    const sections = beat?.sections ?? [];
+    const activeSectionIdx = sections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-    // Build flat lyric lines from project lyrics for auto-scroll display
-    interface LyricLine { text: string; sectionType: string; isHeader: boolean }
-    const lyricLines = useMemo((): LyricLine[] => {
-        if (!lyrics || lyrics.length === 0) return [] as LyricLine[];
-        const lines: LyricLine[] = [];
-        for (const section of lyrics) {
-            // Add section header
-            lines.push({ text: section.type.toUpperCase(), sectionType: section.type, isHeader: true });
-            // Add each non-empty line of lyrics
-            const textLines = section.text.split('\n').filter((l: string) => l.trim().length > 0);
-            for (const line of textLines) {
-                lines.push({ text: line, sectionType: section.type, isHeader: false });
-            }
-        }
-        return lines;
-    }, [lyrics]);
-
-    // Calculate which lyric line is active based on current time distributed across the duration
-    const contentLinesCount = lyricLines.filter((l: LyricLine) => !l.isHeader).length;
+    // Real transcription lines
+    const transcriptionLines = selectedSession?.lines || [];
     const activeLyricIdx = useMemo(() => {
-        if (contentLinesCount === 0 || duration <= 0) return -1;
-        const timePerLine = duration / contentLinesCount;
-        return Math.min(Math.floor(currentTime / timePerLine), contentLinesCount - 1);
-    }, [contentLinesCount, currentTime, duration]);
+        if (transcriptionLines.length === 0) return -1;
+        
+        // Find line where current time falls within bounds
+        const idx = transcriptionLines.findIndex(l => currentTime >= l.startTime && currentTime < l.endTime);
+        if (idx !== -1) return idx;
 
-    // Map activeLyricIdx (content-only) back to lyricLines index (includes headers)
-    const activeLyricLineIdx = useMemo(() => {
-        if (activeLyricIdx < 0) return -1;
-        let contentCount = -1;
-        for (let i = 0; i < lyricLines.length; i++) {
-            if (!lyricLines[i].isHeader) contentCount++;
-            if (contentCount === activeLyricIdx) return i;
+        // If we passed the last line, keep the last one active
+        if (currentTime >= transcriptionLines[transcriptionLines.length - 1].endTime) {
+            return transcriptionLines.length - 1;
         }
+
         return -1;
-    }, [activeLyricIdx, lyricLines]);
+    }, [transcriptionLines, currentTime]);
 
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
@@ -161,6 +173,16 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             });
         }
     }, [activeSectionIdx]);
+
+    // Auto-scroll active lyric
+    useEffect(() => {
+        if (activeLyricIdx >= 0) {
+            lyricRefs.current[activeLyricIdx]?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        }
+    }, [activeLyricIdx]);
 
     if (!session) {
         return (
@@ -185,8 +207,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     ref={beatRef}
                     src={beatSrc}
                     onTimeUpdate={e => {
+                        const time = e.currentTarget.currentTime;
+                        setBeatCurrentTime(time);
                         if (isBeatLooping && beatLoopStart != null && beatLoopEnd != null) {
-                            if (e.currentTarget.currentTime >= beatLoopEnd) {
+                            if (time >= beatLoopEnd) {
                                 e.currentTarget.currentTime = beatLoopStart;
                             }
                         }
@@ -196,8 +220,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div className="flex-1 overflow-hidden px-6 pt-10 pb-4 flex flex-col justify-end">
-                {lyricLines.length === 0 ? (
-                    // Empty state: no lyrics written yet
+                {transcriptionLines.length === 0 ? (
+                    // Loading / Empty state
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
                             <motion.div
@@ -217,47 +241,47 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             />
                         </div>
                         <p className="text-white/40 text-sm text-center max-w-xs">
-                            No lyrics written yet. Write your lyrics in the Studio to see them scroll here.
+                            {selectedSession?.transcription ? "Processing lyrics..." : "No lyrics detected in this recording."}
                         </p>
                     </div>
                 ) : (
-                    // Lyrics display: actual written lyrics, line by line with auto-scroll
-                    <div className="flex flex-col gap-2">
-                        {lyricLines.map((line, i) => {
-                            const offset = i - (activeLyricLineIdx < 0 ? 0 : activeLyricLineIdx);
-                            // Only render lines near the active one for performance
-                            if (Math.abs(offset) > 4) return null;
+                    // Apple Music Style Lyrics
+                    <div className="flex flex-col gap-6 overflow-y-auto scrollbar-hide py-[20vh]">
+                        {transcriptionLines.map((line, i) => {
+                            const offset = i - activeLyricIdx;
+                            // Only render near lines
+                            if (Math.abs(offset) > 5) return null;
 
-                            if (line.isHeader) {
-                                // Section header (VERSE, CHORUS, etc.)
-                                const isNearActive = Math.abs(offset) <= 1;
-                                return (
-                                    <motion.p
-                                        key={`header-${i}`}
-                                        className="text-left text-[var(--accent)] uppercase tracking-widest"
-                                        style={{ fontSize: '0.65rem', letterSpacing: '0.2em' }}
-                                        animate={{ opacity: isNearActive ? 0.7 : 0.15 }}
-                                        transition={{ duration: 0.3 }}
-                                    >
-                                        {line.text}
-                                    </motion.p>
-                                );
+                            const isActive = i === activeLyricIdx;
+                            
+                            // Visual properties based on offset
+                            let opacity = 0.08;
+                            let fontSize = '1rem';
+                            let fontWeight = 400;
+
+                            if (isActive) {
+                                opacity = 1;
+                                fontSize = '1.75rem';
+                                fontWeight = 600;
+                            } else if (offset === -1) { // Just sang
+                                opacity = 0.45;
+                                fontSize = '1.2rem';
+                            } else if (offset === 1) { // Coming next
+                                opacity = 0.35;
+                                fontSize = '1.1rem';
+                            } else if (Math.abs(offset) === 2) {
+                                opacity = 0.18;
+                                fontSize = '1rem';
                             }
 
-                            const isActive = i === activeLyricLineIdx;
-                            const opacity = isActive
-                                ? 1
-                                : offset === 1 ? 0.5
-                                : offset === -1 ? 0.35
-                                : offset === 2 ? 0.25
-                                : 0.12;
                             return (
                                 <motion.p
                                     key={`line-${i}`}
-                                    className="text-left font-bold text-white leading-tight"
-                                    style={{ fontSize: isActive ? '1.75rem' : '1.25rem', lineHeight: 1.2 }}
+                                    ref={el => { lyricRefs.current[i] = el; }}
+                                    className="text-left text-white leading-tight cursor-pointer transition-all duration-500"
+                                    style={{ fontSize, fontWeight }}
                                     animate={{ opacity }}
-                                    transition={{ duration: 0.3 }}
+                                    onClick={() => seekTo(line.startTime)}
                                 >
                                     {line.text}
                                 </motion.p>
@@ -287,8 +311,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 </div>
             )}
 
-            {/* ── Section pills ──────────────────────────────────────── */}
-            {sections.length > 0 && (
+            {/* ── Section pills — Beat Mode Only ────────────────────── */}
+            {beat && sections.length > 0 && (
                 <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
                     {sections.map((sec, i) => {
                         const isActive = i === activeSectionIdx;
@@ -308,7 +332,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 </motion.span>
                                 <button
                                     onClick={() => {
-                                        seekTo(sec.startTime);
+                                        const vocalTime = sec.startTime - (selectedSession?.beatOffset ?? 0);
+                                        seekTo(Math.max(0, vocalTime));
                                         onSetLoopRegion?.(sec.startTime, sec.endTime);
                                     }}
                                     className={cn(

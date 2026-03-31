@@ -6,6 +6,7 @@ interface SplitOptions {
     minSilenceDuration?: number; // in seconds (1.0 default)
     loopStart?: number;
     loopEnd?: number;
+    startOffset?: number; // Beat currentTime when recording started
     isLoopSession?: boolean;
     passCount?: number;
 }
@@ -20,6 +21,7 @@ export const analyzeAudioAndSplit = async (
         isLoopSession = false,
         loopStart = 0,
         loopEnd = 0,
+        startOffset = 0,
         passCount = 1
     } = options;
 
@@ -33,8 +35,8 @@ export const analyzeAudioAndSplit = async (
 
     // Helper to classify a chunk of audio
     const classifySection = (start: number, end: number): 'vocal' | 'instrumental' | 'speech' => {
-        const startIdx = Math.floor(start * sampleRate);
-        const endIdx = Math.floor(end * sampleRate);
+        const startIdx = Math.max(0, Math.floor(start * sampleRate));
+        const endIdx = Math.min(channelData.length, Math.floor(end * sampleRate));
         const data = channelData.slice(startIdx, endIdx);
 
         if (data.length === 0) return 'vocal';
@@ -69,11 +71,6 @@ export const analyzeAudioAndSplit = async (
         const meanEnergy = sum / energies.length;
         const energyVar = (sumSq / energies.length) - (meanEnergy * meanEnergy);
 
-        // Heuristics:
-        // - Speech: High ZCR (sibilance), High Energy Variance (transients/pauses)
-        // - Singing: Lower ZCR than speech, Lower Energy Variance (more sustained notes)
-        // - Instrumental: Very low ZCR (often dominated by bass/low freq), Very low variance or very structured
-
         if (zcr > 0.15) return 'speech';
         if (energyVar > 0.02) return 'speech'; // Transients
         if (zcr < 0.05 && energyVar < 0.01) return 'instrumental';
@@ -84,24 +81,41 @@ export const analyzeAudioAndSplit = async (
     // LOOP MODE: Level 2 Split
     if (isLoopSession && loopEnd > loopStart) {
         const loopDuration = loopEnd - loopStart;
-        const passes = Math.max(1, passCount);
+        
+        // The first pass might be shorter if we started recording mid-loop
+        const firstPassRemaining = Math.max(0, loopEnd - startOffset);
+        
+        let currentVocalTime = 0;
+        let passIndex = 0;
 
-        for (let i = 0; i < passes; i++) {
-            const passStartTime = i * loopDuration;
-            let passEndTime = passStartTime + loopDuration;
-            if (passEndTime > duration) passEndTime = duration;
+        while (currentVocalTime < duration) {
+            const currentPassDuration = passIndex === 0 ? firstPassRemaining : loopDuration;
+            
+            if (currentPassDuration <= 0) {
+                // Should not happen with valid loopEnd/startOffset, but safety first
+                break;
+            }
 
+            const passEndTime = Math.min(duration, currentVocalTime + currentPassDuration);
+            
             sections.push({
                 id: randomId(),
-                startTime: passStartTime,
+                startTime: currentVocalTime,
                 endTime: passEndTime,
-                loopPass: i + 1,
-                type: classifySection(passStartTime, passEndTime),
-                isBest: i === passes - 1,
+                loopPass: passIndex + 1,
+                type: classifySection(currentVocalTime, passEndTime),
+                label: `Pass ${passIndex + 1}`,
+                isBest: false,
                 isFavorited: false
             });
 
-            if (passEndTime >= duration) break;
+            currentVocalTime = passEndTime;
+            passIndex++;
+        }
+        
+        // Mark last pass as best by default in loop mode
+        if (sections.length > 0) {
+            sections[sections.length - 1].isBest = true;
         }
     }
     // LINEAR MODE: Level 1 Split (Energy Thresholding)

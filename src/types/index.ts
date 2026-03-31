@@ -37,6 +37,12 @@ export interface AutoSection {
     sentToLyricsId?: string;     // links to a LyricSection if committed
 }
 
+export interface TranscriptionLine {
+    text: string;
+    startTime: number;  // seconds from start of vocal recording
+    endTime: number;
+}
+
 // Vocal layer for multi-track recording (Ableton-style take lanes)
 export interface RecordingLayer {
     id: string;
@@ -59,6 +65,7 @@ export interface RecordingSession {
     base64?: string; // Persisted data
     audioUrl?: string; // URL to the blob for playback (ephemeral)
     transcription?: string;
+    lines?: TranscriptionLine[]; // per-line transcription with timestamps
     bpm?: number;
     sections: AutoSection[];
     duration?: number;

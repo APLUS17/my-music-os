@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 export interface AudioAnalysisResult {
-    sections: {
+    sections?: {
         startTime: number;
         endTime: number;
         type: 'vocal' | 'instrumental' | 'speech' | 'silence';
@@ -9,6 +9,11 @@ export interface AudioAnalysisResult {
         emojiTag?: string;
     }[];
     transcription?: string;
+    lines?: {
+        text: string;
+        startTime: number;
+        endTime: number;
+    }[];
 }
 
 /**
@@ -27,7 +32,7 @@ const stripDataUrlPrefix = (dataUrl: string): { mimeType: string; data: string }
 };
 
 /**
- * Analyze audio with Gemini AI for section classification, BPM, and transcription.
+ * Analyze audio with Gemini AI for line-by-line transcription.
  * Uses lazy initialization of the GenAI client to avoid module-level crashes
  * when the API key env var isn't yet available in the client bundle.
  */
@@ -41,16 +46,16 @@ export const analyzeAudioWithGemini = async (audioBase64: string): Promise<Audio
     // Strip data URL prefix if present
     const { mimeType, data } = stripDataUrlPrefix(audioBase64);
 
-    const prompt = `Analyze this songwriting session audio recording. Provide:
-1. SECTIONS: Identify distinct musical sections with timestamps (start/end in seconds). Classify each as: vocal, instrumental, speech, or silence.
-2. LABELS & TAGS: For each section, provide a short descriptive label (e.g., "verse melody", "guitar riff", "spoken idea") and a relevant emoji tag (🎤 for vocal, 🎸 for instrumental, 💬 for speech, 🔇 for silence).
-3. TRANSCRIPTION: Provide a combined transcript of any spoken or sung words. If none, set to empty string.
-
-Return ONLY a JSON object with this exact structure:
+    const prompt = `Transcribe the vocals or speech in this audio recording.
+Return ONLY a JSON object:
 {
-  "sections": [{"startTime": 0.0, "endTime": 1.5, "type": "vocal", "label": "verse idea", "emojiTag": "🎤"}],
-  "transcription": "the words spoken or sung"
-}`;
+  "transcription": "full plain text of everything sung/spoken",
+  "lines": [
+    { "text": "line of lyrics here", "startTime": 0.0, "endTime": 2.1 }
+  ]
+}
+Split on natural phrasing/breath breaks. Times are seconds from audio start.
+If no vocals detected, return { "transcription": "", "lines": [] }.`;
 
     try {
         const genAI = new GoogleGenAI({ apiKey });
@@ -74,13 +79,9 @@ Return ONLY a JSON object with this exact structure:
         const resultText = response.text;
         if (resultText) {
             const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            if (!parsed.sections || !Array.isArray(parsed.sections)) {
-                console.warn("[AudioIntelligence] Invalid response structure");
-                return null;
-            }
-            console.log("[AudioIntelligence] Analysis complete:", {
-                sections: parsed.sections.length,
-                hasTranscription: !!parsed.transcription
+            console.log("[AudioIntelligence] Vocal analysis complete:", {
+                hasTranscription: !!parsed.transcription,
+                lineCount: parsed.lines?.length || 0
             });
             return parsed;
         }

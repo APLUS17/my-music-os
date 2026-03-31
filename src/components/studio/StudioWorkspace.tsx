@@ -550,6 +550,7 @@ const StudioWorkspace: React.FC = () => {
                 isLoopSession,
                 loopStart: beatLoopStart || 0,
                 loopEnd: beatLoopEnd || 0,
+                startOffset: compensatedOffset || 0,
                 passCount: Math.ceil(passes)
             });
         } catch (err) {
@@ -606,18 +607,7 @@ const StudioWorkspace: React.FC = () => {
                                 return {
                                     ...s,
                                     transcription: aiResult.transcription || s.transcription,
-                                    sections: aiResult.sections.length > 0
-                                        ? aiResult.sections.map(ais => ({
-                                            id: randomId(),
-                                            startTime: ais.startTime,
-                                            endTime: ais.endTime,
-                                            type: ais.type,
-                                            label: ais.label,
-                                            emojiTag: ais.emojiTag,
-                                            isBest: false,
-                                            isFavorited: false
-                                        }))
-                                        : s.sections
+                                    lines: aiResult.lines || s.lines
                                 };
                             }
                             return s;
