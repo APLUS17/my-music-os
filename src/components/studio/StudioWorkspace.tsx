@@ -865,9 +865,45 @@ const StudioWorkspace: React.FC = () => {
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
+        setUploadedBeatId(beat.id);
         setActiveProjectId(null);
         setViewMode('studio');
         setStudioMode('flow');
+
+        // If this beat has no sections yet, analyze it now
+        if (!beat.sections?.length) {
+            (async () => {
+                try {
+                    const b64 = beat.base64 || await getAudioData(beat.id);
+                    if (!b64) return;
+                    const blob = await base64ToBlob(b64);
+                    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                    const audioBuffer = await audioCtx.decodeAudioData(await blob.arrayBuffer());
+                    const rawSections = await analyzeAudioAndSplit(audioBuffer);
+                    setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: rawSections } : b));
+                    audioCtx.close();
+                    if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && b64) {
+                        analyzeInstrumentalWithGemini(b64).then(result => {
+                            if (result?.sections?.length) {
+                                const aiSections: AutoSection[] = result.sections.map(s => ({
+                                    id: randomId(),
+                                    startTime: s.startTime,
+                                    endTime: s.endTime,
+                                    type: s.type,
+                                    label: s.label,
+                                    emojiTag: s.emojiTag,
+                                    isBest: false,
+                                    isFavorited: false,
+                                }));
+                                setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error('Beat analysis failed', e);
+                }
+            })();
+        }
     };
 
     const handleLibraryBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
