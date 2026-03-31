@@ -94,7 +94,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             let beatTime = clamped + (selectedSession?.beatOffset ?? 0);
             
             // Handle loop wrap-around if looping is active
-            if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+            if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
                 const loopDuration = beatLoopEnd - beatLoopStart;
                 if (loopDuration > 0) {
                     const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
@@ -123,7 +123,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 let beatTime = audioRef.current.currentTime + (selectedSession?.beatOffset ?? 0);
                 
                 // Handle loop wrap-around if looping is active
-                if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+                if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
                     const loopDuration = beatLoopEnd - beatLoopStart;
                     if (loopDuration > 0) {
                         const offsetInLoop = (beatTime - beatLoopStart) % loopDuration;
@@ -209,7 +209,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     onTimeUpdate={e => {
                         const time = e.currentTarget.currentTime;
                         setBeatCurrentTime(time);
-                        if (isBeatLooping && beatLoopStart != null && beatLoopEnd != null) {
+                        if (isBeatLooping && typeof beatLoopStart === 'number' && typeof beatLoopEnd === 'number') {
                             if (time >= beatLoopEnd) {
                                 e.currentTarget.currentTime = beatLoopStart;
                             }
