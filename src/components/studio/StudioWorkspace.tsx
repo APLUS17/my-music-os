@@ -675,9 +675,6 @@ const StudioWorkspace: React.FC = () => {
                 }).catch(err => {
                     console.error("AI refinement failed:", err);
                 });
-            } else {
-                // No toast message here anymore
-            }
         }
     };
 
@@ -1408,6 +1405,7 @@ const StudioWorkspace: React.FC = () => {
                             {activeTab === 'player' && (
                                 <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
                                     <PlayerTab
+                                        projectTitle={projectTitle || "Untitled Project"}
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                         sessions={sessions}
                                         beat={beats.find(b => b.id === uploadedBeatId) ?? null}
@@ -1427,6 +1425,7 @@ const StudioWorkspace: React.FC = () => {
                                         duration={duration}
                                         onTogglePlay={togglePlayback}
                                         onSeek={seekTo}
+                                        onSelectSession={setActiveSessionId}
 
                                         onBeatPlaybackChange={(isP) => {
                                             if (isP && isBeatPlaying && beatAudioRef.current) {
