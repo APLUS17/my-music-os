@@ -92,7 +92,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
-        const lookaheadTime = currentTime + 0.1;
+        const lookaheadTime = currentTime + 0.05;
         const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
         if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
@@ -101,16 +101,76 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return -1;
     }, [displayLines, currentTime]);
 
+    const verticalScrollRaf = useRef<number | null>(null);
+    const horizontalScrollRaf = useRef<number | null>(null);
+
+    const smoothScroll = useCallback((
+        element: HTMLElement,
+        targetPosition: number,
+        duration: number,
+        direction: 'vertical' | 'horizontal'
+    ) => {
+        const startPosition = direction === 'vertical' ? element.scrollTop : element.scrollLeft;
+        const distance = targetPosition - startPosition;
+        const startTime = performance.now();
+
+        const rafRef = direction === 'vertical' ? verticalScrollRaf : horizontalScrollRaf;
+
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+        }
+
+        const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+        const step = (time: number) => {
+            const elapsed = time - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const ease = easeOutCubic(progress);
+
+            const currentPosition = startPosition + distance * ease;
+
+            if (direction === 'vertical') {
+                element.scrollTop = currentPosition;
+            } else {
+                element.scrollLeft = currentPosition;
+            }
+
+            if (progress < 1) {
+                rafRef.current = requestAnimationFrame(step);
+            } else {
+                rafRef.current = null;
+            }
+        };
+
+        rafRef.current = requestAnimationFrame(step);
+    }, []);
+
+    // Clean up animation frames on unmount
+    useEffect(() => {
+        return () => {
+            if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
+            if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
+        };
+    }, []);
+
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
         if (activeSectionIdx >= 0) {
-            pillRefs.current[activeSectionIdx]?.scrollIntoView({
-                behavior: 'smooth',
-                inline: 'center',
-                block: 'nearest',
-            });
+            const pillElement = pillRefs.current[activeSectionIdx];
+            if (pillElement) {
+                const parent = pillElement.parentElement;
+                if (parent) {
+                    const pillRect = pillElement.getBoundingClientRect();
+                    const parentRect = parent.getBoundingClientRect();
+                    const pillCenter = pillRect.left + pillRect.width / 2;
+                    const parentCenter = parentRect.left + parentRect.width / 2;
+                    const scrollTarget = parent.scrollLeft + (pillCenter - parentCenter);
+
+                    smoothScroll(parent, scrollTarget, 300, 'horizontal');
+                }
+            }
         }
-    }, [activeSectionIdx]);
+    }, [activeSectionIdx, smoothScroll]);
 
     // Auto-scroll active lyric
     useEffect(() => {
@@ -119,19 +179,20 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             if (element) {
                 const parent = element.parentElement;
                 if (parent) {
-                    const elementTop = element.offsetTop;
-                    const elementHeight = element.offsetHeight;
-                    const parentHeight = parent.clientHeight;
-                    const scrollTarget = elementTop - (parentHeight / 2) + (elementHeight / 2);
+                    const elementRect = element.getBoundingClientRect();
+                    const parentRect = parent.getBoundingClientRect();
 
-                    parent.scrollTo({
-                        top: scrollTarget,
-                        behavior: 'smooth',
-                    });
+                    // Slightly above center (35% from the top)
+                    const targetY = parentRect.top + parentRect.height * 0.35;
+                    const elementCenterY = elementRect.top + elementRect.height / 2;
+
+                    const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
+
+                    smoothScroll(parent, scrollTarget, 300, 'vertical');
                 }
             }
         }
-    }, [activeLyricIdx]);
+    }, [activeLyricIdx, smoothScroll]);
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
