@@ -189,7 +189,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
                     const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
 
-                    smoothScroll(parent, scrollTarget, 400, 'vertical');
+                    smoothScroll(parent, scrollTarget, 500, 'vertical');
                 }
             }
         }
@@ -249,7 +249,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col justify-end relative">
+            <div className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative">
                 {displayLines.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
@@ -262,23 +262,23 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[30vh] mask-fade-edges" style={{ scrollBehavior: 'smooth' }}>
+                    <div className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[20vh] mask-fade-edges" style={{ scrollBehavior: 'smooth' }}>
                         {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
                             const isFuture = i > activeLyricIdx;
                             const distance = Math.abs(i - activeLyricIdx);
                             
-                            let opacity = 0.08; let scale = 0.94; let blur = '3px';
+                            let opacity = 0.15; let scale = 0.96; let blur = '2px';
 
                             if (isActive) { opacity = 1; scale = 1.05; blur = '0px'; }
                             else if (isPast) {
-                                if (distance === 1) { opacity = 0.35; scale = 0.98; blur = '1px'; }
-                                else { opacity = 0.15; scale = 0.96; blur = '2px'; }
+                                if (distance === 1) { opacity = 0.45; scale = 0.98; blur = '0px'; }
+                                else { opacity = 0.25; scale = 0.96; blur = '0.5px'; }
                             } else if (isFuture) {
-                                if (distance === 1) { opacity = 0.25; scale = 1; blur = '2px'; }
-                                else if (distance === 2) { opacity = 0.12; scale = 0.98; blur = '2.5px'; }
-                                else { opacity = 0.05; scale = 0.95; blur = '4px'; }
+                                if (distance === 1) { opacity = 0.4; scale = 1; blur = '1.2px'; }
+                                else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = '2.2px'; }
+                                else { opacity = 0.12; scale = 0.95; blur = '3.5px'; }
                             }
                             if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = '2px'; }
 
@@ -301,9 +301,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         })}
                     </div>
                 )}
-                
-                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
             </div>
 
             {/* ── Section pills — beat only ──────────────────────────── */}
