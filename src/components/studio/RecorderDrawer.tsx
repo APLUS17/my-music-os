@@ -143,9 +143,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   useEffect(() => {
     if (autoStart) {
       startRecording();
+    } else if (!isMinimized) {
+      // Traditional browser recording pattern: prompt for microphone
+      // permissions and initialize as soon as the drawer opens
+      initializeMic().catch(console.error);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, isMinimized]);
 
   // --- Visualizer & Canvas Logic ---
   useEffect(() => {
@@ -528,8 +532,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (layerMode) {
         stopLayerPlayback();
       }
-      // Release mic immediately if not monitoring — kills the browser mic indicator
-      if (!isMonitoring) stopMicStream();
+      // Keep mic active for SpectralEQ unless the user discards or closes drawer
     }
   };
 
@@ -719,7 +722,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         setIsMonitoring(true);
                       } else {
                         setIsMonitoring(false);
-                        if (!isRecording) stopMicStream();
+                        // Do NOT stop mic stream so the Spectral EQ stays active
                       }
                     }}
                   >
