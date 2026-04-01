@@ -88,6 +88,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const [micSource, setMicSource] = useState<MediaStreamAudioSourceNode | null>(null);
   const monitorGainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -445,8 +446,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       merger.connect(monitorGain);
       monitorGainRef.current = monitorGain;
 
+      // Create a destination node for recording the merged stereo signal
+      const destination = audioCtx.createMediaStreamDestination();
+      merger.connect(destination);
+      recordingStreamRef.current = destination.stream;
+
       setAudioCtxReady(true);
-      return { stream, audioCtx, source, monitorGain };
+      return { stream, audioCtx, source, monitorGain, recordingStream: destination.stream };
     } catch (err) {
       console.error("Error accessing microphone:", err);
       throw err;
@@ -462,7 +468,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       const activeCtx = audioContext ?? micResult?.audioCtx;
       if (!activeCtx) return;
 
-      const mediaRecorder = new MediaRecorder(streamRef.current);
+      const streamToRecord = recordingStreamRef.current ?? micResult?.recordingStream;
+      if (!streamToRecord) return;
+
+      const mediaRecorder = new MediaRecorder(streamToRecord);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       peaksRef.current = [];
