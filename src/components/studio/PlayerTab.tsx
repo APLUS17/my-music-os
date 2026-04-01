@@ -182,13 +182,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     const elementRect = element.getBoundingClientRect();
                     const parentRect = parent.getBoundingClientRect();
 
-                    // Slightly above center (35% from the top)
-                    const targetY = parentRect.top + parentRect.height * 0.35;
+                    // Closer to the vertical center (50% from the top)
+                    // This ensures the active text is completely clear of the top gradient
+                    const targetY = parentRect.top + parentRect.height * 0.5;
                     const elementCenterY = elementRect.top + elementRect.height / 2;
 
                     const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
 
-                    smoothScroll(parent, scrollTarget, 300, 'vertical');
+                    smoothScroll(parent, scrollTarget, 400, 'vertical');
                 }
             }
         }
