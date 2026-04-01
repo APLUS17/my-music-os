@@ -88,6 +88,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const [micSource, setMicSource] = useState<MediaStreamAudioSourceNode | null>(null);
   const monitorGainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,9 +143,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   useEffect(() => {
     if (autoStart) {
       startRecording();
+    } else if (!isMinimized) {
+      // Traditional browser recording pattern: prompt for microphone
+      // permissions and initialize as soon as the drawer opens
+      initializeMic().catch(console.error);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, isMinimized]);
 
   // --- Visualizer & Canvas Logic ---
   useEffect(() => {
@@ -445,8 +450,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       merger.connect(monitorGain);
       monitorGainRef.current = monitorGain;
 
+      // Create a destination node for recording the merged stereo signal
+      const destination = audioCtx.createMediaStreamDestination();
+      merger.connect(destination);
+      recordingStreamRef.current = destination.stream;
+
       setAudioCtxReady(true);
-      return { stream, audioCtx, source, monitorGain };
+      return { stream, audioCtx, source, monitorGain, recordingStream: destination.stream };
     } catch (err) {
       console.error("Error accessing microphone:", err);
       throw err;
@@ -462,7 +472,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       const activeCtx = audioContext ?? micResult?.audioCtx;
       if (!activeCtx) return;
 
-      const mediaRecorder = new MediaRecorder(streamRef.current);
+      const streamToRecord = recordingStreamRef.current ?? micResult?.recordingStream;
+      if (!streamToRecord) return;
+
+      const mediaRecorder = new MediaRecorder(streamToRecord);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       peaksRef.current = [];
@@ -519,8 +532,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (layerMode) {
         stopLayerPlayback();
       }
-      // Release mic immediately if not monitoring — kills the browser mic indicator
-      if (!isMonitoring) stopMicStream();
+      // Keep mic active for SpectralEQ unless the user discards or closes drawer
     }
   };
 
@@ -710,7 +722,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         setIsMonitoring(true);
                       } else {
                         setIsMonitoring(false);
-                        if (!isRecording) stopMicStream();
+                        // Do NOT stop mic stream so the Spectral EQ stays active
                       }
                     }}
                   >
