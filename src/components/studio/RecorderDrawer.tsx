@@ -89,6 +89,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const monitorGainRef = useRef<GainNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const isInitializingMicRef = useRef(false);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -415,8 +416,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const initializeMic = async () => {
     if (streamRef.current && audioContext) return;
+    if (isInitializingMicRef.current) return;
 
     try {
+      isInitializingMicRef.current = true;
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false, channelCount: 1 },
       });
@@ -460,6 +463,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } catch (err) {
       console.error("Error accessing microphone:", err);
       throw err;
+    } finally {
+      isInitializingMicRef.current = false;
     }
   };
 

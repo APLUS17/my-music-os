@@ -210,7 +210,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             onClick={() => setShowTakeList(!showTakeList)}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95"
                         >
-                            <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessionIdx + 1}</span>
+                            <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessions.length - sessionIdx}</span>
                             <ChevronDown size={14} className={cn("text-white/40 transition-transform duration-300", showTakeList && "rotate-180")} />
                         </button>
 
@@ -236,7 +236,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                                     activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-white/60 hover:bg-white/5"
                                                 )}
                                             >
-                                                <span>Take {i + 1}</span>
+                                                <span>Take {sessions.length - i}</span>
                                                 {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />}
                                             </button>
                                         ))}
@@ -287,6 +287,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
                                     className={cn("text-left cursor-pointer origin-left", isActive ? "text-white" : "text-white/80")}
+                                    style={{ willChange: "transform, filter, opacity" }}
                                     initial={false}
                                     animate={{ opacity, scale, filter: `blur(${blur})` }}
                                     transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
@@ -398,7 +399,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
                 <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
-                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer accent-white touch-none
+                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer accent-white
                     [&::-webkit-slider-runnable-track]:h-full [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent
                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
                     [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
