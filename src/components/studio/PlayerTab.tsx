@@ -103,6 +103,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const verticalScrollRaf = useRef<number | null>(null);
     const horizontalScrollRaf = useRef<number | null>(null);
+    const scrollDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const smoothScroll = useCallback((
         element: HTMLElement,
@@ -150,6 +151,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return () => {
             if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
             if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
+            if (scrollDelayTimer.current !== null) clearTimeout(scrollDelayTimer.current);
         };
     }, []);
 
@@ -174,24 +176,32 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     // Auto-scroll active lyric
     useEffect(() => {
+        if (scrollDelayTimer.current !== null) {
+            clearTimeout(scrollDelayTimer.current);
+            scrollDelayTimer.current = null;
+        }
+
         if (activeLyricIdx >= 0) {
-            const element = lyricRefs.current[activeLyricIdx];
-            if (element) {
-                const parent = element.parentElement;
-                if (parent) {
-                    const elementRect = element.getBoundingClientRect();
-                    const parentRect = parent.getBoundingClientRect();
+            scrollDelayTimer.current = setTimeout(() => {
+                const element = lyricRefs.current[activeLyricIdx];
+                if (element) {
+                    const parent = element.parentElement;
+                    if (parent) {
+                        const elementRect = element.getBoundingClientRect();
+                        const parentRect = parent.getBoundingClientRect();
 
-                    // Closer to the vertical center (50% from the top)
-                    // This ensures the active text is completely clear of the top gradient
-                    const targetY = parentRect.top + parentRect.height * 0.5;
-                    const elementCenterY = elementRect.top + elementRect.height / 2;
+                        // Closer to the vertical center (50% from the top)
+                        // This ensures the active text is completely clear of the top gradient
+                        const targetY = parentRect.top + parentRect.height * 0.5;
+                        const elementCenterY = elementRect.top + elementRect.height / 2;
 
-                    const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
+                        const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
 
-                    smoothScroll(parent, scrollTarget, 400, 'vertical');
+                        smoothScroll(parent, scrollTarget, 650, 'vertical');
+                    }
                 }
-            }
+                scrollDelayTimer.current = null;
+            }, 200);
         }
     }, [activeLyricIdx, smoothScroll]);
 
@@ -290,7 +300,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     style={{ willChange: "transform, filter, opacity" }}
                                     initial={false}
                                     animate={{ opacity, scale, filter: `blur(${blur})` }}
-                                    transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                                    transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
                                     <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : "")}>
