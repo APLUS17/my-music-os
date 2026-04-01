@@ -92,7 +92,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
-        const lookaheadTime = currentTime + 0.1;
+        const lookaheadTime = currentTime + 0.05;
         const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
         if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
@@ -101,16 +101,76 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return -1;
     }, [displayLines, currentTime]);
 
+    const verticalScrollRaf = useRef<number | null>(null);
+    const horizontalScrollRaf = useRef<number | null>(null);
+
+    const smoothScroll = useCallback((
+        element: HTMLElement,
+        targetPosition: number,
+        duration: number,
+        direction: 'vertical' | 'horizontal'
+    ) => {
+        const startPosition = direction === 'vertical' ? element.scrollTop : element.scrollLeft;
+        const distance = targetPosition - startPosition;
+        const startTime = performance.now();
+
+        const rafRef = direction === 'vertical' ? verticalScrollRaf : horizontalScrollRaf;
+
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+        }
+
+        const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+        const step = (time: number) => {
+            const elapsed = time - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const ease = easeOutCubic(progress);
+
+            const currentPosition = startPosition + distance * ease;
+
+            if (direction === 'vertical') {
+                element.scrollTop = currentPosition;
+            } else {
+                element.scrollLeft = currentPosition;
+            }
+
+            if (progress < 1) {
+                rafRef.current = requestAnimationFrame(step);
+            } else {
+                rafRef.current = null;
+            }
+        };
+
+        rafRef.current = requestAnimationFrame(step);
+    }, []);
+
+    // Clean up animation frames on unmount
+    useEffect(() => {
+        return () => {
+            if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
+            if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
+        };
+    }, []);
+
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
         if (activeSectionIdx >= 0) {
-            pillRefs.current[activeSectionIdx]?.scrollIntoView({
-                behavior: 'smooth',
-                inline: 'center',
-                block: 'nearest',
-            });
+            const pillElement = pillRefs.current[activeSectionIdx];
+            if (pillElement) {
+                const parent = pillElement.parentElement;
+                if (parent) {
+                    const pillRect = pillElement.getBoundingClientRect();
+                    const parentRect = parent.getBoundingClientRect();
+                    const pillCenter = pillRect.left + pillRect.width / 2;
+                    const parentCenter = parentRect.left + parentRect.width / 2;
+                    const scrollTarget = parent.scrollLeft + (pillCenter - parentCenter);
+
+                    smoothScroll(parent, scrollTarget, 300, 'horizontal');
+                }
+            }
         }
-    }, [activeSectionIdx]);
+    }, [activeSectionIdx, smoothScroll]);
 
     // Auto-scroll active lyric
     useEffect(() => {
@@ -119,19 +179,21 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             if (element) {
                 const parent = element.parentElement;
                 if (parent) {
-                    const elementTop = element.offsetTop;
-                    const elementHeight = element.offsetHeight;
-                    const parentHeight = parent.clientHeight;
-                    const scrollTarget = elementTop - (parentHeight / 2) + (elementHeight / 2);
+                    const elementRect = element.getBoundingClientRect();
+                    const parentRect = parent.getBoundingClientRect();
 
-                    parent.scrollTo({
-                        top: scrollTarget,
-                        behavior: 'smooth',
-                    });
+                    // Closer to the vertical center (50% from the top)
+                    // This ensures the active text is completely clear of the top gradient
+                    const targetY = parentRect.top + parentRect.height * 0.5;
+                    const elementCenterY = elementRect.top + elementRect.height / 2;
+
+                    const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
+
+                    smoothScroll(parent, scrollTarget, 400, 'vertical');
                 }
             }
         }
-    }, [activeLyricIdx]);
+    }, [activeLyricIdx, smoothScroll]);
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
@@ -336,8 +398,12 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
                 <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
                 <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
-                    className="flex-1 h-10 appearance-none bg-transparent rounded-full cursor-pointer accent-white touch-none [&::-webkit-slider-runnable-track]:h-[3px] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-white/20 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:bg-white/20 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-                    style={{ background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.2) 100%)` }}
+                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer accent-white touch-none
+                    [&::-webkit-slider-runnable-track]:h-full [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent
+                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
+                    [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+                    style={{ background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) 100%)` }}
                 />
                 <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
             </div>

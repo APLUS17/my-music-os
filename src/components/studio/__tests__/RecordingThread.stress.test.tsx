@@ -45,6 +45,10 @@ describe('RecordingThread Stress Test', () => {
                 onDeleteSession={onDeleteSession}
                 onUpdateSection={onUpdateSection}
                 onOpenSplitEditor={onOpenSplitEditor}
+                isPlaying={false}
+                currentTime={0}
+                onTogglePlay={vi.fn()}
+                onSeek={vi.fn()}
             />
         );
 
