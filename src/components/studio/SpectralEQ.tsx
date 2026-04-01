@@ -187,7 +187,13 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     };
 
     audio.addEventListener('play', handlePlay);
-    return () => audio.removeEventListener('play', handlePlay);
+    return () => {
+      audio.removeEventListener('play', handlePlay);
+      if (internalAudioCtxRef.current) {
+        internalAudioCtxRef.current.close();
+        internalAudioCtxRef.current = null;
+      }
+    };
   }, [isActive, audioRef, externalSource, initializeAudio]);
 
   // --- Recompute EQ curve in place ---
@@ -258,6 +264,17 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         const sampleRate = audioContext?.sampleRate ?? 44100;
         const nyquist = sampleRate / 2;
 
+        const maxBarHeight = h * 0.6;
+        const lowGrad = ctx2d.createLinearGradient(0, h, 0, h - maxBarHeight);
+        lowGrad.addColorStop(0, COLOR_LOW + 'CC');
+        lowGrad.addColorStop(1, COLOR_LOW + '33');
+        const midGrad = ctx2d.createLinearGradient(0, h, 0, h - maxBarHeight);
+        midGrad.addColorStop(0, COLOR_MID + 'CC');
+        midGrad.addColorStop(1, COLOR_MID + '33');
+        const highGrad = ctx2d.createLinearGradient(0, h, 0, h - maxBarHeight);
+        highGrad.addColorStop(0, COLOR_HIGH + 'CC');
+        highGrad.addColorStop(1, COLOR_HIGH + '33');
+
         for (let i = 0; i < barCount; i++) {
           const freqStart = 20 * Math.pow(20000 / 20, i / barCount);
           const freqEnd = 20 * Math.pow(20000 / 20, (i + 1) / barCount);
@@ -271,18 +288,13 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
             sum += dataArray[j]; count++;
           }
           const magnitude = count > 0 ? sum / count : 0;
-          const barHeight = (magnitude / 255) * h * 0.6;
+          const barHeight = (magnitude / 255) * maxBarHeight;
           const x = i * barWidth;
 
-          let color: string;
-          if (geoMean < 300) color = COLOR_LOW;
-          else if (geoMean < 5000) color = COLOR_MID;
-          else color = COLOR_HIGH;
+          if (geoMean < 300) ctx2d.fillStyle = lowGrad;
+          else if (geoMean < 5000) ctx2d.fillStyle = midGrad;
+          else ctx2d.fillStyle = highGrad;
 
-          const grad = ctx2d.createLinearGradient(x, h, x, h - barHeight);
-          grad.addColorStop(0, color + 'CC');
-          grad.addColorStop(1, color + '33');
-          ctx2d.fillStyle = grad;
           ctx2d.fillRect(x + 1, h - barHeight, barWidth - 2, barHeight);
         }
       } else {
