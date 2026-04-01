@@ -281,7 +281,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             
                             let opacity = 0.15; let scale = 0.96; let blur = '2px';
 
-                            if (isActive) { opacity = 1; scale = 1.05; blur = '0px'; }
+                            if (isActive) { opacity = 1; scale = 1; blur = '0px'; }
                             else if (isPast) {
                                 if (distance === 1) { opacity = 0.45; scale = 0.98; blur = '0px'; }
                                 else { opacity = 0.25; scale = 0.96; blur = '0.5px'; }
@@ -296,7 +296,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
-                                    className={cn("text-left cursor-pointer origin-left", isActive ? "text-white" : "text-white/80")}
+                                    className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
                                     style={{ willChange: "transform, filter, opacity" }}
                                     initial={false}
                                     animate={{ opacity, scale, filter: `blur(${blur})` }}
