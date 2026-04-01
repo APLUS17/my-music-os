@@ -24,7 +24,9 @@ interface PlayerTabProps {
     onClearLoop?: () => void;
     lyrics?: LyricSection[];
     onSelectSession?: (id: string) => void;
-    
+    isAnalyzingVocal?: boolean;
+    isAnalyzingBeat?: boolean;
+
     // Lifted State Props
     isPlaying: boolean;
     currentTime: number;
@@ -57,7 +59,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     onClearLoop,
     lyrics,
     onSelectSession,
-    
+    isAnalyzingVocal,
+    isAnalyzingBeat,
+
     // Lifted
     isPlaying,
     currentTime,
@@ -192,7 +196,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} />
                         </div>
                         <p className="text-white/40 text-sm text-center max-w-xs uppercase tracking-widest font-mono text-[10px]">
-                            {activeSession ? "Syncing transcription..." : "Awaiting first take..."}
+                            {isAnalyzingVocal ? "Transcribing lyrics..." : activeSession ? "Syncing transcription..." : "Awaiting first take..."}
                         </p>
                     </div>
                 ) : (
@@ -239,44 +243,56 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
             </div>
 
-            {/* ── Section pills — Primary Structure ────────────────────── */}
-            {beat && beatSections.length > 0 && (
-                <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
-                    {beatSections.map((sec, i) => {
-                        const isActive = i === activeSectionIdx;
-                        return (
-                            <div
-                                key={sec.id}
-                                ref={el => { pillRefs.current[i] = el; }}
-                                className="flex flex-col items-center shrink-0"
-                                style={{ minWidth: 72 }}
-                            >
-                                <motion.span
-                                    className="text-[var(--accent)] text-xs font-bold mb-1 block"
-                                    animate={{ opacity: isActive ? 1 : 0 }}
-                                    transition={{ duration: 0.2 }}
+            {/* ── Section pills — beat only ──────────────────────────── */}
+            {beat && (
+                isAnalyzingBeat ? (
+                    // Beat sections loading — skeleton pills
+                    <div className="flex gap-3 px-6 pb-2 pt-4 overflow-hidden">
+                        {[80, 64, 96, 72, 88].map((w, i) => (
+                            <div key={i} className="shrink-0 h-8 rounded-xl bg-white/10 animate-pulse" style={{ width: w }} />
+                        ))}
+                    </div>
+                ) : beatSections.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
+                        {beatSections.map((sec, i) => {
+                            const isActive = i === activeSectionIdx;
+                            return (
+                                <div
+                                    key={sec.id}
+                                    ref={el => { pillRefs.current[i] = el; }}
+                                    className="flex flex-col items-center shrink-0"
+                                    style={{ minWidth: 72 }}
                                 >
-                                    →
-                                </motion.span>
-                                <button
-                                    onClick={() => {
-                                        const vocalTime = sec.startTime - (activeSession?.beatOffset ?? 0);
-                                        onSeek(Math.max(0, vocalTime));
-                                        onSetLoopRegion?.(sec.startTime, sec.endTime);
-                                    }}
-                                    className={cn(
-                                        'w-full px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
-                                        isActive
-                                            ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
-                                            : 'border-white/20 text-white/70 bg-white/[0.07]'
-                                    )}
-                                >
-                                    {sec.label || sec.type}
-                                </button>
-                            </div>
-                        );
-                    })}
-                </div>
+                                    <motion.span
+                                        className="text-[var(--accent)] text-xs font-bold mb-1 block"
+                                        animate={{ opacity: isActive ? 1 : 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        →
+                                    </motion.span>
+                                    <button
+                                        onClick={() => {
+                                            const vocalTime = sec.startTime - (activeSession?.beatOffset ?? 0);
+                                            onSeek(Math.max(0, vocalTime));
+                                            // Only update loop region if loop mode is already active
+                                            if (isBeatLooping) {
+                                                onSetLoopRegion?.(sec.startTime, sec.endTime);
+                                            }
+                                        }}
+                                        className={cn(
+                                            'w-full px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
+                                            isActive
+                                                ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
+                                                : 'border-white/20 text-white/70 bg-white/[0.07]'
+                                        )}
+                                    >
+                                        {sec.label || sec.type}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : null
             )}
 
             {/* ── Scrubber ───────────────────────────────────────────── */}

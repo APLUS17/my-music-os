@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 export interface AudioAnalysisResult {
-    sections?: {
+    sections: {
         startTime: number;
         endTime: number;
         type: 'vocal' | 'instrumental' | 'speech' | 'silence';
@@ -9,11 +9,7 @@ export interface AudioAnalysisResult {
         emojiTag?: string;
     }[];
     transcription?: string;
-    lines?: {
-        text: string;
-        startTime: number;
-        endTime: number;
-    }[];
+    lines?: { text: string; startTime: number; endTime: number }[];
 }
 
 /**
@@ -32,7 +28,8 @@ const stripDataUrlPrefix = (dataUrl: string): { mimeType: string; data: string }
 };
 
 /**
- * Analyze audio with Gemini AI for line-by-line transcription.
+ * Transcribe vocal audio with Gemini AI, returning per-line timestamps.
+ * Does NOT detect sections — section detection is only for instrumentals.
  * Uses lazy initialization of the GenAI client to avoid module-level crashes
  * when the API key env var isn't yet available in the client bundle.
  */
@@ -47,15 +44,19 @@ export const analyzeAudioWithGemini = async (audioBase64: string): Promise<Audio
     const { mimeType, data } = stripDataUrlPrefix(audioBase64);
 
     const prompt = `Transcribe the vocals or speech in this audio recording.
-Return ONLY a JSON object:
+
+Return ONLY a JSON object with this exact structure:
 {
-  "transcription": "full plain text of everything sung/spoken",
+  "transcription": "full plain text of everything sung or spoken",
   "lines": [
-    { "text": "line of lyrics here", "startTime": 0.0, "endTime": 2.1 }
+    { "text": "first lyric line or phrase", "startTime": 0.0, "endTime": 2.1 },
+    { "text": "second lyric line or phrase", "startTime": 2.3, "endTime": 4.5 }
   ]
 }
-Split on natural phrasing/breath breaks. Times are seconds from audio start.
-If no vocals detected, return { "transcription": "", "lines": [] }.`;
+
+Split on natural phrasing or breath breaks — one sung phrase per line entry.
+Timestamps are seconds from the start of the audio file.
+If no vocals are detected, return { "transcription": "", "lines": [] }.`;
 
     try {
         const genAI = new GoogleGenAI({ apiKey });
@@ -79,15 +80,18 @@ If no vocals detected, return { "transcription": "", "lines": [] }.`;
         const resultText = response.text;
         if (resultText) {
             const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            console.log("[AudioIntelligence] Vocal analysis complete:", {
-                hasTranscription: !!parsed.transcription,
-                lineCount: parsed.lines?.length || 0
+            // Vocal analysis returns lines, not sections — normalise
+            if (!parsed.lines) parsed.lines = [];
+            if (!parsed.sections) parsed.sections = [];
+            console.log("[AudioIntelligence] Vocal transcription complete:", {
+                lines: parsed.lines.length,
+                hasTranscription: !!parsed.transcription
             });
             return parsed;
         }
         return null;
     } catch (error) {
-        console.error("[AudioIntelligence] Gemini analysis failed:", error);
+        console.error("[AudioIntelligence] Gemini transcription failed:", error);
         return null;
     }
 };

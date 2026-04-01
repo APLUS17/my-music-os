@@ -409,7 +409,9 @@ const StudioWorkspace: React.FC = () => {
     const [beatMuted, setBeatMuted] = useState(false);
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
-    const [isBeatLooping, setIsBeatLooping] = useState(true);
+    const [isBeatLooping, setIsBeatLooping] = useState(false);
+    const [isAnalyzingVocal, setIsAnalyzingVocal] = useState(false);
+    const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
 
     const [showTour, setShowTour] = useState(false);
 
@@ -655,26 +657,28 @@ const StudioWorkspace: React.FC = () => {
                 setRecordingTargetLineId(null);
             }
 
-            toast.success('Recording saved! AI analyzing...');
-            
-            // Background AI refinement
+            toast.success('Recording saved! Transcribing lyrics...');
+            setIsAnalyzingVocal(true);
             analyzeAudioWithGemini(base64).then(aiResult => {
-                    if (aiResult) {
-                        setSessions(prev => prev.map(s => {
-                            if (s.id === id) {
-                                return {
-                                    ...s,
-                                    transcription: aiResult.transcription || s.transcription,
-                                    lines: aiResult.lines || s.lines
-                                };
-                            }
-                            return s;
-                        }));
-                        toast.success('✨ AI refined your recording!');
-                    }
-                }).catch(err => {
-                    console.error("AI refinement failed:", err);
-                });
+                setIsAnalyzingVocal(false);
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => {
+                        if (s.id === id) {
+                            return {
+                                ...s,
+                                transcription: aiResult.transcription || s.transcription,
+                                lines: aiResult.lines || s.lines
+                                // Do NOT overwrite sections — keep smartSplit sections for RecordingThread
+                            };
+                        }
+                        return s;
+                    }));
+                    toast.success('🎤 Lyrics transcribed!');
+                }
+            }).catch(err => {
+                setIsAnalyzingVocal(false);
+                console.error("Vocal transcription failed:", err);
+            });
         }
     };
 
@@ -930,7 +934,9 @@ const StudioWorkspace: React.FC = () => {
                 try {
                     const b64 = beat.base64 || await getAudioData(beat.id);
                     if (!b64) return;
+                    setIsAnalyzingBeat(true);
                     analyzeInstrumentalWithGemini(b64).then(result => {
+                        setIsAnalyzingBeat(false);
                         if (result?.sections?.length) {
                             const aiSections: AutoSection[] = result.sections.map(s => ({
                                 id: randomId(),
@@ -943,9 +949,11 @@ const StudioWorkspace: React.FC = () => {
                                 isFavorited: false,
                             }));
                             setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
+                            toast.success('🎵 Beat sections ready!');
                         }
-                    });
+                    }).catch(() => setIsAnalyzingBeat(false));
                 } catch (e) {
+                    setIsAnalyzingBeat(false);
                     console.error('Beat analysis failed', e);
                 }
             })();
@@ -1366,7 +1374,9 @@ const StudioWorkspace: React.FC = () => {
 
                                                     // Background beat structure analysis via Gemini — non-blocking
                                                     if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
+                                                        setIsAnalyzingBeat(true);
                                                         analyzeInstrumentalWithGemini(base64).then(result => {
+                                                            setIsAnalyzingBeat(false);
                                                             if (result?.sections?.length) {
                                                                 const aiSections: AutoSection[] = result.sections.map(s => ({
                                                                     id: randomId(),
@@ -1381,8 +1391,9 @@ const StudioWorkspace: React.FC = () => {
                                                                 setBeats(prev => prev.map(b =>
                                                                     b.id === id ? { ...b, sections: aiSections } : b
                                                                 ));
+                                                                toast.success('🎵 Beat sections ready!');
                                                             }
-                                                        }).catch(e => console.error('Beat analysis failed', e));
+                                                        }).catch(e => { setIsAnalyzingBeat(false); console.error('Beat analysis failed', e); });
                                                     }
                                                 };
                                             }}
@@ -1418,7 +1429,9 @@ const StudioWorkspace: React.FC = () => {
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}
                                         lyrics={sections}
-                                        
+                                        isAnalyzingVocal={isAnalyzingVocal}
+                                        isAnalyzingBeat={isAnalyzingBeat}
+
                                         // Shared Audio State
                                         isPlaying={isPlaying}
                                         currentTime={currentTime}
