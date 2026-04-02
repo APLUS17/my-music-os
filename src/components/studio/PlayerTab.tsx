@@ -279,27 +279,27 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             const isFuture = i > activeLyricIdx;
                             const distance = Math.abs(i - activeLyricIdx);
                             
-                            let opacity = 0.15; let scale = 0.96; let blur = '2px';
+                            let opacity = 0.15; let scale = 0.96;
 
-                            if (isActive) { opacity = 1; scale = 1; blur = '0px'; }
+                            if (isActive) { opacity = 1; scale = 1; }
                             else if (isPast) {
-                                if (distance === 1) { opacity = 0.45; scale = 0.98; blur = '0px'; }
-                                else { opacity = 0.25; scale = 0.96; blur = '0.5px'; }
+                                if (distance === 1) { opacity = 0.45; scale = 0.98; }
+                                else { opacity = 0.25; scale = 0.96; }
                             } else if (isFuture) {
-                                if (distance === 1) { opacity = 0.4; scale = 1; blur = '1.2px'; }
-                                else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = '2.2px'; }
-                                else { opacity = 0.12; scale = 0.95; blur = '3.5px'; }
+                                if (distance === 1) { opacity = 0.4; scale = 1; }
+                                else if (distance === 2) { opacity = 0.2; scale = 0.98; }
+                                else { opacity = 0.12; scale = 0.95; }
                             }
-                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = '2px'; }
+                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; }
 
                             return (
                                 <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
                                     className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
-                                    style={{ willChange: "transform, filter, opacity" }}
+                                    style={{ willChange: "transform, opacity" }}
                                     initial={false}
-                                    animate={{ opacity, scale, filter: `blur(${blur})` }}
+                                    animate={{ opacity, scale }}
                                     transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
