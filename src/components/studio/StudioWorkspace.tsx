@@ -410,7 +410,8 @@ const StudioWorkspace: React.FC = () => {
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
     const [isBeatLooping, setIsBeatLooping] = useState(false);
-    const [isAnalyzingVocal, setIsAnalyzingVocal] = useState(false);
+    const [analyzingVocalCount, setAnalyzingVocalCount] = useState(0);
+    const isAnalyzingVocal = analyzingVocalCount > 0;
     const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
 
     const [showTour, setShowTour] = useState(false);
@@ -629,8 +630,9 @@ const StudioWorkspace: React.FC = () => {
                 gain: 0.8
             };
 
+            const targetSessionId = layerModeSessionId;
             setSessions(prev => prev.map(s => {
-                if (s.id === layerModeSessionId) {
+                if (s.id === targetSessionId) {
                     return {
                         ...s,
                         layers: [...(s.layers || []), newLayer]
@@ -639,8 +641,31 @@ const StudioWorkspace: React.FC = () => {
                 return s;
             }));
 
-            toast.success('Layer added!');
+            toast.success('Layer added! Transcribing lyrics...');
             setLayerModeSessionId(null);
+            setAnalyzingVocalCount(c => c + 1);
+            analyzeAudioWithGemini(base64).then(aiResult => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => {
+                        if (s.id === targetSessionId) {
+                            return {
+                                ...s,
+                                layers: (s.layers || []).map(l =>
+                                    l.id === id
+                                        ? { ...l, transcription: aiResult.transcription, lines: aiResult.lines }
+                                        : l
+                                )
+                            };
+                        }
+                        return s;
+                    }));
+                    toast.success('🎤 Lyrics transcribed!');
+                }
+            }).catch(err => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                console.error("Vocal transcription failed:", err);
+            });
         } else {
             // Create new session (original behavior)
             const newSession: RecordingSession = {
@@ -658,9 +683,9 @@ const StudioWorkspace: React.FC = () => {
             }
 
             toast.success('Recording saved! Transcribing lyrics...');
-            setIsAnalyzingVocal(true);
+            setAnalyzingVocalCount(c => c + 1);
             analyzeAudioWithGemini(base64).then(aiResult => {
-                setIsAnalyzingVocal(false);
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
                     setSessions(prev => prev.map(s => {
                         if (s.id === id) {
@@ -676,7 +701,7 @@ const StudioWorkspace: React.FC = () => {
                     toast.success('🎤 Lyrics transcribed!');
                 }
             }).catch(err => {
-                setIsAnalyzingVocal(false);
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 console.error("Vocal transcription failed:", err);
             });
         }
