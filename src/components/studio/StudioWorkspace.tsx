@@ -629,8 +629,9 @@ const StudioWorkspace: React.FC = () => {
                 gain: 0.8
             };
 
+            const targetSessionId = layerModeSessionId;
             setSessions(prev => prev.map(s => {
-                if (s.id === layerModeSessionId) {
+                if (s.id === targetSessionId) {
                     return {
                         ...s,
                         layers: [...(s.layers || []), newLayer]
@@ -639,8 +640,31 @@ const StudioWorkspace: React.FC = () => {
                 return s;
             }));
 
-            toast.success('Layer added!');
+            toast.success('Layer added! Transcribing lyrics...');
             setLayerModeSessionId(null);
+            setIsAnalyzingVocal(true);
+            analyzeAudioWithGemini(base64).then(aiResult => {
+                setIsAnalyzingVocal(false);
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => {
+                        if (s.id === targetSessionId) {
+                            return {
+                                ...s,
+                                layers: (s.layers || []).map(l =>
+                                    l.id === id
+                                        ? { ...l, transcription: aiResult.transcription, lines: aiResult.lines }
+                                        : l
+                                )
+                            };
+                        }
+                        return s;
+                    }));
+                    toast.success('🎤 Lyrics transcribed!');
+                }
+            }).catch(err => {
+                setIsAnalyzingVocal(false);
+                console.error("Vocal transcription failed:", err);
+            });
         } else {
             // Create new session (original behavior)
             const newSession: RecordingSession = {

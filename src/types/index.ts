@@ -52,6 +52,8 @@ export interface RecordingLayer {
     duration?: number;
     isMuted: boolean;
     gain?: number;               // 0-1 volume level
+    transcription?: string;
+    lines?: TranscriptionLine[];
 }
 
 export interface RecordingSession {
