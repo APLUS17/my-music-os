@@ -82,9 +82,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const sessionIdx = sessions && activeSession ? sessions.findIndex(s => s.id === activeSession.id) : -1;
 
     // Derived — beat sections drive pills ONLY
-    const beatCurrentTime = currentTime + (activeSession?.beatOffset ?? 0);
-    const beatSections = beat?.sections ?? [];
-    const activeSectionIdx = beatSections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
+    // Only calculate beat highlights if recording was made WITH the beat
+    const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
+      ? currentTime + activeSession.beatOffset
+      : null;
+    const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
+    const activeSectionIdx = beatSections.length > 0
+      ? beatSections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime)
+      : -1;
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     // Transcription Lines from the active session ONLY
