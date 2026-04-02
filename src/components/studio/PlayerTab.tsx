@@ -88,7 +88,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
       : null;
     const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
     const activeSectionIdx = beatSections.length > 0
-      ? beatSections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime)
+      ? beatSections.findIndex(s => beatCurrentTime! >= s.startTime && beatCurrentTime! < s.endTime)
       : -1;
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
