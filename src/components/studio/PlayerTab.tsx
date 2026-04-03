@@ -59,7 +59,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     onClearLoop,
     lyrics,
     onSelectSession,
-    isAnalyzingVocal,
     isAnalyzingBeat,
 
     // Lifted
