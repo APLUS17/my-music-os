@@ -369,6 +369,8 @@ const StudioWorkspace: React.FC = () => {
     const [fabOpen, setFabOpen] = useState(false);
     const fabInputRef = useRef<HTMLInputElement>(null);
     const beatAudioRef = useRef<HTMLAudioElement>(null);
+    const beatAudioCtxRef = useRef<AudioContext | null>(null);
+    const beatGainRef = useRef<GainNode | null>(null);
 
     const [projectTitle, setProjectTitle] = useState("");
     const [projectBpm, setProjectBpm] = useState("120");
@@ -421,6 +423,7 @@ const StudioWorkspace: React.FC = () => {
         const shouldPlay = play !== undefined ? play : !isPlaying;
         
         if (shouldPlay) {
+            beatAudioCtxRef.current?.resume();
             vocalAudioRef.current?.play().catch(console.error);
             if (uploadedBeat && beatAudioRef.current) {
                 const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
@@ -450,10 +453,30 @@ const StudioWorkspace: React.FC = () => {
         setCurrentTime(clamped);
     };
 
+    // Wire beat audio through Web Audio API so iOS respects volume changes
+    useEffect(() => {
+        const audio = beatAudioRef.current;
+        if (!audio) return;
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContextClass() as AudioContext;
+        beatAudioCtxRef.current = ctx;
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 1;
+        beatGainRef.current = gainNode;
+        const source = ctx.createMediaElementSource(audio);
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        return () => {
+            ctx.close();
+            beatAudioCtxRef.current = null;
+            beatGainRef.current = null;
+        };
+    }, []);
+
     // Update Beat Volume
     useEffect(() => {
-        if (beatAudioRef.current) {
-            beatAudioRef.current.volume = beatMuted ? 0 : beatVolume;
+        if (beatGainRef.current) {
+            beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
         }
     }, [beatVolume, beatMuted]);
 
@@ -743,7 +766,7 @@ const StudioWorkspace: React.FC = () => {
             if (uploadedBeat && session.beatOffset !== undefined && beatAudioRef.current) {
                 // Account for latency compensation already being in beatOffset
                 beatAudioRef.current.currentTime = session.beatOffset;
-                beatAudioRef.current.volume = beatVolume;
+                if (beatGainRef.current) beatGainRef.current.gain.value = beatVolume;
                 beatAudioRef.current.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
@@ -834,7 +857,7 @@ const StudioWorkspace: React.FC = () => {
 
         audio.addEventListener('timeupdate', handleTimeUpdate);
         audio.addEventListener('ended', onEnded);
-        audio.volume = beatVolume;
+        if (beatGainRef.current) beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
 
         if (isBeatPlaying) {
             if (audio.paused && audio.src) {
@@ -1646,7 +1669,7 @@ const StudioWorkspace: React.FC = () => {
                 className="w-full flex-1 max-w-lg relative bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out"
             >
                 {/* Persistent Studio Beat Audio */}
-                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" />
+                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
                 
                 {/* Persistent Vocal Session Audio */}
                 <audio 
