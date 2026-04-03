@@ -1,5 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 
+let _genAI: GoogleGenAI | null = null;
+const getGenAI = (): GoogleGenAI => {
+    if (!_genAI) {
+        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY!;
+        _genAI = new GoogleGenAI({ apiKey });
+    }
+    return _genAI;
+};
+
 export interface AudioAnalysisResult {
     sections: {
         startTime: number;
@@ -59,10 +68,8 @@ Timestamps are seconds from the start of the audio file.
 If no vocals are detected, return { "transcription": "", "lines": [] }.`;
 
     try {
-        const genAI = new GoogleGenAI({ apiKey });
-
-        const response = await genAI.models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
+        const response = await getGenAI().models.generateContent({
+            model: "gemini-2.5-flash",
             contents: [
                 { text: prompt },
                 {
@@ -126,10 +133,8 @@ Return ONLY a JSON object with this exact structure:
 }`;
 
     try {
-        const genAI = new GoogleGenAI({ apiKey });
-
-        const response = await genAI.models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
+        const response = await getGenAI().models.generateContent({
+            model: "gemini-2.5-flash",
             contents: [
                 { text: prompt },
                 {
