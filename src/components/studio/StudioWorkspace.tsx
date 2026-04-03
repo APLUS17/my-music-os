@@ -836,6 +836,8 @@ const StudioWorkspace: React.FC = () => {
         const audio = beatAudioRef.current;
         if (!audio) return;
 
+        const noVocalSession = !sessions.length || !activeSessionId;
+
         const handleTimeUpdate = () => {
             if (!audio) return;
             if (isBeatLooping) {
@@ -844,6 +846,16 @@ const StudioWorkspace: React.FC = () => {
                 if (audio.currentTime >= end && end > 0) {
                     audio.currentTime = start;
                 }
+            }
+            // When no vocal session, drive the shared player time from beat audio
+            if (noVocalSession) {
+                setCurrentTime(audio.currentTime);
+            }
+        };
+
+        const handleLoadedMetadata = () => {
+            if (noVocalSession) {
+                setDuration(audio.duration);
             }
         };
 
@@ -854,11 +866,18 @@ const StudioWorkspace: React.FC = () => {
                 audio.play().catch(console.error);
             } else {
                 setIsBeatPlaying(false);
+                if (noVocalSession) setIsPlaying(false);
             }
         };
 
         audio.addEventListener('timeupdate', handleTimeUpdate);
+        audio.addEventListener('loadedmetadata', handleLoadedMetadata);
         audio.addEventListener('ended', onEnded);
+
+        // Trigger metadata update in case already loaded
+        if (noVocalSession && audio.duration > 0) {
+            setDuration(audio.duration);
+        }
         if (beatGainRef.current) beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
 
         if (isBeatPlaying) {
@@ -874,9 +893,18 @@ const StudioWorkspace: React.FC = () => {
 
         return () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
+            audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
             audio.removeEventListener('ended', onEnded);
         };
-    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat]);
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat, sessions, activeSessionId]);
+
+    // When no vocal session, sync beat play state to shared player so PlayerTab reflects it
+    useEffect(() => {
+        const noVocalSession = !sessions.length || !activeSessionId;
+        if (noVocalSession) {
+            setIsPlaying(isBeatPlaying);
+        }
+    }, [isBeatPlaying, sessions, activeSessionId]);
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
