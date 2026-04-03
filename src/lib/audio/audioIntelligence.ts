@@ -143,7 +143,7 @@ Accuracy is critical: timestamps must land on clean beat boundaries so loop regi
 
     try {
         const response = await getGenAI().models.generateContent({
-            model: "gemini-2.5-pro",
+            model: "gemini-2.0-flash",
             contents: [
                 { text: prompt },
                 {
@@ -154,12 +154,8 @@ Accuracy is critical: timestamps must land on clean beat boundaries so loop regi
                 }
             ],
             config: {
-                responseMimeType: "application/json",
-                thinking: {
-                    type: "enabled",
-                    budgetTokens: 5000
-                }
-            } as any
+                responseMimeType: "application/json"
+            }
         });
 
         const resultText = response.text;
