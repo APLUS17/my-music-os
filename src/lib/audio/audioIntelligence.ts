@@ -143,7 +143,7 @@ Accuracy is critical: timestamps must land on clean beat boundaries so loop regi
 
     try {
         const response = await getGenAI().models.generateContent({
-            model: "gemini-3.1-pro",
+            model: "gemini-2.5-pro",
             contents: [
                 { text: prompt },
                 {
