@@ -1440,7 +1440,7 @@ const StudioWorkspace: React.FC = () => {
                                                                     isFavorited: false,
                                                                 }));
                                                                 setBeats(prev => prev.map(b =>
-                                                                    b.id === id ? { ...b, sections: aiSections } : b
+                                                                    b.id === id ? { ...b, sections: aiSections, bpm: result.bpm } : b
                                                                 ));
                                                                 toast.success('🎵 Beat sections ready!');
                                                             }

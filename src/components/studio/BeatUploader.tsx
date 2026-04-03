@@ -190,7 +190,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
     if (file) {
       setLoopStart(null);
       setLoopEnd(null);
-      setIsLooping(true);
       onUpload(file);
     }
   };

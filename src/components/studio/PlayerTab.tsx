@@ -5,6 +5,7 @@ import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volu
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
+import { snapLoopRegion, secondsToMs, msToSeconds } from '@/lib/audio/loopSnapping';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -71,6 +72,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
     const lyricRefs = useRef<(HTMLParagraphElement | null)[]>([]);
     const [showTakeList, setShowTakeList] = useState(false);
+    const [displayLoopStart, setDisplayLoopStart] = useState<number | null>(null);
+    const [displayLoopEnd, setDisplayLoopEnd] = useState<number | null>(null);
 
     const skip = (delta: number) => onSeek(currentTime + delta);
 
@@ -157,6 +160,17 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
         };
     }, []);
+
+    // Sync loop region display when loop state changes from uploader
+    useEffect(() => {
+        if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+            setDisplayLoopStart(beatLoopStart);
+            setDisplayLoopEnd(beatLoopEnd);
+        } else {
+            setDisplayLoopStart(null);
+            setDisplayLoopEnd(null);
+        }
+    }, [isBeatLooping, beatLoopStart, beatLoopEnd]);
 
     // Auto-scroll active pill into centre of scroll row
     useEffect(() => {
@@ -328,7 +342,18 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                             onSeek(Math.max(0, vocalTime));
                                             // Only update loop region if loop mode is already active
                                             if (isBeatLooping) {
-                                                onSetLoopRegion?.(sec.startTime, sec.endTime);
+                                                // Use beat snapping if BPM is available for perfect loop alignment
+                                                if (beat?.bpm) {
+                                                    const snapped = snapLoopRegion(
+                                                        secondsToMs(sec.startTime),
+                                                        secondsToMs(sec.endTime),
+                                                        beat.bpm
+                                                    );
+                                                    onSetLoopRegion?.(msToSeconds(snapped.start), msToSeconds(snapped.end));
+                                                } else {
+                                                    // Fallback to section boundaries if no BPM detected
+                                                    onSetLoopRegion?.(sec.startTime, sec.endTime);
+                                                }
                                             }
                                         }}
                                         className={cn(
@@ -356,6 +381,16 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         onSeek(((e.clientX - rect.left) / rect.width) * duration);
                     }}
                 >
+                    {/* Loop region background */}
+                    {displayLoopStart !== null && displayLoopEnd !== null && duration > 0 && (
+                        <div
+                            className="absolute top-1/2 -translate-y-1/2 h-3 bg-[var(--accent)] opacity-20 rounded-sm"
+                            style={{
+                                left: `${(displayLoopStart / duration) * 100}%`,
+                                width: `${((displayLoopEnd - displayLoopStart) / duration) * 100}%`
+                            }}
+                        />
+                    )}
                     <motion.div className="absolute left-0 top-0 h-full bg-white rounded-full" animate={{ width: `${progress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
                     <motion.div className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-white rounded-full shadow" animate={{ left: `calc(${progress}% - 7px)` }} transition={{ duration: 0.1, ease: 'linear' }} />
                 </div>

@@ -19,6 +19,7 @@ export interface AudioAnalysisResult {
     }[];
     transcription?: string;
     lines?: { text: string; startTime: number; endTime: number }[];
+    bpm?: number; // Detected BPM for beat-aligned loop snapping (beats per minute)
 }
 
 /**
@@ -117,24 +118,32 @@ export const analyzeInstrumentalWithGemini = async (audioBase64: string): Promis
     const { mimeType, data } = stripDataUrlPrefix(audioBase64);
 
     const prompt = `Analyze this instrumental music track and identify its song structure sections.
-Identify distinct musical sections with timestamps and classify each with standard music terminology:
+
+IMPORTANT: Ensure all timestamps align with beat boundaries for seamless looping.
+Identify distinct musical sections with precise timestamps and classify each with standard music terminology:
 - Intro, Verse, Pre-Chorus, Chorus, Bridge, Outro, Drop, Build, Break, Hook, etc.
 
 For each section provide:
-1. startTime and endTime (in seconds)
+1. startTime and endTime (in seconds) — MUST align with musical beat boundaries
 2. type: always "instrumental"
 3. label: standard section name (e.g., "Intro", "Verse 1", "Chorus", "Bridge", "Drop")
 4. emojiTag: relevant emoji for visual context (🎬 for Intro/Outro, 🎵 for Verse, 🔥 for Chorus/Drop, 🌉 for Bridge, ⚡ for Build, 🔇 for Break)
 
+Also detect the tempo:
+5. bpm: The beats per minute (BPM) of the track for beat-aligned loop calculations
+
 Return ONLY a JSON object with this exact structure:
 {
   "sections": [{"startTime": 0.0, "endTime": 8.0, "type": "instrumental", "label": "Intro", "emojiTag": "🎬"}],
-  "transcription": ""
-}`;
+  "transcription": "",
+  "bpm": 128
+}
+
+Accuracy is critical: timestamps must land on clean beat boundaries so loop regions play smoothly, and BPM must be precise.`;
 
     try {
         const response = await getGenAI().models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
+            model: "models/gemini-3.1-pro",
             contents: [
                 { text: prompt },
                 {
@@ -145,8 +154,12 @@ Return ONLY a JSON object with this exact structure:
                 }
             ],
             config: {
-                responseMimeType: "application/json"
-            }
+                responseMimeType: "application/json",
+                thinking: {
+                    type: "enabled",
+                    budgetTokens: 5000
+                }
+            } as any
         });
 
         const resultText = response.text;

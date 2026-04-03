@@ -83,6 +83,7 @@ export interface Beat {
     duration: string;
     date: string;
     sections?: AutoSection[];
+    bpm?: number; // Detected BPM for beat-aligned loop snapping (internal use only)
 }
 
 export interface SavedProject {
