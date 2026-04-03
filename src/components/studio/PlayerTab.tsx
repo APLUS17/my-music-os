@@ -285,7 +285,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             } else if (isFuture) {
                                 if (distance === 1) { opacity = 0.4; scale = 1; blur = 1; }
                                 else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = 2; }
-                                else { opacity = 0.12; scale = 0.95; blur = 2; }
+                                else { opacity = 0.12; scale = 0.95; blur = 0; }
                             }
                             if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = 1; }
 
@@ -294,7 +294,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
                                     className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
-                                    style={{ willChange: "transform, opacity" }}
                                     initial={false}
                                     animate={{ opacity, scale, filter: `blur(${blur}px)` }}
                                     transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
