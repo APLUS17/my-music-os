@@ -163,7 +163,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     // Sync loop region display when loop state changes from uploader
     useEffect(() => {
-        if (isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null) {
+        if (isBeatLooping && beatLoopStart != null && beatLoopEnd != null) {
             setDisplayLoopStart(beatLoopStart);
             setDisplayLoopEnd(beatLoopEnd);
         } else {
