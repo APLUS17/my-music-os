@@ -106,9 +106,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return -1;
     }, [displayLines, currentTime]);
 
-    const verticalScrollRaf = useRef<number | null>(null);
     const horizontalScrollRaf = useRef<number | null>(null);
-    const scrollDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lyricContainerRef = useRef<HTMLDivElement>(null);
+    const lyricListRef = useRef<HTMLDivElement>(null);
+    const [lyricTranslateY, setLyricTranslateY] = useState(0);
 
     const smoothScroll = useCallback((
         element: HTMLElement,
@@ -120,7 +121,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         const distance = targetPosition - startPosition;
         const startTime = performance.now();
 
-        const rafRef = direction === 'vertical' ? verticalScrollRaf : horizontalScrollRaf;
+        const rafRef = horizontalScrollRaf;
 
         if (rafRef.current !== null) {
             cancelAnimationFrame(rafRef.current);
@@ -154,9 +155,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     // Clean up animation frames on unmount
     useEffect(() => {
         return () => {
-            if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
             if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
-            if (scrollDelayTimer.current !== null) clearTimeout(scrollDelayTimer.current);
         };
     }, []);
 
@@ -179,36 +178,24 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [activeSectionIdx, smoothScroll]);
 
-    // Auto-scroll active lyric
+    // Reset list position when a new session's lyrics load
     useEffect(() => {
-        if (scrollDelayTimer.current !== null) {
-            clearTimeout(scrollDelayTimer.current);
-            scrollDelayTimer.current = null;
-        }
+        setLyricTranslateY(0);
+    }, [displayLines]);
 
-        if (activeLyricIdx >= 0) {
-            scrollDelayTimer.current = setTimeout(() => {
-                const element = lyricRefs.current[activeLyricIdx];
-                if (element) {
-                    const parent = element.parentElement;
-                    if (parent) {
-                        const elementRect = element.getBoundingClientRect();
-                        const parentRect = parent.getBoundingClientRect();
+    // Spring-based lyric centering — Framer Motion drives the animation, no style mutation
+    useEffect(() => {
+        if (activeLyricIdx < 0) return;
+        const container = lyricContainerRef.current;
+        const activeEl = lyricRefs.current[activeLyricIdx];
+        if (!container || !activeEl) return;
 
-                        // Closer to the vertical center (50% from the top)
-                        // This ensures the active text is completely clear of the top gradient
-                        const targetY = parentRect.top + parentRect.height * 0.5;
-                        const elementCenterY = elementRect.top + elementRect.height / 2;
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        const delta = (containerRect.top + containerRect.height / 2) - (activeRect.top + activeRect.height / 2);
 
-                        const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
-
-                        smoothScroll(parent, scrollTarget, 650, 'vertical');
-                    }
-                }
-                scrollDelayTimer.current = null;
-            }, 200);
-        }
-    }, [activeLyricIdx, smoothScroll]);
+        setLyricTranslateY(prev => prev + delta);
+    }, [activeLyricIdx]);
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
@@ -264,7 +251,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative">
+            <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
                 {displayLines.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
@@ -277,35 +264,39 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[20vh] mask-fade-edges" style={{ scrollBehavior: 'smooth' }}>
+                    <motion.div
+                        ref={lyricListRef}
+                        className="flex flex-col gap-8 py-[50vh] shrink-0"
+                        animate={{ y: lyricTranslateY }}
+                        transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
+                    >
                         {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
                             const isFuture = i > activeLyricIdx;
                             const distance = Math.abs(i - activeLyricIdx);
                             
-                            let opacity = 0.15; let scale = 0.96;
+                            let opacity = 0.15; let scale = 0.96; let blur = 2;
 
-                            if (isActive) { opacity = 1; scale = 1; }
+                            if (isActive) { opacity = 1; scale = 1; blur = 0; }
                             else if (isPast) {
-                                if (distance === 1) { opacity = 0.45; scale = 0.98; }
-                                else { opacity = 0.25; scale = 0.96; }
+                                if (distance === 1) { opacity = 0.45; scale = 0.98; blur = 1; }
+                                else { opacity = 0.25; scale = 0.96; blur = 2; }
                             } else if (isFuture) {
-                                if (distance === 1) { opacity = 0.4; scale = 1; }
-                                else if (distance === 2) { opacity = 0.2; scale = 0.98; }
-                                else { opacity = 0.12; scale = 0.95; }
+                                if (distance === 1) { opacity = 0.4; scale = 1; blur = 1; }
+                                else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = 2; }
+                                else { opacity = 0.12; scale = 0.95; blur = 0; }
                             }
-                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; }
+                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = 1; }
 
                             return (
                                 <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
                                     className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
-                                    style={{ willChange: "transform, opacity" }}
                                     initial={false}
-                                    animate={{ opacity, scale }}
-                                    transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+                                    animate={{ opacity, scale, filter: `blur(${blur}px)` }}
+                                    transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
                                     <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : "")}>
@@ -314,7 +305,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 </motion.div>
                             );
                         })}
-                    </div>
+                    </motion.div>
                 )}
             </div>
 
