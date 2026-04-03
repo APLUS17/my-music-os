@@ -271,6 +271,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
               value={volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
               className="flex-1 h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+              style={{ touchAction: 'none' }}
             />
           </div>
         </div>
