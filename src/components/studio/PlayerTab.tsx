@@ -252,19 +252,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
             <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
-                {displayLines.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-4">
-                        <div className="flex gap-2">
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }} />
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} />
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} />
-                        </div>
-                        <p className="text-white/40 text-sm text-center max-w-xs uppercase tracking-widest font-mono text-[10px]">
-                            {isAnalyzingVocal ? "Transcribing lyrics..." : activeSession ? "Syncing transcription..." : "Awaiting first take..."}
-                        </p>
-                    </div>
-                ) : (
-                    <motion.div
+                <motion.div
                         ref={lyricListRef}
                         className="flex flex-col gap-8 py-[50vh] shrink-0"
                         animate={{ y: lyricTranslateY }}
@@ -306,7 +294,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                             );
                         })}
                     </motion.div>
-                )}
             </div>
 
             {/* ── Section pills — beat only ──────────────────────────── */}

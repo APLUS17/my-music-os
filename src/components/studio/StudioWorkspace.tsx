@@ -767,6 +767,7 @@ const StudioWorkspace: React.FC = () => {
                 // Account for latency compensation already being in beatOffset
                 beatAudioRef.current.currentTime = session.beatOffset;
                 if (beatGainRef.current) beatGainRef.current.gain.value = beatVolume;
+                beatAudioCtxRef.current?.resume();
                 beatAudioRef.current.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
@@ -849,6 +850,7 @@ const StudioWorkspace: React.FC = () => {
         const onEnded = () => {
             if (isBeatLooping) {
                 audio.currentTime = beatLoopStart ?? 0;
+                beatAudioCtxRef.current?.resume();
                 audio.play().catch(console.error);
             } else {
                 setIsBeatPlaying(false);
@@ -861,6 +863,7 @@ const StudioWorkspace: React.FC = () => {
 
         if (isBeatPlaying) {
             if (audio.paused && audio.src) {
+                beatAudioCtxRef.current?.resume();
                 audio.play().catch(() => setIsBeatPlaying(false));
             }
         } else {
@@ -1772,6 +1775,7 @@ const StudioWorkspace: React.FC = () => {
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
+                    onResumeBeatAudio={() => beatAudioCtxRef.current?.resume()}
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}

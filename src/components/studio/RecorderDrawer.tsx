@@ -35,6 +35,7 @@ interface RecorderDrawerProps {
   loopStart?: number | null;
   loopEnd?: number | null;
   isLooping?: boolean;
+  onResumeBeatAudio?: () => void;
   // Layer mode props
   layerMode?: boolean;
   existingLayers?: RecordingLayer[];
@@ -54,6 +55,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   loopStart = null,
   loopEnd = null,
   isLooping = false,
+  onResumeBeatAudio,
   layerMode = false,
   existingLayers = [],
   parentAudioUrl = null,
@@ -326,7 +328,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         const compensatedStartOffset = Math.max(0, recordingStartOffsetRef.current - (latencyCompensation / 1000));
         const beatPos = getBeatPosition(audio.currentTime, compensatedStartOffset);
         backingAudio.currentTime = beatPos;
-        backingAudio.volume = beatVolume;
+        onResumeBeatAudio?.();
         backingAudio.play().catch(console.error);
       }
     } else {
@@ -500,7 +502,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         const backingAudio = backingAudioRef.current;
         recordingStartOffsetRef.current = backingAudio.currentTime;
         loopPassCountRef.current = 0;
-        backingAudio.volume = beatVolume;
+        onResumeBeatAudio?.();
         backingAudio.play().catch(console.error);
       } else {
         recordingStartOffsetRef.current = 0;
