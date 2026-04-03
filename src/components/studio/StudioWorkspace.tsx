@@ -1011,6 +1011,7 @@ const StudioWorkspace: React.FC = () => {
         setStudioMode('flow');
 
         // If this beat has no sections yet, analyze it with Gemini for song structure
+        /*
         if (!beat.sections?.length && process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
             (async () => {
                 try {
@@ -1042,6 +1043,7 @@ const StudioWorkspace: React.FC = () => {
                 }
             })();
         }
+        */
     };
 
     const handleLibraryBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1458,6 +1460,7 @@ const StudioWorkspace: React.FC = () => {
                                                     });
 
                                                     // Background beat structure analysis via Gemini — non-blocking
+                                                    /*
                                                     if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
                                                         setIsAnalyzingBeat(true);
                                                         analyzeInstrumentalWithGemini(base64).then(result => {
@@ -1489,6 +1492,7 @@ const StudioWorkspace: React.FC = () => {
                                                             toast.error('❌ Beat analysis failed - check console');
                                                         });
                                                     }
+                                                    */
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); setCurrentBeat(null); }}
