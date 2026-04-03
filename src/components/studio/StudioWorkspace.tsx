@@ -1507,6 +1507,9 @@ const StudioWorkspace: React.FC = () => {
                                             setBeatLoopStart(null);
                                             setBeatLoopEnd(null);
                                         }}
+                                        onToggleLooping={(enabled) => {
+                                            setIsBeatLooping(enabled);
+                                        }}
                                     />
                                 </div>
                             )}

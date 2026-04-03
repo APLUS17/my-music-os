@@ -23,6 +23,7 @@ interface PlayerTabProps {
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
     onSetLoopRegion?: (startTime: number, endTime: number) => void;
     onClearLoop?: () => void;
+    onToggleLooping?: (enabled: boolean) => void;
     lyrics?: LyricSection[];
     onSelectSession?: (id: string) => void;
     isAnalyzingVocal?: boolean;
@@ -84,11 +85,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const sessionIdx = sessions && activeSession ? sessions.findIndex(s => s.id === activeSession.id) : -1;
 
     // Derived — beat sections drive pills ONLY
-    // Only calculate beat highlights if recording was made WITH the beat
+    // Show beat sections regardless of whether there's an active session
     const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
       ? currentTime + activeSession.beatOffset
-      : null;
-    const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
+      : currentTime; // Use current playback time if no session offset
+    const beatSections = beat?.sections ?? [];
     const activeSectionIdx = beatSections.length > 0
       ? beatSections.findIndex(s => beatCurrentTime! >= s.startTime && beatCurrentTime! < s.endTime)
       : -1;
@@ -410,8 +411,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 <button onClick={() => skip(10)} className="text-white active:opacity-60 transition-opacity"><FastForward size={34} fill="white" /></button>
                 <button
                     onClick={() => {
-                        if (isBeatLooping) onClearLoop?.();
-                        else { const sec = activeSectionIdx >= 0 ? beatSections[activeSectionIdx] : null; if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime); }
+                        if (isBeatLooping) {
+                            onToggleLooping?.(false);
+                        } else {
+                            onToggleLooping?.(true);
+                            const sec = activeSectionIdx >= 0 ? beatSections[activeSectionIdx] : null;
+                            if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime);
+                        }
                     }}
                     className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-white/40')}
                 >
