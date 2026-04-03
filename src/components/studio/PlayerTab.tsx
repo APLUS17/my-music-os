@@ -59,6 +59,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     onBeatPlaybackChange,
     onSetLoopRegion,
     onClearLoop,
+    onToggleLooping,
     lyrics,
     onSelectSession,
     isAnalyzingBeat,
