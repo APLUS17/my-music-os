@@ -143,7 +143,7 @@ Accuracy is critical: timestamps must land on clean beat boundaries so loop regi
 
     try {
         const response = await getGenAI().models.generateContent({
-            model: "models/gemini-3.1-pro",
+            model: "gemini-3.1-pro",
             contents: [
                 { text: prompt },
                 {
@@ -164,19 +164,23 @@ Accuracy is critical: timestamps must land on clean beat boundaries so loop regi
 
         const resultText = response.text;
         if (resultText) {
+            console.log("[AudioIntelligence] Raw beat analysis response:", resultText.substring(0, 500));
             const parsed = JSON.parse(resultText) as AudioAnalysisResult;
             if (!parsed.sections || !Array.isArray(parsed.sections)) {
-                console.warn("[AudioIntelligence] Invalid beat analysis response");
+                console.warn("[AudioIntelligence] Invalid beat analysis response - no sections in result");
                 return null;
             }
             console.log("[AudioIntelligence] Beat structure analysis complete:", {
-                sections: parsed.sections.length
+                sections: parsed.sections.length,
+                sectionDetails: parsed.sections.map(s => ({ label: s.label, start: s.startTime, end: s.endTime }))
             });
             return parsed;
         }
+        console.warn("[AudioIntelligence] No text in response");
         return null;
     } catch (error) {
         console.error("[AudioIntelligence] Beat analysis failed:", error);
+        console.error("[AudioIntelligence] Full error details:", error instanceof Error ? error.message : String(error));
         return null;
     }
 };

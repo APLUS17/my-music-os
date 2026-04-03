@@ -1479,8 +1479,15 @@ const StudioWorkspace: React.FC = () => {
                                                                     b.id === id ? beatWithSections : b
                                                                 ));
                                                                 toast.success('🎵 Beat sections ready!');
+                                                            } else {
+                                                                console.warn('Beat analysis returned no sections', result);
+                                                                toast.error('⚠️ Could not detect beat sections');
                                                             }
-                                                        }).catch(e => { setIsAnalyzingBeat(false); console.error('Beat analysis failed', e); });
+                                                        }).catch(e => {
+                                                            setIsAnalyzingBeat(false);
+                                                            console.error('Beat analysis failed', e);
+                                                            toast.error('❌ Beat analysis failed - check console');
+                                                        });
                                                     }
                                                 };
                                             }}
