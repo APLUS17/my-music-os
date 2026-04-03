@@ -415,6 +415,8 @@ const StudioWorkspace: React.FC = () => {
     const [analyzingVocalCount, setAnalyzingVocalCount] = useState(0);
     const isAnalyzingVocal = analyzingVocalCount > 0;
     const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
+    // Direct reference to the currently loaded beat to avoid ID lookup race conditions
+    const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
 
     const [showTour, setShowTour] = useState(false);
 
@@ -1003,6 +1005,7 @@ const StudioWorkspace: React.FC = () => {
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
         setUploadedBeatId(beat.id);
+        setCurrentBeat(beat);
         setActiveProjectId(null);
         setViewMode('studio');
         setStudioMode('flow');
@@ -1027,7 +1030,9 @@ const StudioWorkspace: React.FC = () => {
                                 isBest: false,
                                 isFavorited: false,
                             }));
-                            setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
+                            const beatWithSections = { ...beat, sections: aiSections };
+                            setCurrentBeat(beatWithSections);
+                            setBeats(prev => prev.map(b => b.id === beat.id ? beatWithSections : b));
                             toast.success('🎵 Beat sections ready!');
                         }
                     }).catch(() => setIsAnalyzingBeat(false));
@@ -1445,6 +1450,7 @@ const StudioWorkspace: React.FC = () => {
                                                         id, name, duration: durationStr,
                                                         audioUrl: url, base64, date: new Date().toLocaleDateString()
                                                     };
+                                                    setCurrentBeat(newBeat);
                                                     setBeats(prev => {
                                                         // Replace existing beat with same name so sections update correctly
                                                         const filtered = prev.filter(b => b.name !== name);
@@ -1467,8 +1473,10 @@ const StudioWorkspace: React.FC = () => {
                                                                     isBest: false,
                                                                     isFavorited: false,
                                                                 }));
+                                                                const beatWithSections = { ...newBeat, sections: aiSections, bpm: result.bpm };
+                                                                setCurrentBeat(beatWithSections);
                                                                 setBeats(prev => prev.map(b =>
-                                                                    b.id === id ? { ...b, sections: aiSections, bpm: result.bpm } : b
+                                                                    b.id === id ? beatWithSections : b
                                                                 ));
                                                                 toast.success('🎵 Beat sections ready!');
                                                             }
@@ -1476,7 +1484,7 @@ const StudioWorkspace: React.FC = () => {
                                                     }
                                                 };
                                             }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); setCurrentBeat(null); }}
                                         />
                                     </div>
                                 </div>
@@ -1498,7 +1506,7 @@ const StudioWorkspace: React.FC = () => {
                                         projectTitle={projectTitle || "Untitled Project"}
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                         sessions={sessions}
-                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
+                                        beat={currentBeat}
                                         beatSrc={uploadedBeat}
                                         beatVolume={beatVolume}
                                         beatMuted={beatMuted}
