@@ -106,9 +106,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return -1;
     }, [displayLines, currentTime]);
 
-    const verticalScrollRaf = useRef<number | null>(null);
     const horizontalScrollRaf = useRef<number | null>(null);
-    const scrollDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lyricContainerRef = useRef<HTMLDivElement>(null);
+    const lyricListRef = useRef<HTMLDivElement>(null);
 
     const smoothScroll = useCallback((
         element: HTMLElement,
@@ -120,7 +120,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         const distance = targetPosition - startPosition;
         const startTime = performance.now();
 
-        const rafRef = direction === 'vertical' ? verticalScrollRaf : horizontalScrollRaf;
+        const rafRef = horizontalScrollRaf;
 
         if (rafRef.current !== null) {
             cancelAnimationFrame(rafRef.current);
@@ -154,9 +154,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     // Clean up animation frames on unmount
     useEffect(() => {
         return () => {
-            if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
             if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
-            if (scrollDelayTimer.current !== null) clearTimeout(scrollDelayTimer.current);
         };
     }, []);
 
@@ -179,36 +177,30 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [activeSectionIdx, smoothScroll]);
 
-    // Auto-scroll active lyric
+    // Reset list position when a new session's lyrics load
     useEffect(() => {
-        if (scrollDelayTimer.current !== null) {
-            clearTimeout(scrollDelayTimer.current);
-            scrollDelayTimer.current = null;
-        }
+        const list = lyricListRef.current;
+        if (!list) return;
+        list.style.transition = 'none';
+        list.style.transform = 'translateY(0)';
+    }, [displayLines]);
 
-        if (activeLyricIdx >= 0) {
-            scrollDelayTimer.current = setTimeout(() => {
-                const element = lyricRefs.current[activeLyricIdx];
-                if (element) {
-                    const parent = element.parentElement;
-                    if (parent) {
-                        const elementRect = element.getBoundingClientRect();
-                        const parentRect = parent.getBoundingClientRect();
+    // GPU-composited lyric scroll — translateY on the list, no scrollTop, no RAF, no delay
+    useEffect(() => {
+        if (activeLyricIdx < 0) return;
+        const container = lyricContainerRef.current;
+        const list = lyricListRef.current;
+        const activeEl = lyricRefs.current[activeLyricIdx];
+        if (!container || !list || !activeEl) return;
 
-                        // Closer to the vertical center (50% from the top)
-                        // This ensures the active text is completely clear of the top gradient
-                        const targetY = parentRect.top + parentRect.height * 0.5;
-                        const elementCenterY = elementRect.top + elementRect.height / 2;
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        const delta = (containerRect.top + containerRect.height / 2) - (activeRect.top + activeRect.height / 2);
+        const currentY = new DOMMatrix(getComputedStyle(list).transform).m42;
 
-                        const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
-
-                        smoothScroll(parent, scrollTarget, 650, 'vertical');
-                    }
-                }
-                scrollDelayTimer.current = null;
-            }, 200);
-        }
-    }, [activeLyricIdx, smoothScroll]);
+        list.style.transition = 'transform 420ms cubic-bezier(0.16, 1, 0.3, 1)';
+        list.style.transform = `translateY(${currentY + delta}px)`;
+    }, [activeLyricIdx]);
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
@@ -264,7 +256,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative">
+            <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges">
                 {displayLines.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                         <div className="flex gap-2">
@@ -277,7 +269,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         </p>
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[20vh] mask-fade-edges" style={{ scrollBehavior: 'smooth' }}>
+                    <div ref={lyricListRef} className="flex flex-col gap-8 py-[50vh] shrink-0" style={{ willChange: 'transform' }}>
                         {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
