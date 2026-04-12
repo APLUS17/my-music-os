@@ -67,40 +67,53 @@ Split on natural phrasing or breath breaks — one sung phrase per line entry.
 Timestamps are seconds from the start of the audio file.
 If no vocals are detected, return { "transcription": "", "lines": [] }.`;
 
-    try {
-        const response = await getGenAI().models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType,
-                        data
-                    }
-                }
-            ],
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
-
-        const resultText = response.text;
-        if (resultText) {
-            const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            // Vocal analysis returns lines, not sections — normalise
-            if (!parsed.lines) parsed.lines = [];
-            if (!parsed.sections) parsed.sections = [];
-            console.log("[AudioIntelligence] Vocal transcription complete:", {
-                lines: parsed.lines.length,
-                hasTranscription: !!parsed.transcription
-            });
-            return parsed;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            // Exponential backoff: 2s, 4s
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
         }
-        return null;
-    } catch (error) {
-        console.error("[AudioIntelligence] Gemini transcription failed:", error);
-        return null;
+        try {
+            const response = await getGenAI().models.generateContent({
+                model: "gemini-3.1-flash-lite-preview",
+                contents: [
+                    { text: prompt },
+                    {
+                        inlineData: {
+                            mimeType,
+                            data
+                        }
+                    }
+                ],
+                config: {
+                    responseMimeType: "application/json"
+                }
+            });
+
+            const resultText = response.text;
+            if (resultText) {
+                const parsed = JSON.parse(resultText) as AudioAnalysisResult;
+                // Vocal analysis returns lines, not sections — normalise
+                if (!parsed.lines) parsed.lines = [];
+                if (!parsed.sections) parsed.sections = [];
+                console.log("[AudioIntelligence] Vocal transcription complete:", {
+                    lines: parsed.lines.length,
+                    hasTranscription: !!parsed.transcription
+                });
+                return parsed;
+            }
+            return null;
+        } catch (error) {
+            lastError = error;
+            const isRateLimit = error instanceof Error && (
+                error.message.includes('429') || error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')
+            );
+            if (!isRateLimit || attempt === 2) break;
+            console.warn(`[AudioIntelligence] Rate limit hit, retrying (attempt ${attempt + 1}/3)...`);
+        }
     }
+    console.error("[AudioIntelligence] Gemini transcription failed:", lastError);
+    return null;
 };
 
 /**
@@ -132,38 +145,50 @@ Return ONLY a JSON object with this exact structure:
   "transcription": ""
 }`;
 
-    try {
-        const response = await getGenAI().models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType,
-                        data
-                    }
-                }
-            ],
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
-
-        const resultText = response.text;
-        if (resultText) {
-            const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            if (!parsed.sections || !Array.isArray(parsed.sections)) {
-                console.warn("[AudioIntelligence] Invalid beat analysis response");
-                return null;
-            }
-            console.log("[AudioIntelligence] Beat structure analysis complete:", {
-                sections: parsed.sections.length
-            });
-            return parsed;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
         }
-        return null;
-    } catch (error) {
-        console.error("[AudioIntelligence] Beat analysis failed:", error);
-        return null;
+        try {
+            const response = await getGenAI().models.generateContent({
+                model: "gemini-3.1-flash-lite-preview",
+                contents: [
+                    { text: prompt },
+                    {
+                        inlineData: {
+                            mimeType,
+                            data
+                        }
+                    }
+                ],
+                config: {
+                    responseMimeType: "application/json"
+                }
+            });
+
+            const resultText = response.text;
+            if (resultText) {
+                const parsed = JSON.parse(resultText) as AudioAnalysisResult;
+                if (!parsed.sections || !Array.isArray(parsed.sections)) {
+                    console.warn("[AudioIntelligence] Invalid beat analysis response");
+                    return null;
+                }
+                console.log("[AudioIntelligence] Beat structure analysis complete:", {
+                    sections: parsed.sections.length
+                });
+                return parsed;
+            }
+            return null;
+        } catch (error) {
+            lastError = error;
+            const isRateLimit = error instanceof Error && (
+                error.message.includes('429') || error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')
+            );
+            if (!isRateLimit || attempt === 2) break;
+            console.warn(`[AudioIntelligence] Rate limit hit, retrying (attempt ${attempt + 1}/3)...`);
+        }
     }
+    console.error("[AudioIntelligence] Beat analysis failed:", lastError);
+    return null;
 };
