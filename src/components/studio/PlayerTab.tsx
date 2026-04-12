@@ -96,7 +96,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
-        const lookaheadTime = currentTime + 0.05;
+        const lookaheadTime = currentTime + 0.03; // ~half of the 60ms RAF interval
         const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
         if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {

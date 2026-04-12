@@ -405,6 +405,13 @@ const StudioWorkspace: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
+    // Stable refs so the RAF loop reads current values without restarting
+    const animFrameRef = useRef<number | null>(null);
+    const sessionsRef = useRef(sessions);
+    const activeSessionIdRef = useRef(activeSessionId);
+    useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
+    useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
     // Persistent Beat Playback State (Lifted from BeatUploader)
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
@@ -452,6 +459,60 @@ const StudioWorkspace: React.FC = () => {
         }
         setCurrentTime(clamped);
     };
+
+    // RAF loop: drives currentTime at ~16fps and corrects beat drift every 2s
+    useEffect(() => {
+        if (!isPlaying) {
+            if (animFrameRef.current !== null) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
+            return;
+        }
+
+        const TIME_INTERVAL = 60;        // ~16fps React updates
+        const DRIFT_INTERVAL = 2000;     // beat re-sync check every 2s
+        const DRIFT_THRESHOLD = 0.05;    // 50ms drift tolerance
+        let lastTimeUpdate = 0;
+        let lastDriftCheck = 0;
+
+        const tick = (timestamp: number) => {
+            // Update currentTime state at ~16fps
+            if (timestamp - lastTimeUpdate >= TIME_INTERVAL) {
+                lastTimeUpdate = timestamp;
+                const t = vocalAudioRef.current?.currentTime;
+                if (t !== undefined) setCurrentTime(t);
+            }
+
+            // Periodic beat drift correction
+            if (uploadedBeat && timestamp - lastDriftCheck >= DRIFT_INTERVAL) {
+                lastDriftCheck = timestamp;
+                const vocal = vocalAudioRef.current;
+                const beat = beatAudioRef.current;
+                if (vocal && beat && !beat.paused) {
+                    const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current)
+                        ?? sessionsRef.current[0];
+                    const offset = session?.beatOffset ?? 0;
+                    const expected = vocal.currentTime + offset;
+                    const drift = Math.abs(beat.currentTime - expected);
+                    if (drift > DRIFT_THRESHOLD) {
+                        console.log(`[BeatSync] Correcting ${(drift * 1000).toFixed(0)}ms drift`);
+                        beat.currentTime = expected;
+                    }
+                }
+            }
+
+            animFrameRef.current = requestAnimationFrame(tick);
+        };
+
+        animFrameRef.current = requestAnimationFrame(tick);
+        return () => {
+            if (animFrameRef.current !== null) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
+        };
+    }, [isPlaying, uploadedBeat]);
 
     // Wire beat audio through Web Audio API so iOS respects volume changes
     useEffect(() => {
@@ -618,7 +679,8 @@ const StudioWorkspace: React.FC = () => {
 
         const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
 
-        // Kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
+        // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
+        setAnalyzingVocalCount(c => c + 1);
         const transcriptionPromise = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
             ? analyzeAudioWithGemini(base64)
             : Promise.resolve(null);
@@ -672,7 +734,6 @@ const StudioWorkspace: React.FC = () => {
 
             toast.success('Layer added! Transcribing lyrics...');
             setLayerModeSessionId(null);
-            setAnalyzingVocalCount(c => c + 1);
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
@@ -712,7 +773,6 @@ const StudioWorkspace: React.FC = () => {
             }
 
             toast.success('Recording saved! Transcribing lyrics...');
-            setAnalyzingVocalCount(c => c + 1);
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
@@ -1630,10 +1690,9 @@ const StudioWorkspace: React.FC = () => {
                 <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
                 
                 {/* Persistent Vocal Session Audio */}
-                <audio 
-                    ref={vocalAudioRef} 
+                <audio
+                    ref={vocalAudioRef}
                     src={sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64}
-                    onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
                     onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
                     onEnded={() => { setIsPlaying(false); setIsBeatPlaying(false); beatAudioRef.current?.pause(); }}
                     className="hidden"
