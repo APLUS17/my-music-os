@@ -618,7 +618,8 @@ const StudioWorkspace: React.FC = () => {
 
         const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
 
-        // Kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
+        // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
+        setAnalyzingVocalCount(c => c + 1);
         const transcriptionPromise = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
             ? analyzeAudioWithGemini(base64)
             : Promise.resolve(null);
@@ -672,7 +673,6 @@ const StudioWorkspace: React.FC = () => {
 
             toast.success('Layer added! Transcribing lyrics...');
             setLayerModeSessionId(null);
-            setAnalyzingVocalCount(c => c + 1);
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
@@ -712,7 +712,6 @@ const StudioWorkspace: React.FC = () => {
             }
 
             toast.success('Recording saved! Transcribing lyrics...');
-            setAnalyzingVocalCount(c => c + 1);
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
