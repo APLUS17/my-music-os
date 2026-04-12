@@ -75,14 +75,19 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash-lite",
+                model: "gemini-2.0-flash",
                 contents: [
-                    { text: prompt },
                     {
-                        inlineData: {
-                            mimeType,
-                            data
-                        }
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType,
+                                    data
+                                }
+                            }
+                        ]
                     }
                 ],
                 config: {
@@ -152,14 +157,19 @@ Return ONLY a JSON object with this exact structure:
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash-lite",
+                model: "gemini-2.0-flash",
                 contents: [
-                    { text: prompt },
                     {
-                        inlineData: {
-                            mimeType,
-                            data
-                        }
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType,
+                                    data
+                                }
+                            }
+                        ]
                     }
                 ],
                 config: {
