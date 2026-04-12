@@ -75,7 +75,7 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash",
+                model: "gemini-3.1-flash-lite-preview",
                 contents: [
                     {
                         role: "user",
@@ -157,7 +157,7 @@ Return ONLY a JSON object with this exact structure:
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash",
+                model: "gemini-3.1-flash-lite-preview",
                 contents: [
                     {
                         role: "user",
