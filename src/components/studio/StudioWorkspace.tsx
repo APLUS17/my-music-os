@@ -14,7 +14,7 @@ import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { analyzeAudioWithGemini, analyzeInstrumentalWithGemini } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -979,36 +979,7 @@ const StudioWorkspace: React.FC = () => {
         setViewMode('studio');
         setStudioMode('flow');
 
-        // If this beat has no sections yet, analyze it with Gemini for song structure
-        if (!beat.sections?.length && process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
-            (async () => {
-                try {
-                    const b64 = beat.base64 || await getAudioData(beat.id);
-                    if (!b64) return;
-                    setIsAnalyzingBeat(true);
-                    analyzeInstrumentalWithGemini(b64).then(result => {
-                        setIsAnalyzingBeat(false);
-                        if (result?.sections?.length) {
-                            const aiSections: AutoSection[] = result.sections.map(s => ({
-                                id: randomId(),
-                                startTime: s.startTime,
-                                endTime: s.endTime,
-                                type: s.type,
-                                label: s.label,
-                                emojiTag: s.emojiTag,
-                                isBest: false,
-                                isFavorited: false,
-                            }));
-                            setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
-                            toast.success('🎵 Beat sections ready!');
-                        }
-                    }).catch(() => setIsAnalyzingBeat(false));
-                } catch (e) {
-                    setIsAnalyzingBeat(false);
-                    console.error('Beat analysis failed', e);
-                }
-            })();
-        }
+        // Beat structure detection disabled — interferes with transcription flow
     };
 
     const handleLibraryBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1423,29 +1394,7 @@ const StudioWorkspace: React.FC = () => {
                                                         return [newBeat, ...filtered];
                                                     });
 
-                                                    // Background beat structure analysis via Gemini — non-blocking
-                                                    if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
-                                                        setIsAnalyzingBeat(true);
-                                                        analyzeInstrumentalWithGemini(base64).then(result => {
-                                                            setIsAnalyzingBeat(false);
-                                                            if (result?.sections?.length) {
-                                                                const aiSections: AutoSection[] = result.sections.map(s => ({
-                                                                    id: randomId(),
-                                                                    startTime: s.startTime,
-                                                                    endTime: s.endTime,
-                                                                    type: s.type,
-                                                                    label: s.label,
-                                                                    emojiTag: s.emojiTag,
-                                                                    isBest: false,
-                                                                    isFavorited: false,
-                                                                }));
-                                                                setBeats(prev => prev.map(b =>
-                                                                    b.id === id ? { ...b, sections: aiSections } : b
-                                                                ));
-                                                                toast.success('🎵 Beat sections ready!');
-                                                            }
-                                                        }).catch(e => { setIsAnalyzingBeat(false); console.error('Beat analysis failed', e); });
-                                                    }
+                                                    // Beat structure detection disabled — interferes with transcription flow
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
