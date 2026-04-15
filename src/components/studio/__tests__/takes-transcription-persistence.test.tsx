@@ -4,6 +4,8 @@
  *   2. Take switching — PlayerTab shows the correct take's transcription when the
  *      active session changes
  *   3. Beat-offset sync — beatCurrentTime formula is correct for both cases
+ *   4. Three-take + beat — transcription is isolated per session and beat sessions
+ *      are handled correctly
  *
  * These tests use jsdom (no real browser APIs). Audio elements are mocked to
  * prevent play() rejections. framer-motion animations render normally in jsdom
@@ -531,5 +533,194 @@ describe('Session persistence — two takes', () => {
         expect(t2.transcription).toBe('Stored take two chorus');
         expect(t2.beatOffset).toBe(3.2);
         expect(t2.lines[0].text).toBe('Chorus stored one');
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════════
+// 5. THREE TAKES + BEAT — transcription isolation and beat session handling
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('Three takes + uploaded beat — transcription isolation', () => {
+    // Simulate the setSessions update that StudioWorkspace applies when a
+    // transcription promise resolves for a specific take id.
+    function applyTranscription(
+        sessions: RecordingSession[],
+        targetId: string,
+        aiResult: { transcription?: string; lines?: { text: string; startTime: number; endTime: number }[] }
+    ): RecordingSession[] {
+        return sessions.map(s =>
+            s.id === targetId
+                ? {
+                    ...s,
+                    transcription: aiResult.transcription || s.transcription,
+                    lines: aiResult.lines || s.lines,
+                }
+                : s
+        );
+    }
+
+    const take1 = makeSession({ id: 't1', name: 'Take 1', transcription: undefined, lines: undefined });
+    const take2 = makeSession({ id: 't2', name: 'Take 2', transcription: undefined, lines: undefined });
+    const take3 = makeSession({
+        id: 't3',
+        name: 'Take 3',
+        isLoopSession: true,
+        beatOffset: 4.0,
+        loopStart: 0,
+        loopEnd: 16,
+        transcription: undefined,
+        lines: undefined,
+    });
+
+    it('transcription for take-1 does not touch take-2 or take-3', () => {
+        let sessions: RecordingSession[] = [take3, take2, take1];
+        sessions = applyTranscription(sessions, 't1', {
+            transcription: 'Take 1 verse',
+            lines: [{ text: 'Verse line one', startTime: 0, endTime: 2 }],
+        });
+
+        expect(sessions.find(s => s.id === 't1')?.transcription).toBe('Take 1 verse');
+        expect(sessions.find(s => s.id === 't2')?.transcription).toBeUndefined();
+        expect(sessions.find(s => s.id === 't3')?.transcription).toBeUndefined();
+    });
+
+    it('transcription for take-2 does not touch take-1 or take-3', () => {
+        let sessions: RecordingSession[] = [take3, take2, take1];
+        sessions = applyTranscription(sessions, 't2', {
+            transcription: 'Take 2 chorus',
+            lines: [{ text: 'Chorus line one', startTime: 0, endTime: 2 }],
+        });
+
+        expect(sessions.find(s => s.id === 't1')?.transcription).toBeUndefined();
+        expect(sessions.find(s => s.id === 't2')?.transcription).toBe('Take 2 chorus');
+        expect(sessions.find(s => s.id === 't3')?.transcription).toBeUndefined();
+    });
+
+    it('beat session (take-3, isLoopSession) receives transcription correctly', () => {
+        let sessions: RecordingSession[] = [take3, take2, take1];
+        sessions = applyTranscription(sessions, 't3', {
+            transcription: 'Hook over beat',
+            lines: [
+                { text: 'Hook line one', startTime: 0, endTime: 2.5 },
+                { text: 'Hook line two', startTime: 3.0, endTime: 5.5 },
+            ],
+        });
+
+        const updated = sessions.find(s => s.id === 't3')!;
+        expect(updated.transcription).toBe('Hook over beat');
+        expect(updated.lines).toHaveLength(2);
+        expect(updated.lines![0].text).toBe('Hook line one');
+        // isLoopSession and beatOffset must be preserved — not clobbered by the update
+        expect(updated.isLoopSession).toBe(true);
+        expect(updated.beatOffset).toBe(4.0);
+        expect(updated.loopStart).toBe(0);
+        expect(updated.loopEnd).toBe(16);
+    });
+
+    it('all three transcriptions applied sequentially leave each session independent', () => {
+        let sessions: RecordingSession[] = [take3, take2, take1];
+
+        // Simulate promises resolving in reverse order (take-3 first, take-1 last)
+        sessions = applyTranscription(sessions, 't3', { transcription: 'Beat take lyrics', lines: [{ text: 'Beat line', startTime: 0, endTime: 3 }] });
+        sessions = applyTranscription(sessions, 't2', { transcription: 'Second take lyrics', lines: [{ text: 'Second line', startTime: 0, endTime: 3 }] });
+        sessions = applyTranscription(sessions, 't1', { transcription: 'First take lyrics', lines: [{ text: 'First line', startTime: 0, endTime: 3 }] });
+
+        expect(sessions.find(s => s.id === 't1')?.transcription).toBe('First take lyrics');
+        expect(sessions.find(s => s.id === 't2')?.transcription).toBe('Second take lyrics');
+        expect(sessions.find(s => s.id === 't3')?.transcription).toBe('Beat take lyrics');
+    });
+
+    it('a null AI result (API failure) leaves existing transcription unchanged', () => {
+        // take-1 already has transcription from a previous partial result
+        const priorState: RecordingSession[] = [
+            { ...take3 },
+            { ...take2 },
+            { ...take1, transcription: 'Earlier partial result', lines: [{ text: 'Earlier line', startTime: 0, endTime: 2 }] },
+        ];
+
+        // Simulate the `if (aiResult)` guard — null result skips the update entirely
+        const aiResult = null;
+        const updated = aiResult ? applyTranscription(priorState, 't1', aiResult) : priorState;
+
+        expect(updated.find(s => s.id === 't1')?.transcription).toBe('Earlier partial result');
+    });
+
+    it('three-take + beat sessions all persist to localStorage', () => {
+        const localStore: Record<string, string> = {};
+        vi.spyOn(Storage.prototype, 'setItem').mockImplementation((k, v) => { localStore[k] = String(v); });
+        vi.spyOn(Storage.prototype, 'getItem').mockImplementation(k => localStore[k] ?? null);
+
+        const sessions: RecordingSession[] = [
+            { ...take3, transcription: 'Beat hook', lines: [{ text: 'Hook', startTime: 0, endTime: 3 }] },
+            { ...take2, transcription: 'Chorus', lines: [{ text: 'Chorus line', startTime: 0, endTime: 3 }] },
+            { ...take1, transcription: 'Verse', lines: [{ text: 'Verse line', startTime: 0, endTime: 3 }] },
+        ];
+
+        // Replicate StudioWorkspace's save: strip audioUrl + base64
+        const toSave = sessions.map(({ audioUrl: _a, base64: _b, ...rest }) => rest);
+        localStorage.setItem('studio-pro-data-v2', JSON.stringify({ sessions: toSave }));
+
+        const { sessions: loaded } = JSON.parse(localStorage.getItem('studio-pro-data-v2')!);
+        expect(loaded).toHaveLength(3);
+        expect(loaded.find((s: RecordingSession) => s.id === 't1')?.transcription).toBe('Verse');
+        expect(loaded.find((s: RecordingSession) => s.id === 't2')?.transcription).toBe('Chorus');
+        expect(loaded.find((s: RecordingSession) => s.id === 't3')?.transcription).toBe('Beat hook');
+        expect(loaded.find((s: RecordingSession) => s.id === 't3')?.isLoopSession).toBe(true);
+        expect(loaded.find((s: RecordingSession) => s.id === 't3')?.beatOffset).toBe(4.0);
+
+        vi.restoreAllMocks();
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════════
+// 6. PLAYER TAB — three takes, correct lyrics shown per take
+// ═════════════════════════════════════════════════════════════════════════
+
+describe('PlayerTab — three takes including beat session', () => {
+    const take1 = makeSession({
+        id: 't1', name: 'Take 1',
+        transcription: 'Verse lyrics',
+        lines: [{ text: 'Verse line one', startTime: 0, endTime: 2 }],
+    });
+    const take2 = makeSession({
+        id: 't2', name: 'Take 2',
+        transcription: 'Chorus lyrics',
+        lines: [{ text: 'Chorus line one', startTime: 0, endTime: 2 }],
+    });
+    const take3 = makeSession({
+        id: 't3', name: 'Take 3',
+        isLoopSession: true, beatOffset: 4.0,
+        transcription: 'Hook over beat',
+        lines: [{ text: 'Hook line one', startTime: 0, endTime: 3 }],
+    });
+    const allTakes = [take3, take2, take1];
+
+    it('shows only take-1 lyrics when take-1 is active', () => {
+        render(<PlayerTab {...makePlayerProps(take1, allTakes)} />);
+        expect(screen.getByText('Verse line one')).toBeTruthy();
+        expect(screen.queryByText('Chorus line one')).toBeNull();
+        expect(screen.queryByText('Hook line one')).toBeNull();
+    });
+
+    it('shows only take-2 lyrics when take-2 is active', () => {
+        render(<PlayerTab {...makePlayerProps(take2, allTakes)} />);
+        expect(screen.getByText('Chorus line one')).toBeTruthy();
+        expect(screen.queryByText('Verse line one')).toBeNull();
+        expect(screen.queryByText('Hook line one')).toBeNull();
+    });
+
+    it('shows only beat-take lyrics when take-3 (beat session) is active', () => {
+        render(<PlayerTab {...makePlayerProps(take3, allTakes)} />);
+        expect(screen.getByText('Hook line one')).toBeTruthy();
+        expect(screen.queryByText('Verse line one')).toBeNull();
+        expect(screen.queryByText('Chorus line one')).toBeNull();
+    });
+
+    it('take picker lists all three takes', () => {
+        render(<PlayerTab {...makePlayerProps(take3, allTakes)} />);
+        const takeButton = screen.getByText(/TAKE \d/i);
+        fireEvent.click(takeButton);
+        const takeLabels = screen.getAllByText(/Take \d/i);
+        expect(takeLabels.length).toBeGreaterThanOrEqual(3);
     });
 });
