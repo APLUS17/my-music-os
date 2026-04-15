@@ -14,7 +14,7 @@ import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { transcribeAudio } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioWithGemini } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -681,8 +681,8 @@ const StudioWorkspace: React.FC = () => {
 
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
-        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_API_KEY
-            ? transcribeAudio(base64)
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
+            ? analyzeAudioWithGemini(base64)
             : Promise.resolve(null);
 
         await saveAudioData(id, base64);
