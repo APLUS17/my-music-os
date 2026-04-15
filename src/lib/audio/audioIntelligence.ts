@@ -75,7 +75,7 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-3.1-flash-lite-preview",
+                model: "gemini-2.0-flash",
                 contents: [
                     {
                         role: "user",
@@ -107,6 +107,7 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
                 });
                 return parsed;
             }
+            console.warn("[AudioIntelligence] Gemini returned an empty response (no text)");
             return null;
         } catch (error) {
             lastError = error;
@@ -157,7 +158,7 @@ Return ONLY a JSON object with this exact structure:
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-3.1-flash-lite-preview",
+                model: "gemini-2.0-flash",
                 contents: [
                     {
                         role: "user",

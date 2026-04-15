@@ -751,11 +751,13 @@ const StudioWorkspace: React.FC = () => {
                         return s;
                     }));
                     toast.success('🎤 Lyrics transcribed!');
+                } else {
+                    toast.error('Transcription failed — check DevTools console for details');
                 }
             }).catch(err => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 console.error("Vocal transcription failed:", err);
-                toast.error('Transcription failed — check your connection and try again');
+                toast.error('Transcription failed — check DevTools console for details');
             });
         } else {
             // Create new session (original behavior)
@@ -789,11 +791,13 @@ const StudioWorkspace: React.FC = () => {
                         return s;
                     }));
                     toast.success('🎤 Lyrics transcribed!');
+                } else {
+                    toast.error('Transcription failed — check DevTools console for details');
                 }
             }).catch(err => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 console.error("Vocal transcription failed:", err);
-                toast.error('Transcription failed — check your connection and try again');
+                toast.error('Transcription failed — check DevTools console for details');
             });
         }
     };
