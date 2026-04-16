@@ -732,7 +732,7 @@ const StudioWorkspace: React.FC = () => {
                 return s;
             }));
 
-            toast.success('Layer added! Transcribing lyrics...');
+            toast.success('Layer added');
             setLayerModeSessionId(null);
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
@@ -750,7 +750,6 @@ const StudioWorkspace: React.FC = () => {
                         }
                         return s;
                     }));
-                    toast.success('🎤 Lyrics transcribed!');
                 }
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
@@ -772,7 +771,7 @@ const StudioWorkspace: React.FC = () => {
                 setRecordingTargetLineId(null);
             }
 
-            toast.success('Recording saved! Transcribing lyrics...');
+            toast.success('Recording saved');
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 if (aiResult) {
@@ -787,7 +786,6 @@ const StudioWorkspace: React.FC = () => {
                         }
                         return s;
                     }));
-                    toast.success('🎤 Lyrics transcribed!');
                 }
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
