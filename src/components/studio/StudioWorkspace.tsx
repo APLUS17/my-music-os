@@ -752,9 +752,9 @@ const StudioWorkspace: React.FC = () => {
                     }));
                     toast.success('🎤 Lyrics transcribed!');
                 }
-            }).catch(err => {
+            }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                console.error("Vocal transcription failed:", err);
+                toast.error(err.message);
             });
         } else {
             // Create new session (original behavior)
@@ -789,9 +789,9 @@ const StudioWorkspace: React.FC = () => {
                     }));
                     toast.success('🎤 Lyrics transcribed!');
                 }
-            }).catch(err => {
+            }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                console.error("Vocal transcription failed:", err);
+                toast.error(err.message);
             });
         }
     };

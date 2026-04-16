@@ -45,8 +45,7 @@ const stripDataUrlPrefix = (dataUrl: string): { mimeType: string; data: string }
 export const analyzeAudioWithGemini = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
     if (!apiKey) {
-        console.warn("[AudioIntelligence] No API key — skipping AI analysis");
-        return null;
+        throw new Error('Gemini API key is not configured (NEXT_PUBLIC_GOOGLE_API_KEY missing)');
     }
 
     // Strip data URL prefix if present
@@ -75,14 +74,19 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash-lite",
+                model: "gemini-2.0-flash",
                 contents: [
-                    { text: prompt },
                     {
-                        inlineData: {
-                            mimeType,
-                            data
-                        }
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType,
+                                    data
+                                }
+                            }
+                        ]
                     }
                 ],
                 config: {
@@ -102,18 +106,29 @@ If no vocals are detected, return { "transcription": "", "lines": [] }.`;
                 });
                 return parsed;
             }
-            return null;
+            throw new Error('Gemini returned an empty response — model may not support this audio format');
         } catch (error) {
             lastError = error;
-            const isRateLimit = error instanceof Error && (
-                error.message.includes('429') || error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED')
-            );
+            const msg = error instanceof Error ? error.message : String(error);
+            const isRateLimit = msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
             if (!isRateLimit || attempt === 2) break;
             console.warn(`[AudioIntelligence] Rate limit hit, retrying (attempt ${attempt + 1}/3)...`);
         }
     }
+
+    // Categorise the error into a user-readable message
+    const raw = lastError instanceof Error ? lastError.message : String(lastError);
     console.error("[AudioIntelligence] Gemini transcription failed:", lastError);
-    return null;
+    if (raw.includes('API_KEY_INVALID') || raw.includes('API key not valid') || raw.includes('403')) {
+        throw new Error('Gemini API key is invalid — check the NEXT_PUBLIC_GOOGLE_API_KEY env var in Vercel');
+    }
+    if (raw.includes('429') || raw.includes('RESOURCE_EXHAUSTED') || raw.includes('quota')) {
+        throw new Error('Gemini quota exceeded — try again in a moment');
+    }
+    if (raw.includes('404') || raw.includes('not found') || raw.includes('NOT_FOUND')) {
+        throw new Error('Gemini model not found — the model name may be wrong or not enabled for this API key');
+    }
+    throw new Error(`Gemini error: ${raw.slice(0, 120)}`);
 };
 
 /**
@@ -152,14 +167,19 @@ Return ONLY a JSON object with this exact structure:
         }
         try {
             const response = await getGenAI().models.generateContent({
-                model: "gemini-2.0-flash-lite",
+                model: "gemini-2.0-flash",
                 contents: [
-                    { text: prompt },
                     {
-                        inlineData: {
-                            mimeType,
-                            data
-                        }
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType,
+                                    data
+                                }
+                            }
+                        ]
                     }
                 ],
                 config: {
