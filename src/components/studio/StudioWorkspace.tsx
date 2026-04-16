@@ -681,7 +681,7 @@ const StudioWorkspace: React.FC = () => {
 
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
-        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_API_KEY
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED === 'true'
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 

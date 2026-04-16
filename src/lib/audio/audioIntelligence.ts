@@ -16,24 +16,31 @@ const stripDataUrlPrefix = (dataUrl: string): { mimeType: string; data: string }
     return { mimeType: 'audio/webm', data: dataUrl };
 };
 
-const mimeToExt = (mimeType: string): string => ({
-    'audio/webm': 'webm',
-    'audio/mp4': 'mp4',
-    'audio/mpeg': 'mp3',
-    'audio/mpga': 'mp3',
-    'audio/ogg': 'ogg',
-    'audio/wav': 'wav',
-    'audio/flac': 'flac',
-    'audio/m4a': 'm4a',
-} as Record<string, string>)[mimeType] ?? 'webm';
+const mimeToExt = (mimeType: string): string => {
+    const map: Record<string, string> = {
+        'audio/webm': 'webm',
+        'audio/mp4': 'mp4',
+        'audio/mpeg': 'mp3',
+        'audio/mpga': 'mp3',
+        'audio/ogg': 'ogg',
+        'audio/wav': 'wav',
+        'audio/flac': 'flac',
+        'audio/m4a': 'm4a',
+    };
+    return map[mimeType] ?? 'webm';
+};
 
+/**
+ * Transcribe vocal audio via the /api/transcribe Next.js route, which
+ * forwards the audio to Groq Whisper server-side (no CORS issues).
+ * Requires GROQ_API_KEY set in Vercel environment variables.
+ * NEXT_PUBLIC_GROQ_ENABLED=true must also be set so the client knows
+ * transcription is active.
+ */
 export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
-    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
-    if (!apiKey) {
-        throw new Error('Groq API key not configured (add NEXT_PUBLIC_GROQ_API_KEY to Vercel env vars)');
-    }
-
     const { mimeType } = stripDataUrlPrefix(audioBase64);
+
+    // Convert data URL → Blob for multipart upload
     const blob = await fetch(audioBase64).then(r => r.blob());
 
     const formData = new FormData();
@@ -48,16 +55,16 @@ export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysi
     for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
         try {
-            const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+            const response = await fetch('/api/transcribe', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${apiKey}` },
                 body: formData,
+                // No Authorization header — key lives server-side in the route
             });
 
             if (!response.ok) {
-                const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
-                const msg = body?.error?.message ?? response.statusText;
-                lastError = new Error(`Groq ${response.status}: ${msg}`);
+                const body = await response.json().catch(() => ({})) as { error?: string };
+                const msg = body?.error ?? response.statusText;
+                lastError = new Error(`Transcription ${response.status}: ${msg}`);
                 if (response.status !== 429 || attempt === 2) break;
                 console.warn(`[AudioIntelligence] Rate limit, retrying (${attempt + 1}/3)...`);
                 continue;
@@ -81,13 +88,10 @@ export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysi
     }
 
     const raw = lastError instanceof Error ? lastError.message : String(lastError);
-    console.error('[AudioIntelligence] Groq failed:', lastError);
+    console.error('[AudioIntelligence] Groq transcription failed:', lastError);
 
-    if (raw.includes('401') || raw.includes('invalid_api_key')) throw new Error('Groq API key is invalid');
+    if (raw.includes('401') || raw.includes('invalid_api_key')) throw new Error('Groq API key is invalid — check GROQ_API_KEY in Vercel');
     if (raw.includes('429') || raw.includes('rate_limit')) throw new Error('Groq rate limit — try again in a moment');
     if (raw.includes('413')) throw new Error('Recording too large for Groq (25 MB limit)');
-    if (raw.toLowerCase().includes('cors') || raw.includes('Failed to fetch')) {
-        throw new Error('Groq blocked by browser CORS — needs a server-side proxy route');
-    }
-    throw new Error(`Groq error: ${raw.slice(0, 120)}`);
+    throw new Error(`Transcription error: ${raw.slice(0, 120)}`);
 };
