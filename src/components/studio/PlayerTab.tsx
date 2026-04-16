@@ -60,7 +60,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     lyrics,
     onSelectSession,
     isAnalyzingBeat,
-    isAnalyzingVocal,
 
     // Lifted
     isPlaying,
@@ -258,13 +257,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                         animate={{ y: lyricTranslateY }}
                         transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
                     >
-                        {isAnalyzingVocal && displayLines.length === 0 ? (
-                            <>
-                                {[{ w: 'w-3/4' }, { w: 'w-1/2' }, { w: 'w-5/6' }, { w: 'w-2/5' }].map((item, i) => (
-                                    <div key={i} className={`${item.w} h-8 rounded-xl bg-white/10 animate-pulse`} />
-                                ))}
-                            </>
-                        ) : displayLines.map((line, i) => {
+                        {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
                             const isFuture = i > activeLyricIdx;
@@ -365,17 +358,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                 >
                     <motion.div className="absolute left-0 top-0 h-full bg-white rounded-full" animate={{ width: `${progress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
                     <motion.div className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-white rounded-full shadow" animate={{ left: `calc(${progress}% - 7px)` }} transition={{ duration: 0.1, ease: 'linear' }} />
-                    {isAnalyzingVocal && (
-                        <motion.div
-                            className="absolute top-0 h-full w-[40%] rounded-full"
-                            style={{
-                                background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.55), transparent)',
-                                pointerEvents: 'none',
-                            }}
-                            animate={{ left: ['-40%', '100%'] }}
-                            transition={{ duration: 1.4, ease: 'easeInOut', repeat: Infinity, repeatType: 'loop' }}
-                        />
-                    )}
                 </div>
                 <div className="flex justify-between text-xs text-white/50 mt-2 font-medium">
                     <span>{formatTime(currentTime)}</span>

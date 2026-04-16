@@ -734,8 +734,10 @@ const StudioWorkspace: React.FC = () => {
 
             toast.success('Layer added');
             setLayerModeSessionId(null);
+            const layerToastId = toast.loading('Transcribing lyrics...');
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.dismiss(layerToastId);
                 if (aiResult) {
                     setSessions(prev => prev.map(s => {
                         if (s.id === targetSessionId) {
@@ -753,7 +755,7 @@ const StudioWorkspace: React.FC = () => {
                 }
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.error(err.message);
+                toast.error(err.message, { id: layerToastId });
             });
         } else {
             // Create new session (original behavior)
@@ -772,8 +774,10 @@ const StudioWorkspace: React.FC = () => {
             }
 
             toast.success('Recording saved');
+            const recordingToastId = toast.loading('Transcribing lyrics...');
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.dismiss(recordingToastId);
                 if (aiResult) {
                     setSessions(prev => prev.map(s => {
                         if (s.id === id) {
@@ -789,7 +793,7 @@ const StudioWorkspace: React.FC = () => {
                 }
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.error(err.message);
+                toast.error(err.message, { id: recordingToastId });
             });
         }
     };
