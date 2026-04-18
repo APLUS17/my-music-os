@@ -428,16 +428,18 @@ const StudioWorkspace: React.FC = () => {
     // Sync Vocal and Beat
     const togglePlayback = (play?: boolean) => {
         const shouldPlay = play !== undefined ? play : !isPlaying;
-        
+
         if (shouldPlay) {
             beatAudioCtxRef.current?.resume();
             vocalAudioRef.current?.play().catch(console.error);
-            if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
-                const offset = session?.beatOffset || 0;
-                beatAudioRef.current.currentTime = (vocalAudioRef.current?.currentTime || 0) + offset;
-                beatAudioRef.current.play().catch(console.error);
-                setIsBeatPlaying(true);
+            if (uploadedBeat && beatAudioRef.current && sessions.length > 0) {
+                const session = sessions.find(s => s.id === activeSessionId);
+                if (session) {
+                    const offset = session.beatOffset || 0;
+                    beatAudioRef.current.currentTime = (vocalAudioRef.current?.currentTime || 0) + offset;
+                    beatAudioRef.current.play().catch(console.error);
+                    setIsBeatPlaying(true);
+                }
             }
             setIsPlaying(true);
         } else {
@@ -451,11 +453,13 @@ const StudioWorkspace: React.FC = () => {
     const seekTo = (time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
         if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
-        
-        if (beatAudioRef.current) {
-            const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
-            const offset = session?.beatOffset || 0;
-            beatAudioRef.current.currentTime = clamped + offset;
+
+        if (beatAudioRef.current && sessions.length > 0) {
+            const session = sessions.find(s => s.id === activeSessionId);
+            if (session) {
+                const offset = session.beatOffset || 0;
+                beatAudioRef.current.currentTime = clamped + offset;
+            }
         }
         setCurrentTime(clamped);
     };
@@ -489,15 +493,16 @@ const StudioWorkspace: React.FC = () => {
                 lastDriftCheck = timestamp;
                 const vocal = vocalAudioRef.current;
                 const beat = beatAudioRef.current;
-                if (vocal && beat && !beat.paused) {
-                    const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current)
-                        ?? sessionsRef.current[0];
-                    const offset = session?.beatOffset ?? 0;
-                    const expected = vocal.currentTime + offset;
-                    const drift = Math.abs(beat.currentTime - expected);
-                    if (drift > DRIFT_THRESHOLD) {
-                        console.log(`[BeatSync] Correcting ${(drift * 1000).toFixed(0)}ms drift`);
-                        beat.currentTime = expected;
+                if (vocal && beat && !beat.paused && sessionsRef.current.length > 0) {
+                    const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current);
+                    if (session) {
+                        const offset = session.beatOffset ?? 0;
+                        const expected = vocal.currentTime + offset;
+                        const drift = Math.abs(beat.currentTime - expected);
+                        if (drift > DRIFT_THRESHOLD) {
+                            console.log(`[BeatSync] Correcting ${(drift * 1000).toFixed(0)}ms drift`);
+                            beat.currentTime = expected;
+                        }
                     }
                 }
             }
