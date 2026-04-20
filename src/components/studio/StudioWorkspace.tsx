@@ -539,6 +539,13 @@ const StudioWorkspace: React.FC = () => {
         };
     }, []);
 
+    // Ensure beat audio loads when src changes
+    useEffect(() => {
+        const audio = beatAudioRef.current;
+        if (!audio || !uploadedBeat) return;
+        audio.load();
+    }, [uploadedBeat]);
+
     // Update Beat Volume
     useEffect(() => {
         if (beatGainRef.current) {
@@ -911,11 +918,11 @@ const StudioWorkspace: React.FC = () => {
 
         const handleTimeUpdate = () => {
             if (!audio) return;
-            if (isBeatLooping) {
-                const start = beatLoopStart ?? 0;
-                const end = beatLoopEnd ?? audio.duration;
-                if (audio.currentTime >= end && end > 0) {
-                    audio.currentTime = start;
+            if (isBeatLooping && beatLoopEnd && beatLoopStart !== null) {
+                // Only seek if we've actually exceeded the end by a significant margin (more than 10ms)
+                // This prevents excessive seeking that causes dropouts
+                if (audio.currentTime >= beatLoopEnd + 0.01) {
+                    audio.currentTime = beatLoopStart;
                 }
             }
         };
@@ -930,8 +937,12 @@ const StudioWorkspace: React.FC = () => {
             }
         };
 
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('ended', onEnded);
+        // Only attach listeners if audio element has a valid source
+        if (audio.src) {
+            audio.addEventListener('timeupdate', handleTimeUpdate);
+            audio.addEventListener('ended', onEnded);
+        }
+
         if (beatGainRef.current) beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
 
         if (isBeatPlaying) {
@@ -949,7 +960,7 @@ const StudioWorkspace: React.FC = () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', onEnded);
         };
-    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat]);
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat, beatMuted]);
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
