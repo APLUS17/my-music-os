@@ -982,6 +982,12 @@ const StudioWorkspace: React.FC = () => {
             }
         }
 
+        // Stop all audio playback before clearing
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+
         setSections([{
             id: randomId(),
             type: type,
@@ -991,6 +997,7 @@ const StudioWorkspace: React.FC = () => {
 
         setSessions([]);
         setActiveSessionId(null);
+        setPlayingSessionId(null);
         setProjectTitle("");
         setProjectBpm("120");
         setProjectKey("C Min");
@@ -1003,10 +1010,17 @@ const StudioWorkspace: React.FC = () => {
         setSavedProjects(prev => prev.filter(p => p.id !== id));
         // If the project being deleted is the one currently loaded, reset the workspace
         if (id === activeProjectId) {
+            // Stop all audio playback before clearing
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
@@ -1015,11 +1029,18 @@ const StudioWorkspace: React.FC = () => {
 
     const handleNewProject = () => {
         if (window.confirm("Start a new project? Current work will be archived.")) {
+            // Stop all audio playback before clearing
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             archiveCurrentProject();
             setSections([]); // Empty for Flow mode
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setUploadedBeatName("");
@@ -1032,11 +1053,18 @@ const StudioWorkspace: React.FC = () => {
 
     const loadProject = (p: SavedProject) => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
+            // Stop all audio playback before loading new project
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             const hasSections = p.sections && p.sections.length > 0;
             setSections(p.sections || []);
             setScraps(p.scraps || []);
             setSessions(p.sessions || []);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
             setUploadedBeat(p.beats?.[0]?.audioUrl || null);
             setUploadedBeatName(p.beats?.[0]?.name || "");
@@ -1049,12 +1077,19 @@ const StudioWorkspace: React.FC = () => {
 
     const handleStartProjectFromBeat = (beat: Beat) => {
         if (globalAudioRef.current) globalAudioRef.current.pause();
+        // Stop all audio playback before loading beat project
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+
         setPlayingBeatId(null);
         archiveCurrentProject();
         setSections([]); // Blank canvas for Flow mode
         setScraps([]);
         setSessions([]);
         setActiveSessionId(null);
+        setPlayingSessionId(null);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
@@ -1710,7 +1745,7 @@ const StudioWorkspace: React.FC = () => {
                 {/* Persistent Vocal Session Audio */}
                 <audio
                     ref={vocalAudioRef}
-                    src={sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64}
+                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || '') : ''}
                     onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
                     onEnded={() => { setIsPlaying(false); setIsBeatPlaying(false); beatAudioRef.current?.pause(); }}
                     className="hidden"
