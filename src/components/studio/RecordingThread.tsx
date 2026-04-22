@@ -124,7 +124,7 @@ const SessionCard = ({
 }) => {
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
-    const layerAudioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+    const layerAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
     const progress = (session.duration || 0) > 0 ? (isActive ? currentTime / (session.duration || 0) : 0) : 0;
     const isThisSessionPlaying = isActive && isPlaying;
@@ -140,12 +140,26 @@ const SessionCard = ({
         }
     }, [currentTime, playingSectionId, isActive, onTogglePlay, session.sections]);
 
+    // Cleanup stale refs when layers change
+    useEffect(() => {
+        if (!session.layers) {
+            layerAudioRefs.current.clear();
+            return;
+        }
+        const layerIds = new Set(session.layers.map(l => l.id));
+        for (const layerId of layerAudioRefs.current.keys()) {
+            if (!layerIds.has(layerId)) {
+                layerAudioRefs.current.delete(layerId);
+            }
+        }
+    }, [session.layers?.length]);
+
     // Handle Layer Sync
     useEffect(() => {
-        if (isThisSessionPlaying) {
-            layerAudioRefs.current.forEach((audio, idx) => {
-                const layer = session.layers?.[idx];
-                if (!audio || !layer || layer.isMuted) return;
+        if (isThisSessionPlaying && session.layers) {
+            session.layers.forEach(layer => {
+                const audio = layerAudioRefs.current.get(layer.id);
+                if (!audio || layer.isMuted) return;
 
                 // Keep layers in sync with main clock
                 if (Math.abs(audio.currentTime - currentTime) > 0.1) {
@@ -234,10 +248,10 @@ const SessionCard = ({
                 )}
                 onClick={onSelect}
             >
-                {session.layers?.map((layer, i) => (
+                {session.layers?.map((layer) => (
                     <audio
                         key={layer.id}
-                        ref={el => { layerAudioRefs.current[i] = el; }}
+                        ref={el => { if (el) layerAudioRefs.current.set(layer.id, el); }}
                         src={layer.audioUrl || layer.base64}
                         preload="auto"
                     />

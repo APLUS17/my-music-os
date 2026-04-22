@@ -83,7 +83,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   // Layer playback refs - for playing existing layers while recording new one
   const parentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const layerAudioRefs = useRef<HTMLAudioElement[]>([]);
+  const layerAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -392,9 +392,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
 
     // Play all unmuted existing layers
-    layerAudioRefs.current.forEach((audio, idx) => {
-      const layer = existingLayers[idx];
-      if (audio && layer && !layer.isMuted) {
+    existingLayers.forEach((layer) => {
+      const audio = layerAudioRefs.current.get(layer.id);
+      if (audio && !layer.isMuted) {
         audio.currentTime = 0;
         audio.volume = layer.gain ?? 1;
         audio.play().catch(console.error);
@@ -409,10 +409,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       parentAudioRef.current.currentTime = 0;
     }
     layerAudioRefs.current.forEach(audio => {
-      if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
+      audio.pause();
+      audio.currentTime = 0;
     });
   };
 
@@ -580,10 +578,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       {layerMode && parentAudioUrl && (
         <audio ref={parentAudioRef} src={parentAudioUrl} className="hidden" preload="auto" />
       )}
-      {layerMode && existingLayers.map((layer, idx) => (
+      {layerMode && existingLayers.map((layer) => (
         <audio
           key={layer.id}
-          ref={(el) => { if (el) layerAudioRefs.current[idx] = el; }}
+          ref={(el) => { if (el) layerAudioRefs.current.set(layer.id, el); }}
           src={layer.audioUrl}
           className="hidden"
           preload="auto"
