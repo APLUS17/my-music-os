@@ -433,16 +433,24 @@ const StudioWorkspace: React.FC = () => {
 
         if (shouldPlay) {
             beatAudioCtxRef.current?.resume();
-            vocalAudioRef.current?.play().catch(console.error);
-            if (uploadedBeat && beatAudioRef.current && sessions.length > 0) {
-                const session = sessions.find(s => s.id === activeSessionId);
-                if (session) {
-                    const offset = session.beatOffset || 0;
-                    beatAudioRef.current.currentTime = (vocalAudioRef.current?.currentTime || 0) + offset;
-                    beatAudioRef.current.play().catch(console.error);
-                    setIsBeatPlaying(true);
-                }
+            
+            // 1. Play Vocal if available
+            const hasVocals = sessions.length > 0 && vocalAudioRef.current;
+            if (hasVocals) {
+                vocalAudioRef.current?.play().catch(console.error);
             }
+
+            // 2. Play Beat if available
+            if (uploadedBeat && beatAudioRef.current) {
+                const session = sessions.find(s => s.id === activeSessionId);
+                if (session && vocalAudioRef.current) {
+                    const offset = session.beatOffset || 0;
+                    beatAudioRef.current.currentTime = vocalAudioRef.current.currentTime + offset;
+                }
+                beatAudioRef.current.play().catch(console.error);
+                setIsBeatPlaying(true);
+            }
+            
             setIsPlaying(true);
         } else {
             vocalAudioRef.current?.pause();
@@ -456,14 +464,31 @@ const StudioWorkspace: React.FC = () => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
         if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
 
-        if (beatAudioRef.current && sessions.length > 0) {
+        if (beatAudioRef.current) {
             const session = sessions.find(s => s.id === activeSessionId);
             if (session) {
                 const offset = session.beatOffset || 0;
                 beatAudioRef.current.currentTime = clamped + offset;
+            } else if (!vocalAudioRef.current || sessions.length === 0) {
+                // If no vocal, seek beat directly
+                beatAudioRef.current.currentTime = clamped;
             }
         }
         setCurrentTime(clamped);
+    };
+
+    const handleBeatSeek = (beatTime: number) => {
+        if (!beatAudioRef.current) return;
+        
+        const session = sessions.find(s => s.id === activeSessionId);
+        if (session && vocalAudioRef.current) {
+            const offset = session.beatOffset || 0;
+            const vocalTime = Math.max(0, beatTime - offset);
+            vocalAudioRef.current.currentTime = vocalTime;
+            setCurrentTime(vocalTime);
+        } else {
+            setCurrentTime(beatTime);
+        }
     };
 
     // RAF loop: drives currentTime at ~16fps and corrects beat drift every 2s
@@ -486,8 +511,14 @@ const StudioWorkspace: React.FC = () => {
             // Update currentTime state at ~16fps
             if (timestamp - lastTimeUpdate >= TIME_INTERVAL) {
                 lastTimeUpdate = timestamp;
-                const t = vocalAudioRef.current?.currentTime;
-                if (t !== undefined) setCurrentTime(t);
+                const vocalTime = vocalAudioRef.current?.currentTime;
+                const beatTime = beatAudioRef.current?.currentTime;
+                
+                if (vocalTime !== undefined && sessions.length > 0) {
+                    setCurrentTime(vocalTime);
+                } else if (beatTime !== undefined) {
+                    setCurrentTime(beatTime);
+                }
             }
 
             // Periodic beat drift correction
@@ -647,6 +678,11 @@ const StudioWorkspace: React.FC = () => {
                             }
                         }));
                         setBeats(loadedBeats);
+                        if (loadedBeats.length > 0 && !uploadedBeat) {
+                            setUploadedBeat(loadedBeats[0].audioUrl || null);
+                            setUploadedBeatName(loadedBeats[0].name || "Untitled Beat");
+                            setUploadedBeatId(parsed.uploadedBeatId || loadedBeats[0].id);
+                        }
                     }
                     if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
                 } catch (e) { console.error("Failed to load saved state", e); }
@@ -663,21 +699,25 @@ const StudioWorkspace: React.FC = () => {
     const saveTimeoutRef = useRef<number | null>(null);
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        setSaveIndicator('saving');
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-        const dataToSave = {
-            sections, scraps, savedProjects,
-            projectTitle, projectBpm, projectKey,
-            sessions: sessionsToSave, beats: beatsToSave,
-            activeProjectId
+        
+        const saveState = () => {
+            setSaveIndicator('saving');
+            const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            const dataToSave = {
+                sections, scraps, savedProjects,
+                projectTitle, projectBpm, projectKey,
+                sessions: sessionsToSave, beats: beatsToSave,
+                activeProjectId, uploadedBeatId
+            };
+            try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
+            catch (e) { console.error("Storage full or error", e); }
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
         };
-        try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
-        catch (e) { console.error("Storage full or error", e); }
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
+
+        const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
+        return () => clearTimeout(timeoutId);
     }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId]);
 
     const handleRecordStart = (lineId?: string) => {
@@ -706,20 +746,24 @@ const StudioWorkspace: React.FC = () => {
         let sections: AutoSection[] = [];
         try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const arrayBuffer = await blob.arrayBuffer();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-            const isLoopSession = isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null;
-            const passes = isLoopSession && beatLoopStart !== null && beatLoopEnd !== null
-                ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
-                : 1;
+            try {
+                const arrayBuffer = await blob.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const isLoopSession = isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null;
+                const passes = isLoopSession && beatLoopStart !== null && beatLoopEnd !== null
+                    ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
+                    : 1;
 
-            sections = await analyzeAudioAndSplit(audioBuffer, {
-                isLoopSession,
-                loopStart: beatLoopStart || 0,
-                loopEnd: beatLoopEnd || 0,
-                startOffset: compensatedOffset || 0,
-                passCount: Math.ceil(passes)
-            });
+                sections = await analyzeAudioAndSplit(audioBuffer, {
+                    isLoopSession,
+                    loopStart: beatLoopStart || 0,
+                    loopEnd: beatLoopEnd || 0,
+                    startOffset: compensatedOffset || 0,
+                    passCount: Math.ceil(passes)
+                });
+            } finally {
+                audioCtx.close().catch(() => {});
+            }
         } catch (err) {
             console.error("Failed to split recording automatically", err);
         }
@@ -1489,6 +1533,7 @@ const StudioWorkspace: React.FC = () => {
                                             setLoopEnd={setBeatLoopEnd}
                                             isLooping={isBeatLooping}
                                             setIsLooping={setIsBeatLooping}
+                                            onSeek={handleBeatSeek}
                                             onUpload={async (file) => {
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);

@@ -41,7 +41,7 @@ const formatTime = (secs: number): string => {
     return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const PlayerTab: React.FC<PlayerTabProps> = ({
+export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     projectTitle,
     session,
     sessions,
