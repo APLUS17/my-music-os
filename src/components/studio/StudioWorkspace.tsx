@@ -36,7 +36,11 @@ import {
     Mic,
     FileMusic,
     History,
-    Type
+    Type,
+    House,
+    ListMusic,
+    Archive,
+    ChartColumn
 } from 'lucide-react';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,13 +138,10 @@ const NavBtn = ({ active, onClick, icon, label, id }: NavBtnProps) => (
     <button
         id={id}
         onClick={onClick}
-        title={label}
-        className={`flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${active
-            ? 'bg-[var(--bg-secondary)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm scale-100 opacity-100'
-            : 'text-[var(--text-secondary)] border border-transparent hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] scale-90 opacity-60 hover:opacity-100 hover:scale-100'
-            }`}
+        className={`flex flex-col items-center gap-1 py-2 pb-1 text-xs transition-colors ${active ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
     >
         {icon}
+        <span>{label}</span>
     </button>
 );
 
@@ -354,6 +355,7 @@ const StudioWorkspace: React.FC = () => {
 
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
+    const [showNavHint, setShowNavHint] = useState(true);
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
@@ -1811,25 +1813,43 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
-                    <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
-                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
-                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <button
-                            id="tour-nav-record"
-                            onClick={() => {
-                                setShowRecorder(true);
-                                setRecorderMinimized(true);
-                                setRecorderAutoStart(isBeatPlaying);
-                            }}
-                            className="w-12 h-12 bg-[var(--studio-red)] text-white rounded-xl flex items-center justify-center shadow-[0_0_20px_-5px_rgba(255,0,60,0.5)] hover:scale-105 active:scale-95 transition-all mx-1"
-                        >
-                            <div className="w-3 h-3 rounded-full bg-current" />
-                        </button>
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid size={20} />} label="Board" />
-                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search size={20} />} label="Search" />
+                <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
+                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
+                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
+                        <div className="flex justify-center" style={{ marginTop: '-62px' }}>
+                            <div className="relative flex flex-col items-center">
+                                {showNavHint && (
+                                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-medium pl-3 pr-1.5 py-1.5 rounded-full shadow-lg z-10 flex items-center gap-1">
+                                        <span>Tap • Hold to record</span>
+                                        <button
+                                            className="ml-0.5 p-0.5 rounded-full hover:bg-background/20 transition-colors"
+                                            aria-label="Dismiss hint"
+                                            onClick={() => setShowNavHint(false)}
+                                        >
+                                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                                <line x1="2" y1="2" x2="8" y2="8" />
+                                                <line x1="8" y1="2" x2="2" y2="8" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                                <button
+                                    id="tour-nav-record"
+                                    onClick={() => {
+                                        setShowRecorder(true);
+                                        setRecorderMinimized(true);
+                                        setRecorderAutoStart(isBeatPlaying);
+                                    }}
+                                    className="relative flex items-center justify-center w-[82px] h-[82px] rounded-full transition-all duration-200 select-none border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 shadow-[0_2px_14px_rgba(239,68,68,0.35)]"
+                                    style={{ touchAction: 'none' }}
+                                >
+                                    <Plus className="h-5 w-5 text-white" />
+                                </button>
+                            </div>
+                        </div>
+                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<Archive className="h-5 w-5" />} label="Board" />
+                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<ChartColumn className="h-5 w-5" />} label="Search" />
                     </div>
                 </nav>
             </main>
