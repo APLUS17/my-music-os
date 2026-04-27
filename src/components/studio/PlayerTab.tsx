@@ -406,4 +406,4 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             </div>
         </div>
     );
-};
+});
