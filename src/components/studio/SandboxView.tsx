@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
+import React, { useRef, useEffect, useState, useLayoutEffect, useMemo } from 'react';
 import { Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
 import { LyricSection, RecordingSession } from '@/types';
 import { randomId } from '@/lib/utils/id';
@@ -69,8 +69,16 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   onPlaySession,
   currentlyPlayingSessionId
 }) => {
-  const [activeLineId, setActiveLineId] = useState<string | null>(null);
-  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
+  const sessionMap = useMemo(() => {
+    const map = new Map<string, RecordingSession>();
+    for (const session of sessions) {
+      map.set(session.id, session);
+    }
+    return map;
+  }, [sessions]);
+
+  const [_activeLineId, setActiveLineId] = useState<string | null>(null);
+  const [_draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
 
   // Flatten sections into editable lines for Flow mode
@@ -217,7 +225,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
     const sessionId = e.dataTransfer.getData('text/plain');
 
     // Remove session from any other line and add to target
-    const newLines = lines.map(line => {
+    const _newLines = lines.map(line => {
       if (line.id === targetLineId) return { ...line, sessionId };
       if (line.sessionId === sessionId) return { ...line, sessionId: undefined };
       return line;
@@ -258,7 +266,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       )}
 
       {lines.map((line, index) => {
-        const session = line.sessionId ? sessions.find(t => t.id === line.sessionId) : null;
+        const session = line.sessionId ? sessionMap.get(line.sessionId) : null;
         const isPlaying = session && currentlyPlayingSessionId === session.id;
 
         const isLastLineOfSection = lines[index + 1]?.sectionId !== line.sectionId;
