@@ -41,7 +41,7 @@ const formatTime = (secs: number): string => {
     return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-export const PlayerTab: React.FC<PlayerTabProps> = ({
+export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     projectTitle,
     session,
     sessions,
@@ -59,7 +59,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     onClearLoop,
     lyrics,
     onSelectSession,
-    isAnalyzingVocal,
     isAnalyzingBeat,
 
     // Lifted
@@ -82,9 +81,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     const sessionIdx = sessions && activeSession ? sessions.findIndex(s => s.id === activeSession.id) : -1;
 
     // Derived — beat sections drive pills ONLY
-    const beatCurrentTime = currentTime + (activeSession?.beatOffset ?? 0);
-    const beatSections = beat?.sections ?? [];
-    const activeSectionIdx = beatSections.findIndex(s => beatCurrentTime >= s.startTime && beatCurrentTime < s.endTime);
+    // Only calculate beat highlights if recording was made WITH the beat
+    const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
+      ? currentTime + activeSession.beatOffset
+      : null;
+    const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
+    const activeSectionIdx = beatSections.length > 0
+      ? beatSections.findIndex(s => beatCurrentTime! >= s.startTime && beatCurrentTime! < s.endTime)
+      : -1;
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     // Transcription Lines from the active session ONLY
@@ -92,7 +96,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
 
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
-        const lookaheadTime = currentTime + 0.05;
+        const lookaheadTime = currentTime + 0.03; // ~half of the 60ms RAF interval
         const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
         if (idx !== -1) return idx;
         if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
@@ -101,8 +105,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         return -1;
     }, [displayLines, currentTime]);
 
-    const verticalScrollRaf = useRef<number | null>(null);
     const horizontalScrollRaf = useRef<number | null>(null);
+    const lyricContainerRef = useRef<HTMLDivElement>(null);
+    const lyricListRef = useRef<HTMLDivElement>(null);
+    const [lyricTranslateY, setLyricTranslateY] = useState(0);
 
     const smoothScroll = useCallback((
         element: HTMLElement,
@@ -114,7 +120,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         const distance = targetPosition - startPosition;
         const startTime = performance.now();
 
-        const rafRef = direction === 'vertical' ? verticalScrollRaf : horizontalScrollRaf;
+        const rafRef = horizontalScrollRaf;
 
         if (rafRef.current !== null) {
             cancelAnimationFrame(rafRef.current);
@@ -148,7 +154,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
     // Clean up animation frames on unmount
     useEffect(() => {
         return () => {
-            if (verticalScrollRaf.current !== null) cancelAnimationFrame(verticalScrollRaf.current);
             if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
         };
     }, []);
@@ -172,28 +177,24 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
         }
     }, [activeSectionIdx, smoothScroll]);
 
-    // Auto-scroll active lyric
+    // Reset list position when a new session's lyrics load
     useEffect(() => {
-        if (activeLyricIdx >= 0) {
-            const element = lyricRefs.current[activeLyricIdx];
-            if (element) {
-                const parent = element.parentElement;
-                if (parent) {
-                    const elementRect = element.getBoundingClientRect();
-                    const parentRect = parent.getBoundingClientRect();
+        setLyricTranslateY(0);
+    }, [displayLines]);
 
-                    // Closer to the vertical center (50% from the top)
-                    // This ensures the active text is completely clear of the top gradient
-                    const targetY = parentRect.top + parentRect.height * 0.5;
-                    const elementCenterY = elementRect.top + elementRect.height / 2;
+    // Spring-based lyric centering — Framer Motion drives the animation, no style mutation
+    useEffect(() => {
+        if (activeLyricIdx < 0) return;
+        const container = lyricContainerRef.current;
+        const activeEl = lyricRefs.current[activeLyricIdx];
+        if (!container || !activeEl) return;
 
-                    const scrollTarget = parent.scrollTop + (elementCenterY - targetY);
+        const containerRect = container.getBoundingClientRect();
+        const activeRect = activeEl.getBoundingClientRect();
+        const delta = (containerRect.top + containerRect.height / 2) - (activeRect.top + activeRect.height / 2);
 
-                    smoothScroll(parent, scrollTarget, 400, 'vertical');
-                }
-            }
-        }
-    }, [activeLyricIdx, smoothScroll]);
+        setLyricTranslateY(prev => prev + delta);
+    }, [activeLyricIdx]);
 
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
@@ -249,48 +250,40 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col justify-end relative">
-                {displayLines.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-4">
-                        <div className="flex gap-2">
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity }} />
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }} />
-                            <motion.div className="w-2 h-2 bg-white rounded-full" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }} />
-                        </div>
-                        <p className="text-white/40 text-sm text-center max-w-xs uppercase tracking-widest font-mono text-[10px]">
-                            {isAnalyzingVocal ? "Transcribing lyrics..." : activeSession ? "Syncing transcription..." : "Awaiting first take..."}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-8 overflow-y-auto scrollbar-hide py-[30vh] mask-fade-edges" style={{ scrollBehavior: 'smooth' }}>
+            <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
+                <motion.div
+                        ref={lyricListRef}
+                        className="flex flex-col gap-8 py-[50vh] shrink-0"
+                        animate={{ y: lyricTranslateY }}
+                        transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
+                    >
                         {displayLines.map((line, i) => {
                             const isActive = i === activeLyricIdx;
                             const isPast = i < activeLyricIdx;
                             const isFuture = i > activeLyricIdx;
                             const distance = Math.abs(i - activeLyricIdx);
                             
-                            let opacity = 0.08; let scale = 0.94; let blur = '3px';
+                            let opacity = 0.15; let scale = 0.96; let blur = 2;
 
-                            if (isActive) { opacity = 1; scale = 1.05; blur = '0px'; }
+                            if (isActive) { opacity = 1; scale = 1; blur = 0; }
                             else if (isPast) {
-                                if (distance === 1) { opacity = 0.35; scale = 0.98; blur = '1px'; }
-                                else { opacity = 0.15; scale = 0.96; blur = '2px'; }
+                                if (distance === 1) { opacity = 0.45; scale = 0.98; blur = 1; }
+                                else { opacity = 0.25; scale = 0.96; blur = 2; }
                             } else if (isFuture) {
-                                if (distance === 1) { opacity = 0.25; scale = 1; blur = '2px'; }
-                                else if (distance === 2) { opacity = 0.12; scale = 0.98; blur = '2.5px'; }
-                                else { opacity = 0.05; scale = 0.95; blur = '4px'; }
+                                if (distance === 1) { opacity = 0.4; scale = 1; blur = 1; }
+                                else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = 2; }
+                                else { opacity = 0.12; scale = 0.95; blur = 0; }
                             }
-                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = '2px'; }
+                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = 1; }
 
                             return (
                                 <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
-                                    className={cn("text-left cursor-pointer origin-left", isActive ? "text-white" : "text-white/80")}
-                                    style={{ willChange: "transform, filter, opacity" }}
+                                    className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
                                     initial={false}
-                                    animate={{ opacity, scale, filter: `blur(${blur})` }}
-                                    transition={{ duration: 0.8, ease: [0.4, 0, 0.2, 1] }}
+                                    animate={{ opacity, scale, filter: `blur(${blur}px)` }}
+                                    transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
                                     <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : "")}>
@@ -299,11 +292,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                                 </motion.div>
                             );
                         })}
-                    </div>
-                )}
-                
-                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--bg-main)] to-transparent pointer-events-none z-10" />
+                    </motion.div>
             </div>
 
             {/* ── Section pills — beat only ──────────────────────────── */}
@@ -404,7 +393,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
                     [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
                     [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-                    style={{ background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) 100%)` }}
+                    style={{ touchAction: 'none', background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) 100%)` }}
                 />
                 <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
             </div>
@@ -417,4 +406,4 @@ export const PlayerTab: React.FC<PlayerTabProps> = ({
             </div>
         </div>
     );
-};
+});

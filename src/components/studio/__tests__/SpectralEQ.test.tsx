@@ -243,7 +243,7 @@ describe('SpectralEQ', () => {
       expect(midFilter.Q.value).toBe(0.5);
     });
 
-    it('sets highshelf filter at 5000 Hz', async () => {
+    it('sets highshelf filter at 10000 Hz', async () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       const filters: MockFilter[] = [];
       const mockCtx = makeAudioContext();
@@ -267,7 +267,7 @@ describe('SpectralEQ', () => {
 
       const highFilter = filters[2];
       expect(highFilter.type).toBe('highshelf');
-      expect(highFilter.frequency.value).toBe(5000);
+      expect(highFilter.frequency.value).toBe(10000);
     });
 
     it('connects source → low → mid → high → destinationNode', async () => {
@@ -511,65 +511,34 @@ describe('SpectralEQ', () => {
     });
   });
 
-  // --- Frequency sweep knob ------------------------------------------------
-  describe('Frequency sweep knob', () => {
-    it('renders the MID SWEEP label', () => {
+  // --- Frequency control via horizontal canvas drag -----------------------
+  // The SpectralEQ uses a single canvas. Frequency is changed by dragging a
+  // node horizontally; gain is changed vertically. There is no separate sweep
+  // track element — all interaction is through the canvas pointer events.
+  describe('Frequency control (canvas horizontal drag)', () => {
+    it('renders the drag-to-change-frequency hint text', () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       render(
         <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
       );
-      expect(screen.getByText('MID SWEEP')).toBeTruthy();
+      expect(screen.getByText(/Drag nodes/i)).toBeTruthy();
     });
 
-    it('shows 1.0k as default frequency', () => {
-      const { analyserRef, dataArrayRef } = makeRefs();
-      render(
-        <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
-      );
-      expect(screen.getByText('1.0k')).toBeTruthy();
-    });
-
-    it('dragging sweep knob right increases midFreq and updates display', async () => {
+    it('horizontal canvas drag on mid node activates RESET (freq changed from default)', async () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       const { container } = render(
         <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
       );
+      const canvas = container.querySelector('canvas')!;
 
-      // The sweep track is the div with cursor-ew-resize
-      const sweepTrack = container.querySelector('.cursor-ew-resize') as HTMLElement;
-      expect(sweepTrack).toBeTruthy();
+      // Mid node is at freqToX(1000, 400) ≈ 210, centerY = 88
+      const midNodeX = Math.round(((Math.log10(1000) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20))) * CANVAS_W);
+      const midNodeY = CENTER_Y;
 
-      // Mock clientWidth so deltaX / trackWidth is meaningful
-      Object.defineProperty(sweepTrack, 'clientWidth', { value: 300, configurable: true });
-
-      // Drag right by 90px on a 300px track → t increases by 0.3
-      // Start at freqToT(1000) ≈ 0.526, new t ≈ 0.826 → ~5000Hz range
-      fireEvent.pointerDown(sweepTrack, { clientX: 150, pointerId: 1 });
-      fireEvent.pointerMove(sweepTrack, { clientX: 240, pointerId: 1 });
-      fireEvent.pointerUp(sweepTrack, { pointerId: 1 });
-
-      await waitFor(() => {
-        // Freq should have increased — display should no longer say 1.0k
-        const freqDisplay = container.querySelector('[style*="color"]');
-        // Just check RESET is now enabled (midFreq ≠ default)
-        const resetBtn = screen.getByText('RESET').closest('button')!;
-        expect(resetBtn.disabled).toBe(false);
-      });
-    });
-
-    it('dragging sweep knob left decreases midFreq', async () => {
-      const { analyserRef, dataArrayRef } = makeRefs();
-      const { container } = render(
-        <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
-      );
-
-      const sweepTrack = container.querySelector('.cursor-ew-resize') as HTMLElement;
-      Object.defineProperty(sweepTrack, 'clientWidth', { value: 300, configurable: true });
-
-      // Drag left by 60px → t decreases, freq goes below 1000
-      fireEvent.pointerDown(sweepTrack, { clientX: 150, pointerId: 1 });
-      fireEvent.pointerMove(sweepTrack, { clientX: 90, pointerId: 1 });
-      fireEvent.pointerUp(sweepTrack, { pointerId: 1 });
+      // Drag right (increasing frequency)
+      fireEvent.pointerDown(canvas, { clientX: midNodeX, clientY: midNodeY, pointerId: 1 });
+      fireEvent.pointerMove(canvas, { clientX: midNodeX + 80, clientY: midNodeY, pointerId: 1 });
+      fireEvent.pointerUp(canvas, { pointerId: 1 });
 
       await waitFor(() => {
         const resetBtn = screen.getByText('RESET').closest('button')!;
@@ -577,7 +546,7 @@ describe('SpectralEQ', () => {
       });
     });
 
-    it('sweep updates mid filter frequency value', async () => {
+    it('horizontal canvas drag on mid node updates mid filter frequency', async () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       const filters: MockFilter[] = [];
       const mockCtx = makeAudioContext();
@@ -599,36 +568,35 @@ describe('SpectralEQ', () => {
         )
       );
 
-      const sweepTrack = container.querySelector('.cursor-ew-resize') as HTMLElement;
-      Object.defineProperty(sweepTrack, 'clientWidth', { value: 300, configurable: true });
+      const canvas = container.querySelector('canvas')!;
+      const midNodeX = Math.round(((Math.log10(1000) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20))) * CANVAS_W);
 
-      const initialFreq = filters[1].frequency.value; // mid filter
+      const initialFreq = filters[1].frequency.value;
 
-      fireEvent.pointerDown(sweepTrack, { clientX: 150, pointerId: 1 });
-      fireEvent.pointerMove(sweepTrack, { clientX: 240, pointerId: 1 });
-      fireEvent.pointerUp(sweepTrack, { pointerId: 1 });
+      fireEvent.pointerDown(canvas, { clientX: midNodeX, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerMove(canvas, { clientX: midNodeX + 80, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerUp(canvas, { pointerId: 1 });
 
       await waitFor(() => {
         expect(filters[1].frequency.value).not.toBe(initialFreq);
       });
     });
 
-    it('pointerCancel on sweep track releases drag without error', async () => {
+    it('pointerCancel on canvas releases active node without error', async () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       const { container } = render(
         <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
       );
+      const canvas = container.querySelector('canvas')!;
+      const midNodeX = Math.round(((Math.log10(1000) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20))) * CANVAS_W);
 
-      const sweepTrack = container.querySelector('.cursor-ew-resize') as HTMLElement;
-      Object.defineProperty(sweepTrack, 'clientWidth', { value: 300, configurable: true });
+      fireEvent.pointerDown(canvas, { clientX: midNodeX, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerMove(canvas, { clientX: midNodeX + 40, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerCancel(canvas, { pointerId: 1 });
+      // Further moves should not crash
+      fireEvent.pointerMove(canvas, { clientX: midNodeX + 200, clientY: CENTER_Y, pointerId: 1 });
 
-      fireEvent.pointerDown(sweepTrack, { clientX: 150, pointerId: 1 });
-      fireEvent.pointerCancel(sweepTrack, { pointerId: 1 });
-      // Further moves after cancel should not change state
-      fireEvent.pointerMove(sweepTrack, { clientX: 300, pointerId: 1 });
-
-      // Still alive, no crash
-      expect(sweepTrack).toBeTruthy();
+      expect(canvas).toBeTruthy();
     });
   });
 
@@ -661,19 +629,18 @@ describe('SpectralEQ', () => {
       });
     });
 
-    it('RESET also restores midFreq to 1.0k after sweep', async () => {
+    it('RESET disables itself after a frequency drag is reset', async () => {
       const { analyserRef, dataArrayRef } = makeRefs();
       const { container } = render(
         <SpectralEQ analyserRef={analyserRef} dataArrayRef={dataArrayRef} audioContext={null} />
       );
+      const canvas = container.querySelector('canvas')!;
+      const midNodeX = Math.round(((Math.log10(1000) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20))) * CANVAS_W);
 
-      const sweepTrack = container.querySelector('.cursor-ew-resize') as HTMLElement;
-      Object.defineProperty(sweepTrack, 'clientWidth', { value: 300, configurable: true });
-
-      // Sweep to non-default frequency
-      fireEvent.pointerDown(sweepTrack, { clientX: 150, pointerId: 1 });
-      fireEvent.pointerMove(sweepTrack, { clientX: 240, pointerId: 1 });
-      fireEvent.pointerUp(sweepTrack, { pointerId: 1 });
+      // Drag mid node horizontally to change frequency
+      fireEvent.pointerDown(canvas, { clientX: midNodeX, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerMove(canvas, { clientX: midNodeX + 80, clientY: CENTER_Y, pointerId: 1 });
+      fireEvent.pointerUp(canvas, { pointerId: 1 });
 
       await waitFor(() => {
         expect(screen.getByText('RESET').closest('button')!.disabled).toBe(false);
@@ -682,7 +649,6 @@ describe('SpectralEQ', () => {
       fireEvent.click(screen.getByText('RESET'));
 
       await waitFor(() => {
-        expect(screen.getByText('1.0k')).toBeTruthy();
         expect(screen.getByText('RESET').closest('button')!.disabled).toBe(true);
       });
     });

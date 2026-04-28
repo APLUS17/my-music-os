@@ -14,7 +14,7 @@ import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { analyzeAudioWithGemini, analyzeInstrumentalWithGemini } from '@/lib/audio/audioIntelligence';
+import { transcribeAudio } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
@@ -36,7 +36,11 @@ import {
     Mic,
     FileMusic,
     History,
-    Type
+    Type,
+    House,
+    ListMusic,
+    Archive,
+    ChartColumn
 } from 'lucide-react';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,13 +138,10 @@ const NavBtn = ({ active, onClick, icon, label, id }: NavBtnProps) => (
     <button
         id={id}
         onClick={onClick}
-        title={label}
-        className={`flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] ${active
-            ? 'bg-[var(--bg-secondary)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm scale-100 opacity-100'
-            : 'text-[var(--text-secondary)] border border-transparent hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] scale-90 opacity-60 hover:opacity-100 hover:scale-100'
-            }`}
+        className={`flex flex-col items-center gap-1 py-2 pb-1 text-xs transition-colors ${active ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
     >
         {icon}
+        <span>{label}</span>
     </button>
 );
 
@@ -354,6 +355,7 @@ const StudioWorkspace: React.FC = () => {
 
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
+    const [showNavHint, setShowNavHint] = useState(true);
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
@@ -369,6 +371,8 @@ const StudioWorkspace: React.FC = () => {
     const [fabOpen, setFabOpen] = useState(false);
     const fabInputRef = useRef<HTMLInputElement>(null);
     const beatAudioRef = useRef<HTMLAudioElement>(null);
+    const beatAudioCtxRef = useRef<AudioContext | null>(null);
+    const beatGainRef = useRef<GainNode | null>(null);
 
     const [projectTitle, setProjectTitle] = useState("");
     const [projectBpm, setProjectBpm] = useState("120");
@@ -403,6 +407,13 @@ const StudioWorkspace: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
+    // Stable refs so the RAF loop reads current values without restarting
+    const animFrameRef = useRef<number | null>(null);
+    const sessionsRef = useRef(sessions);
+    const activeSessionIdRef = useRef(activeSessionId);
+    useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
+    useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
     // Persistent Beat Playback State (Lifted from BeatUploader)
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
@@ -410,7 +421,8 @@ const StudioWorkspace: React.FC = () => {
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
     const [isBeatLooping, setIsBeatLooping] = useState(false);
-    const [isAnalyzingVocal, setIsAnalyzingVocal] = useState(false);
+    const [analyzingVocalCount, setAnalyzingVocalCount] = useState(0);
+    const isAnalyzingVocal = analyzingVocalCount > 0;
     const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
 
     const [showTour, setShowTour] = useState(false);
@@ -418,16 +430,27 @@ const StudioWorkspace: React.FC = () => {
     // Sync Vocal and Beat
     const togglePlayback = (play?: boolean) => {
         const shouldPlay = play !== undefined ? play : !isPlaying;
-        
+
         if (shouldPlay) {
-            vocalAudioRef.current?.play().catch(console.error);
+            beatAudioCtxRef.current?.resume();
+            
+            // 1. Play Vocal if available
+            const hasVocals = sessions.length > 0 && vocalAudioRef.current;
+            if (hasVocals) {
+                vocalAudioRef.current?.play().catch(console.error);
+            }
+
+            // 2. Play Beat if available
             if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
-                const offset = session?.beatOffset || 0;
-                beatAudioRef.current.currentTime = (vocalAudioRef.current?.currentTime || 0) + offset;
+                const session = sessions.find(s => s.id === activeSessionId);
+                if (session && vocalAudioRef.current) {
+                    const offset = session.beatOffset || 0;
+                    beatAudioRef.current.currentTime = vocalAudioRef.current.currentTime + offset;
+                }
                 beatAudioRef.current.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
+            
             setIsPlaying(true);
         } else {
             vocalAudioRef.current?.pause();
@@ -440,19 +463,126 @@ const StudioWorkspace: React.FC = () => {
     const seekTo = (time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
         if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
-        
+
         if (beatAudioRef.current) {
-            const session = sessions.find(s => s.id === activeSessionId) || sessions[0];
-            const offset = session?.beatOffset || 0;
-            beatAudioRef.current.currentTime = clamped + offset;
+            const session = sessions.find(s => s.id === activeSessionId);
+            if (session) {
+                const offset = session.beatOffset || 0;
+                beatAudioRef.current.currentTime = clamped + offset;
+            } else if (!vocalAudioRef.current || sessions.length === 0) {
+                // If no vocal, seek beat directly
+                beatAudioRef.current.currentTime = clamped;
+            }
         }
         setCurrentTime(clamped);
     };
 
+    const handleBeatSeek = (beatTime: number) => {
+        if (!beatAudioRef.current) return;
+        
+        const session = sessions.find(s => s.id === activeSessionId);
+        if (session && vocalAudioRef.current) {
+            const offset = session.beatOffset || 0;
+            const vocalTime = Math.max(0, beatTime - offset);
+            vocalAudioRef.current.currentTime = vocalTime;
+            setCurrentTime(vocalTime);
+        } else {
+            setCurrentTime(beatTime);
+        }
+    };
+
+    // RAF loop: drives currentTime at ~16fps and corrects beat drift every 2s
+    useEffect(() => {
+        if (!isPlaying) {
+            if (animFrameRef.current !== null) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
+            return;
+        }
+
+        const TIME_INTERVAL = 60;        // ~16fps React updates
+        const DRIFT_INTERVAL = 2000;     // beat re-sync check every 2s
+        const DRIFT_THRESHOLD = 0.05;    // 50ms drift tolerance
+        let lastTimeUpdate = 0;
+        let lastDriftCheck = 0;
+
+        const tick = (timestamp: number) => {
+            // Update currentTime state at ~16fps
+            if (timestamp - lastTimeUpdate >= TIME_INTERVAL) {
+                lastTimeUpdate = timestamp;
+                const vocalTime = vocalAudioRef.current?.currentTime;
+                const beatTime = beatAudioRef.current?.currentTime;
+                
+                if (vocalTime !== undefined && sessions.length > 0) {
+                    setCurrentTime(vocalTime);
+                } else if (beatTime !== undefined) {
+                    setCurrentTime(beatTime);
+                }
+            }
+
+            // Periodic beat drift correction
+            if (uploadedBeat && timestamp - lastDriftCheck >= DRIFT_INTERVAL) {
+                lastDriftCheck = timestamp;
+                const vocal = vocalAudioRef.current;
+                const beat = beatAudioRef.current;
+                if (vocal && beat && !beat.paused && sessionsRef.current.length > 0) {
+                    const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current);
+                    if (session) {
+                        const offset = session.beatOffset ?? 0;
+                        const expected = vocal.currentTime + offset;
+                        const drift = Math.abs(beat.currentTime - expected);
+                        if (drift > DRIFT_THRESHOLD) {
+                            console.log(`[BeatSync] Correcting ${(drift * 1000).toFixed(0)}ms drift`);
+                            beat.currentTime = expected;
+                        }
+                    }
+                }
+            }
+
+            animFrameRef.current = requestAnimationFrame(tick);
+        };
+
+        animFrameRef.current = requestAnimationFrame(tick);
+        return () => {
+            if (animFrameRef.current !== null) {
+                cancelAnimationFrame(animFrameRef.current);
+                animFrameRef.current = null;
+            }
+        };
+    }, [isPlaying, uploadedBeat]);
+
+    // Wire beat audio through Web Audio API so iOS respects volume changes
+    useEffect(() => {
+        const audio = beatAudioRef.current;
+        if (!audio) return;
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContextClass() as AudioContext;
+        beatAudioCtxRef.current = ctx;
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 1;
+        beatGainRef.current = gainNode;
+        const source = ctx.createMediaElementSource(audio);
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        return () => {
+            ctx.close();
+            beatAudioCtxRef.current = null;
+            beatGainRef.current = null;
+        };
+    }, []);
+
+    // Ensure beat audio loads when src changes
+    useEffect(() => {
+        const audio = beatAudioRef.current;
+        if (!audio || !uploadedBeat) return;
+        audio.load();
+    }, [uploadedBeat]);
+
     // Update Beat Volume
     useEffect(() => {
-        if (beatAudioRef.current) {
-            beatAudioRef.current.volume = beatMuted ? 0 : beatVolume;
+        if (beatGainRef.current) {
+            beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
         }
     }, [beatVolume, beatMuted]);
 
@@ -548,6 +678,11 @@ const StudioWorkspace: React.FC = () => {
                             }
                         }));
                         setBeats(loadedBeats);
+                        if (loadedBeats.length > 0 && !uploadedBeat) {
+                            setUploadedBeat(loadedBeats[0].audioUrl || null);
+                            setUploadedBeatName(loadedBeats[0].name || "Untitled Beat");
+                            setUploadedBeatId(parsed.uploadedBeatId || loadedBeats[0].id);
+                        }
                     }
                     if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
                 } catch (e) { console.error("Failed to load saved state", e); }
@@ -564,21 +699,25 @@ const StudioWorkspace: React.FC = () => {
     const saveTimeoutRef = useRef<number | null>(null);
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        setSaveIndicator('saving');
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-        const dataToSave = {
-            sections, scraps, savedProjects,
-            projectTitle, projectBpm, projectKey,
-            sessions: sessionsToSave, beats: beatsToSave,
-            activeProjectId
+        
+        const saveState = () => {
+            setSaveIndicator('saving');
+            const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            const dataToSave = {
+                sections, scraps, savedProjects,
+                projectTitle, projectBpm, projectKey,
+                sessions: sessionsToSave, beats: beatsToSave,
+                activeProjectId, uploadedBeatId
+            };
+            try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
+            catch (e) { console.error("Storage full or error", e); }
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
         };
-        try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
-        catch (e) { console.error("Storage full or error", e); }
-        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
+
+        const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
+        return () => clearTimeout(timeoutId);
     }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId]);
 
     const handleRecordStart = (lineId?: string) => {
@@ -593,6 +732,13 @@ const StudioWorkspace: React.FC = () => {
         const id = randomId().substring(0, 6).toUpperCase();
 
         const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
+
+        // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
+        setAnalyzingVocalCount(c => c + 1);
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED === 'true'
+            ? transcribeAudio(base64)
+            : Promise.resolve(null);
+
         await saveAudioData(id, base64);
 
         const timestamp = new Date().toISOString();
@@ -600,20 +746,24 @@ const StudioWorkspace: React.FC = () => {
         let sections: AutoSection[] = [];
         try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const arrayBuffer = await blob.arrayBuffer();
-            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-            const isLoopSession = isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null;
-            const passes = isLoopSession && beatLoopStart !== null && beatLoopEnd !== null
-                ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
-                : 1;
+            try {
+                const arrayBuffer = await blob.arrayBuffer();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const isLoopSession = isBeatLooping && beatLoopStart !== null && beatLoopEnd !== null;
+                const passes = isLoopSession && beatLoopStart !== null && beatLoopEnd !== null
+                    ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
+                    : 1;
 
-            sections = await analyzeAudioAndSplit(audioBuffer, {
-                isLoopSession,
-                loopStart: beatLoopStart || 0,
-                loopEnd: beatLoopEnd || 0,
-                startOffset: compensatedOffset || 0,
-                passCount: Math.ceil(passes)
-            });
+                sections = await analyzeAudioAndSplit(audioBuffer, {
+                    isLoopSession,
+                    loopStart: beatLoopStart || 0,
+                    loopEnd: beatLoopEnd || 0,
+                    startOffset: compensatedOffset || 0,
+                    passCount: Math.ceil(passes)
+                });
+            } finally {
+                audioCtx.close().catch(() => {});
+            }
         } catch (err) {
             console.error("Failed to split recording automatically", err);
         }
@@ -629,8 +779,9 @@ const StudioWorkspace: React.FC = () => {
                 gain: 0.8
             };
 
+            const targetSessionId = layerModeSessionId;
             setSessions(prev => prev.map(s => {
-                if (s.id === layerModeSessionId) {
+                if (s.id === targetSessionId) {
                     return {
                         ...s,
                         layers: [...(s.layers || []), newLayer]
@@ -639,8 +790,31 @@ const StudioWorkspace: React.FC = () => {
                 return s;
             }));
 
-            toast.success('Layer added!');
+            toast.success('Layer added');
             setLayerModeSessionId(null);
+            const layerToastId = toast.loading('Transcribing lyrics...');
+            transcriptionPromise.then(aiResult => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.dismiss(layerToastId);
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => {
+                        if (s.id === targetSessionId) {
+                            return {
+                                ...s,
+                                layers: (s.layers || []).map(l =>
+                                    l.id === id
+                                        ? { ...l, transcription: aiResult.transcription, lines: aiResult.lines }
+                                        : l
+                                )
+                            };
+                        }
+                        return s;
+                    }));
+                }
+            }).catch((err: Error) => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.error(err.message, { id: layerToastId });
+            });
         } else {
             // Create new session (original behavior)
             const newSession: RecordingSession = {
@@ -657,10 +831,11 @@ const StudioWorkspace: React.FC = () => {
                 setRecordingTargetLineId(null);
             }
 
-            toast.success('Recording saved! Transcribing lyrics...');
-            setIsAnalyzingVocal(true);
-            analyzeAudioWithGemini(base64).then(aiResult => {
-                setIsAnalyzingVocal(false);
+            toast.success('Recording saved');
+            const recordingToastId = toast.loading('Transcribing lyrics...');
+            transcriptionPromise.then(aiResult => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.dismiss(recordingToastId);
                 if (aiResult) {
                     setSessions(prev => prev.map(s => {
                         if (s.id === id) {
@@ -673,11 +848,10 @@ const StudioWorkspace: React.FC = () => {
                         }
                         return s;
                     }));
-                    toast.success('🎤 Lyrics transcribed!');
                 }
-            }).catch(err => {
-                setIsAnalyzingVocal(false);
-                console.error("Vocal transcription failed:", err);
+            }).catch((err: Error) => {
+                setAnalyzingVocalCount(c => Math.max(0, c - 1));
+                toast.error(err.message, { id: recordingToastId });
             });
         }
     };
@@ -718,7 +892,8 @@ const StudioWorkspace: React.FC = () => {
             if (uploadedBeat && session.beatOffset !== undefined && beatAudioRef.current) {
                 // Account for latency compensation already being in beatOffset
                 beatAudioRef.current.currentTime = session.beatOffset;
-                beatAudioRef.current.volume = beatVolume;
+                if (beatGainRef.current) beatGainRef.current.gain.value = beatVolume;
+                beatAudioCtxRef.current?.resume();
                 beatAudioRef.current.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
@@ -789,11 +964,11 @@ const StudioWorkspace: React.FC = () => {
 
         const handleTimeUpdate = () => {
             if (!audio) return;
-            if (isBeatLooping) {
-                const start = beatLoopStart ?? 0;
-                const end = beatLoopEnd ?? audio.duration;
-                if (audio.currentTime >= end && end > 0) {
-                    audio.currentTime = start;
+            if (isBeatLooping && beatLoopEnd && beatLoopStart !== null) {
+                // Only seek if we've actually exceeded the end by a significant margin (more than 10ms)
+                // This prevents excessive seeking that causes dropouts
+                if (audio.currentTime >= beatLoopEnd + 0.01) {
+                    audio.currentTime = beatLoopStart;
                 }
             }
         };
@@ -801,18 +976,24 @@ const StudioWorkspace: React.FC = () => {
         const onEnded = () => {
             if (isBeatLooping) {
                 audio.currentTime = beatLoopStart ?? 0;
+                beatAudioCtxRef.current?.resume();
                 audio.play().catch(console.error);
             } else {
                 setIsBeatPlaying(false);
             }
         };
 
-        audio.addEventListener('timeupdate', handleTimeUpdate);
-        audio.addEventListener('ended', onEnded);
-        audio.volume = beatVolume;
+        // Only attach listeners if audio element has a valid source
+        if (audio.src) {
+            audio.addEventListener('timeupdate', handleTimeUpdate);
+            audio.addEventListener('ended', onEnded);
+        }
+
+        if (beatGainRef.current) beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
 
         if (isBeatPlaying) {
             if (audio.paused && audio.src) {
+                beatAudioCtxRef.current?.resume();
                 audio.play().catch(() => setIsBeatPlaying(false));
             }
         } else {
@@ -825,7 +1006,7 @@ const StudioWorkspace: React.FC = () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', onEnded);
         };
-    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat]);
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat, beatMuted]);
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
@@ -847,6 +1028,12 @@ const StudioWorkspace: React.FC = () => {
             }
         }
 
+        // Stop all audio playback before clearing
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+
         setSections([{
             id: randomId(),
             type: type,
@@ -856,6 +1043,7 @@ const StudioWorkspace: React.FC = () => {
 
         setSessions([]);
         setActiveSessionId(null);
+        setPlayingSessionId(null);
         setProjectTitle("");
         setProjectBpm("120");
         setProjectKey("C Min");
@@ -868,10 +1056,17 @@ const StudioWorkspace: React.FC = () => {
         setSavedProjects(prev => prev.filter(p => p.id !== id));
         // If the project being deleted is the one currently loaded, reset the workspace
         if (id === activeProjectId) {
+            // Stop all audio playback before clearing
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
@@ -880,11 +1075,18 @@ const StudioWorkspace: React.FC = () => {
 
     const handleNewProject = () => {
         if (window.confirm("Start a new project? Current work will be archived.")) {
+            // Stop all audio playback before clearing
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             archiveCurrentProject();
             setSections([]); // Empty for Flow mode
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle("");
             setUploadedBeat(null);
             setUploadedBeatName("");
@@ -897,11 +1099,18 @@ const StudioWorkspace: React.FC = () => {
 
     const loadProject = (p: SavedProject) => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
+            // Stop all audio playback before loading new project
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+
             const hasSections = p.sections && p.sections.length > 0;
             setSections(p.sections || []);
             setScraps(p.scraps || []);
             setSessions(p.sessions || []);
             setActiveSessionId(null);
+            setPlayingSessionId(null);
             setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
             setUploadedBeat(p.beats?.[0]?.audioUrl || null);
             setUploadedBeatName(p.beats?.[0]?.name || "");
@@ -914,12 +1123,19 @@ const StudioWorkspace: React.FC = () => {
 
     const handleStartProjectFromBeat = (beat: Beat) => {
         if (globalAudioRef.current) globalAudioRef.current.pause();
+        // Stop all audio playback before loading beat project
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+
         setPlayingBeatId(null);
         archiveCurrentProject();
         setSections([]); // Blank canvas for Flow mode
         setScraps([]);
         setSessions([]);
         setActiveSessionId(null);
+        setPlayingSessionId(null);
         setProjectTitle(beat.name);
         setUploadedBeat(beat.audioUrl || null);
         setUploadedBeatName(beat.name);
@@ -928,36 +1144,7 @@ const StudioWorkspace: React.FC = () => {
         setViewMode('studio');
         setStudioMode('flow');
 
-        // If this beat has no sections yet, analyze it with Gemini for song structure
-        if (!beat.sections?.length && process.env.NEXT_PUBLIC_GOOGLE_API_KEY) {
-            (async () => {
-                try {
-                    const b64 = beat.base64 || await getAudioData(beat.id);
-                    if (!b64) return;
-                    setIsAnalyzingBeat(true);
-                    analyzeInstrumentalWithGemini(b64).then(result => {
-                        setIsAnalyzingBeat(false);
-                        if (result?.sections?.length) {
-                            const aiSections: AutoSection[] = result.sections.map(s => ({
-                                id: randomId(),
-                                startTime: s.startTime,
-                                endTime: s.endTime,
-                                type: s.type,
-                                label: s.label,
-                                emojiTag: s.emojiTag,
-                                isBest: false,
-                                isFavorited: false,
-                            }));
-                            setBeats(prev => prev.map(b => b.id === beat.id ? { ...b, sections: aiSections } : b));
-                            toast.success('🎵 Beat sections ready!');
-                        }
-                    }).catch(() => setIsAnalyzingBeat(false));
-                } catch (e) {
-                    setIsAnalyzingBeat(false);
-                    console.error('Beat analysis failed', e);
-                }
-            })();
-        }
+        // Beat structure detection disabled — interferes with transcription flow
     };
 
     const handleLibraryBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1346,6 +1533,7 @@ const StudioWorkspace: React.FC = () => {
                                             setLoopEnd={setBeatLoopEnd}
                                             isLooping={isBeatLooping}
                                             setIsLooping={setIsBeatLooping}
+                                            onSeek={handleBeatSeek}
                                             onUpload={async (file) => {
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
@@ -1372,29 +1560,7 @@ const StudioWorkspace: React.FC = () => {
                                                         return [newBeat, ...filtered];
                                                     });
 
-                                                    // Background beat structure analysis via Gemini — non-blocking
-                                                    if (process.env.NEXT_PUBLIC_GOOGLE_API_KEY && base64) {
-                                                        setIsAnalyzingBeat(true);
-                                                        analyzeInstrumentalWithGemini(base64).then(result => {
-                                                            setIsAnalyzingBeat(false);
-                                                            if (result?.sections?.length) {
-                                                                const aiSections: AutoSection[] = result.sections.map(s => ({
-                                                                    id: randomId(),
-                                                                    startTime: s.startTime,
-                                                                    endTime: s.endTime,
-                                                                    type: s.type,
-                                                                    label: s.label,
-                                                                    emojiTag: s.emojiTag,
-                                                                    isBest: false,
-                                                                    isFavorited: false,
-                                                                }));
-                                                                setBeats(prev => prev.map(b =>
-                                                                    b.id === id ? { ...b, sections: aiSections } : b
-                                                                ));
-                                                                toast.success('🎵 Beat sections ready!');
-                                                            }
-                                                        }).catch(e => { setIsAnalyzingBeat(false); console.error('Beat analysis failed', e); });
-                                                    }
+                                                    // Beat structure detection disabled — interferes with transcription flow
                                                 };
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
@@ -1621,13 +1787,12 @@ const StudioWorkspace: React.FC = () => {
                 className="w-full flex-1 max-w-lg relative bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out"
             >
                 {/* Persistent Studio Beat Audio */}
-                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" />
+                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
                 
                 {/* Persistent Vocal Session Audio */}
-                <audio 
-                    ref={vocalAudioRef} 
-                    src={sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64}
-                    onTimeUpdate={e => setCurrentTime(e.currentTarget.currentTime)}
+                <audio
+                    ref={vocalAudioRef}
+                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || '') : ''}
                     onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
                     onEnded={() => { setIsPlaying(false); setIsBeatPlaying(false); beatAudioRef.current?.pause(); }}
                     className="hidden"
@@ -1693,25 +1858,43 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <nav className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 ${showRecorder && !recorderMinimized ? 'opacity-0 scale-90 translate-y-12' : 'opacity-100 scale-100 translate-y-0'}`}>
-                    <div className="glass-nav px-2 py-2 rounded-2xl flex items-center gap-1 shadow-2xl border border-[var(--border-main)] backdrop-blur-3xl">
-                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<Library size={20} />} label="Library" />
-                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<PenTool size={20} />} label="Studio" />
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <button
-                            id="tour-nav-record"
-                            onClick={() => {
-                                setShowRecorder(true);
-                                setRecorderMinimized(true);
-                                setRecorderAutoStart(isBeatPlaying);
-                            }}
-                            className="w-12 h-12 bg-[var(--studio-red)] text-white rounded-xl flex items-center justify-center shadow-[0_0_20px_-5px_rgba(255,0,60,0.5)] hover:scale-105 active:scale-95 transition-all mx-1"
-                        >
-                            <div className="w-3 h-3 rounded-full bg-current" />
-                        </button>
-                        <div className="w-[1px] h-6 bg-[var(--border-main)] mx-1" />
-                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid size={20} />} label="Board" />
-                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search size={20} />} label="Search" />
+                <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
+                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
+                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
+                        <div className="flex justify-center" style={{ marginTop: '-62px' }}>
+                            <div className="relative flex flex-col items-center">
+                                {showNavHint && (
+                                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-medium pl-3 pr-1.5 py-1.5 rounded-full shadow-lg z-10 flex items-center gap-1">
+                                        <span>Tap • Hold to record</span>
+                                        <button
+                                            className="ml-0.5 p-0.5 rounded-full hover:bg-background/20 transition-colors"
+                                            aria-label="Dismiss hint"
+                                            onClick={() => setShowNavHint(false)}
+                                        >
+                                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                                                <line x1="2" y1="2" x2="8" y2="8" />
+                                                <line x1="8" y1="2" x2="2" y2="8" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                )}
+                                <button
+                                    id="tour-nav-record"
+                                    onClick={() => {
+                                        setShowRecorder(true);
+                                        setRecorderMinimized(true);
+                                        setRecorderAutoStart(isBeatPlaying);
+                                    }}
+                                    className="relative flex items-center justify-center w-[82px] h-[82px] rounded-full transition-all duration-200 select-none border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 shadow-[0_2px_14px_rgba(239,68,68,0.35)]"
+                                    style={{ touchAction: 'none' }}
+                                >
+                                    <Plus className="h-5 w-5 text-white" />
+                                </button>
+                            </div>
+                        </div>
+                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<Archive className="h-5 w-5" />} label="Board" />
+                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<ChartColumn className="h-5 w-5" />} label="Search" />
                     </div>
                 </nav>
             </main>
@@ -1724,6 +1907,7 @@ const StudioWorkspace: React.FC = () => {
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
+                    onResumeBeatAudio={() => beatAudioCtxRef.current?.resume()}
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}

@@ -1,5 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
-
 export interface AudioAnalysisResult {
     sections: {
         startTime: number;
@@ -12,153 +10,88 @@ export interface AudioAnalysisResult {
     lines?: { text: string; startTime: number; endTime: number }[];
 }
 
-/**
- * Strip data URL prefix from base64 string.
- * "data:audio/webm;base64,AAAA" → "AAAA"
- */
 const stripDataUrlPrefix = (dataUrl: string): { mimeType: string; data: string } => {
-    // Matches data:[mime/type];[params];base64,[data]
-    // Captures mime/type in group 1 and data in group 2
     const match = dataUrl.match(/^data:([^;]+).*?;base64,(.+)$/);
-    if (match) {
-        return { mimeType: match[1], data: match[2] };
-    }
-    // Already raw base64 or unknown format
-    return { mimeType: "audio/webm", data: dataUrl };
+    if (match) return { mimeType: match[1], data: match[2] };
+    return { mimeType: 'audio/webm', data: dataUrl };
+};
+
+const mimeToExt = (mimeType: string): string => {
+    const map: Record<string, string> = {
+        'audio/webm': 'webm',
+        'audio/mp4': 'mp4',
+        'audio/mpeg': 'mp3',
+        'audio/mpga': 'mp3',
+        'audio/ogg': 'ogg',
+        'audio/wav': 'wav',
+        'audio/flac': 'flac',
+        'audio/m4a': 'm4a',
+    };
+    return map[mimeType] ?? 'webm';
 };
 
 /**
- * Transcribe vocal audio with Gemini AI, returning per-line timestamps.
- * Does NOT detect sections — section detection is only for instrumentals.
- * Uses lazy initialization of the GenAI client to avoid module-level crashes
- * when the API key env var isn't yet available in the client bundle.
+ * Transcribe vocal audio via the /api/transcribe Next.js route, which
+ * forwards the audio to Groq Whisper server-side (no CORS issues).
+ * Requires GROQ_API_KEY set in Vercel environment variables.
+ * NEXT_PUBLIC_GROQ_ENABLED=true must also be set so the client knows
+ * transcription is active.
  */
-export const analyzeAudioWithGemini = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-    if (!apiKey) {
-        console.warn("[AudioIntelligence] No API key — skipping AI analysis");
-        return null;
-    }
+export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
+    const { mimeType } = stripDataUrlPrefix(audioBase64);
 
-    // Strip data URL prefix if present
-    const { mimeType, data } = stripDataUrlPrefix(audioBase64);
+    // Convert data URL → Blob for multipart upload
+    const blob = await fetch(audioBase64).then(r => r.blob());
 
-    const prompt = `Transcribe the vocals or speech in this audio recording.
+    const formData = new FormData();
+    formData.append('file', blob, `recording.${mimeToExt(mimeType)}`);
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('response_format', 'verbose_json');
+    formData.append('timestamp_granularities[]', 'segment');
+    formData.append('language', 'en');
+    formData.append('temperature', '0');
 
-Return ONLY a JSON object with this exact structure:
-{
-  "transcription": "full plain text of everything sung or spoken",
-  "lines": [
-    { "text": "first lyric line or phrase", "startTime": 0.0, "endTime": 2.1 },
-    { "text": "second lyric line or phrase", "startTime": 2.3, "endTime": 4.5 }
-  ]
-}
-
-Split on natural phrasing or breath breaks — one sung phrase per line entry.
-Timestamps are seconds from the start of the audio file.
-If no vocals are detected, return { "transcription": "", "lines": [] }.`;
-
-    try {
-        const genAI = new GoogleGenAI({ apiKey });
-
-        const response = await genAI.models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
-            contents: [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType,
-                        data
-                    }
-                }
-            ],
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
-
-        const resultText = response.text;
-        if (resultText) {
-            const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            // Vocal analysis returns lines, not sections — normalise
-            if (!parsed.lines) parsed.lines = [];
-            if (!parsed.sections) parsed.sections = [];
-            console.log("[AudioIntelligence] Vocal transcription complete:", {
-                lines: parsed.lines.length,
-                hasTranscription: !!parsed.transcription
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
+        try {
+            const response = await fetch('/api/transcribe', {
+                method: 'POST',
+                body: formData,
+                // No Authorization header — key lives server-side in the route
             });
-            return parsed;
-        }
-        return null;
-    } catch (error) {
-        console.error("[AudioIntelligence] Gemini transcription failed:", error);
-        return null;
-    }
-};
 
-/**
- * Analyze instrumental/beat audio with Gemini AI for song structure identification.
- * Identifies sections like Intro, Verse, Chorus, Bridge, Outro, Drop, Build, etc.
- */
-export const analyzeInstrumentalWithGemini = async (audioBase64: string): Promise<AudioAnalysisResult | null> => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-    if (!apiKey) {
-        console.warn("[AudioIntelligence] No API key — skipping beat analysis");
-        return null;
-    }
-
-    const { mimeType, data } = stripDataUrlPrefix(audioBase64);
-
-    const prompt = `Analyze this instrumental music track and identify its song structure sections.
-Identify distinct musical sections with timestamps and classify each with standard music terminology:
-- Intro, Verse, Pre-Chorus, Chorus, Bridge, Outro, Drop, Build, Break, Hook, etc.
-
-For each section provide:
-1. startTime and endTime (in seconds)
-2. type: always "instrumental"
-3. label: standard section name (e.g., "Intro", "Verse 1", "Chorus", "Bridge", "Drop")
-4. emojiTag: relevant emoji for visual context (🎬 for Intro/Outro, 🎵 for Verse, 🔥 for Chorus/Drop, 🌉 for Bridge, ⚡ for Build, 🔇 for Break)
-
-Return ONLY a JSON object with this exact structure:
-{
-  "sections": [{"startTime": 0.0, "endTime": 8.0, "type": "instrumental", "label": "Intro", "emojiTag": "🎬"}],
-  "transcription": ""
-}`;
-
-    try {
-        const genAI = new GoogleGenAI({ apiKey });
-
-        const response = await genAI.models.generateContent({
-            model: "gemini-3.1-flash-lite-preview",
-            contents: [
-                { text: prompt },
-                {
-                    inlineData: {
-                        mimeType,
-                        data
-                    }
-                }
-            ],
-            config: {
-                responseMimeType: "application/json"
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({})) as { error?: string };
+                const msg = body?.error ?? response.statusText;
+                lastError = new Error(`Transcription ${response.status}: ${msg}`);
+                if (response.status !== 429 || attempt === 2) break;
+                console.warn(`[AudioIntelligence] Rate limit, retrying (${attempt + 1}/3)...`);
+                continue;
             }
-        });
 
-        const resultText = response.text;
-        if (resultText) {
-            const parsed = JSON.parse(resultText) as AudioAnalysisResult;
-            if (!parsed.sections || !Array.isArray(parsed.sections)) {
-                console.warn("[AudioIntelligence] Invalid beat analysis response");
-                return null;
-            }
-            console.log("[AudioIntelligence] Beat structure analysis complete:", {
-                sections: parsed.sections.length
-            });
-            return parsed;
+            const result = await response.json() as {
+                text: string;
+                segments?: { text: string; start: number; end: number }[];
+            };
+
+            const lines = (result.segments ?? [])
+                .map(s => ({ text: s.text.trim(), startTime: s.start, endTime: s.end }))
+                .filter(l => l.text.length > 0);
+
+            console.log('[AudioIntelligence] Groq transcription complete:', { lines: lines.length });
+            return { sections: [], transcription: result.text ?? '', lines };
+        } catch (error) {
+            lastError = error;
+            break;
         }
-        return null;
-    } catch (error) {
-        console.error("[AudioIntelligence] Beat analysis failed:", error);
-        return null;
     }
+
+    const raw = lastError instanceof Error ? lastError.message : String(lastError);
+    console.error('[AudioIntelligence] Groq transcription failed:', lastError);
+
+    if (raw.includes('401') || raw.includes('invalid_api_key')) throw new Error('Groq API key is invalid — check GROQ_API_KEY in Vercel');
+    if (raw.includes('429') || raw.includes('rate_limit')) throw new Error('Groq rate limit — try again in a moment');
+    if (raw.includes('413')) throw new Error('Recording too large for Groq (25 MB limit)');
+    throw new Error(`Transcription error: ${raw.slice(0, 120)}`);
 };

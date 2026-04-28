@@ -32,11 +32,12 @@ interface BeatUploaderProps {
   setLoopEnd: (val: number | null) => void;
   isLooping: boolean;
   setIsLooping: (val: boolean) => void;
+  onSeek?: (time: number) => void;
 }
 
 export const BeatUploader: React.FC<BeatUploaderProps> = ({
   audioSrc, audioRef, beatName, onUpload, onClear,
-  isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping
+  isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping, onSeek
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -129,8 +130,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
       const rect = progressRef.current.getBoundingClientRect();
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       if (audioRef.current) {
-        audioRef.current.currentTime = percent * duration;
-        setCurrentTime(percent * duration);
+        const time = percent * duration;
+        audioRef.current.currentTime = time;
+        setCurrentTime(time);
+        if (onSeek) onSeek(time);
       }
     };
 
@@ -170,8 +173,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
     if (!audioRef.current || !progressRef.current || duration === 0) return;
     const rect = progressRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    audioRef.current.currentTime = percent * duration;
-    setCurrentTime(percent * duration);
+    const time = percent * duration;
+    audioRef.current.currentTime = time;
+    setCurrentTime(time);
+    if (onSeek) onSeek(time);
     setIsDraggingScrub(true);
   };
 
@@ -180,8 +185,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
     if (!audioRef.current || !progressRef.current || duration === 0) return;
     const rect = progressRef.current.getBoundingClientRect();
     const percent = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
-    audioRef.current.currentTime = percent * duration;
-    setCurrentTime(percent * duration);
+    const time = percent * duration;
+    audioRef.current.currentTime = time;
+    setCurrentTime(time);
+    if (onSeek) onSeek(time);
     setIsDraggingScrub(true);
   };
 
@@ -190,7 +197,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
     if (file) {
       setLoopStart(null);
       setLoopEnd(null);
-      setIsLooping(true);
       onUpload(file);
     }
   };

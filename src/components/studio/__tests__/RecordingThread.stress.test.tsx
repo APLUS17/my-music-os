@@ -64,12 +64,17 @@ describe('RecordingThread Stress Test', () => {
         const massiveSessions = screen.getAllByDisplayValue(/Massive Session/);
         expect(massiveSessions.length).toBeGreaterThan(0);
 
-        // Test an interaction
-        const splitEditorButtons = screen.getAllByTitle('Split/Merge Editor');
-        expect(splitEditorButtons.length).toBeGreaterThan(0);
-
-        // Interact
-        fireEvent.click(splitEditorButtons[0]);
-        expect(onOpenSplitEditor).toHaveBeenCalled();
+        // Test an interaction — clicking a session card calls onSelectSession.
+        // Find cards by their name inputs then walk up to the clickable card div.
+        const nameInputs = screen.getAllByDisplayValue(/Massive Session/);
+        expect(nameInputs.length).toBeGreaterThan(0);
+        // Walk up the DOM to find the card container (has onClick=onSelect)
+        let cardEl: HTMLElement | null = nameInputs[0].parentElement;
+        while (cardEl && !cardEl.className.includes('rounded-2xl')) {
+            cardEl = cardEl.parentElement;
+        }
+        expect(cardEl).toBeTruthy();
+        fireEvent.click(cardEl!);
+        expect(onSelectSession).toHaveBeenCalled();
     });
 });
