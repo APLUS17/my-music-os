@@ -138,10 +138,18 @@ const NavBtn = ({ active, onClick, icon, label, id }: NavBtnProps) => (
     <button
         id={id}
         onClick={onClick}
-        className={`flex flex-col items-center gap-1 py-2 pb-1 text-xs transition-colors ${active ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+        className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 transition-all duration-300 relative ${active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
     >
-        {icon}
-        <span>{label}</span>
+        <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-[var(--accent)]/10' : 'hover:bg-white/5'}`}>
+            {icon}
+        </div>
+        <span className="text-[8px] mono uppercase tracking-[0.1em] font-bold">{label}</span>
+        {active && (
+            <motion.div 
+                layoutId="nav-pill" 
+                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" 
+            />
+        )}
     </button>
 );
 
@@ -1850,62 +1858,8 @@ const StudioWorkspace: React.FC = () => {
                 {getActiveView()}
 
 
+
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
-                {showSearch && (
-                    <div className="absolute inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
-                        <div className="max-w-lg mx-auto h-full flex flex-col">
-                            <div className="px-6 pt-12 pb-6 flex items-center gap-4">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
-                                    <input
-                                        autoFocus
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search songs, lyrics, recordings, beats..."
-                                        className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                                    />
-                                </div>
-                                <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="text-[var(--text-secondary)]"><X size={20} /></button>
-                            </div>
-
-                            <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-                                {['all', 'songs', 'sections', 'recordings', 'beats'].map((f) => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setSearchFilter(f as SearchFilter)}
-                                        className={`px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
-                                    >{f}</button>
-                                ))}
-                            </div>
-
-                            <div className="flex-1 overflow-y-auto px-6 pb-32 space-y-2">
-                                {searchResults.map((res) => (
-                                    <button
-                                        key={`${res.type}-${res.id}`}
-                                        onClick={() => {
-                                            if (res.type === 'song') loadProject(res.raw);
-                                            if (res.type === 'recording') handlePlaySession(res.id);
-                                            if (res.type === 'beat') handlePlayBeat(res.id);
-                                            if (res.type === 'section') { setViewMode('studio'); }
-                                            setShowSearch(false);
-                                        }}
-                                        className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-xs mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
-                                                <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
-                                            </div>
-                                            <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>
-                                        </div>
-                                        <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
@@ -1914,7 +1868,7 @@ const StudioWorkspace: React.FC = () => {
                         <div className="flex justify-center relative">
                             <div className="absolute bottom-1 flex flex-col items-center">
                                 {showNavHint && (
-                                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-medium pl-3 pr-1.5 py-1.5 rounded-full shadow-lg z-10 flex items-center gap-1">
+                                    <div className="absolute -top-24 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-bold pl-3 pr-1.5 py-1.5 rounded-full shadow-2xl z-50 flex items-center gap-1 border border-white/10 animate-in fade-in slide-in-from-bottom-2 pointer-events-none">
                                         <span>Tap • Hold to record</span>
                                         <button
                                             className="ml-0.5 p-0.5 rounded-full hover:bg-background/20 transition-colors"
@@ -1935,7 +1889,7 @@ const StudioWorkspace: React.FC = () => {
                                         setRecorderMinimized(true);
                                         setRecorderAutoStart(isBeatPlaying);
                                     }}
-                                    className="relative flex items-center justify-center w-[82px] h-[82px] rounded-full transition-all duration-200 select-none border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 shadow-[0_2px_14px_rgba(239,68,68,0.35)]"
+                                    className="relative flex items-center justify-center w-[72px] h-[72px] sm:w-[82px] sm:h-[82px] rounded-full transition-all duration-300 select-none border-[6px] sm:border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 active:scale-95 shadow-[0_4px_20px_rgba(239,68,68,0.4)]"
                                     style={{ touchAction: 'none' }}
                                 >
                                     <Plus className="h-5 w-5 text-white" />
@@ -1943,7 +1897,7 @@ const StudioWorkspace: React.FC = () => {
                             </div>
                         </div>
                         <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<Archive className="h-5 w-5" />} label="Board" />
-                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<ChartColumn className="h-5 w-5" />} label="Search" />
+                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search className="h-5 w-5" />} label="Search" />
                     </div>
                 </nav>
             </main>
@@ -1984,9 +1938,9 @@ const StudioWorkspace: React.FC = () => {
             </AnimatePresence>
 
             {showSearch && (
-                <div className="fixed inset-0 z-[100] bg-[var(--bg-main)] animate-in fade-in zoom-in-95 duration-300">
-                    <div className="max-w-lg mx-auto h-full flex flex-col">
-                        <div className="px-6 pt-12 pb-6 flex items-center gap-4">
+                <div className="fixed inset-0 z-[200] bg-[var(--bg-main)]/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300">
+                    <div className="max-w-lg mx-auto h-full flex flex-col pt-[env(safe-area-inset-top)]">
+                        <div className="px-6 pt-8 pb-6 flex items-center gap-4">
                             <div className="flex-1 relative">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
                                 <input
@@ -1997,7 +1951,7 @@ const StudioWorkspace: React.FC = () => {
                                     className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
                                 />
                             </div>
-                            <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="text-[var(--text-secondary)]"><X size={20} /></button>
+                                <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors text-[var(--text-secondary)]"><X size={20} /></button>
                         </div>
 
                         <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
