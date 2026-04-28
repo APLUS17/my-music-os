@@ -599,6 +599,27 @@ Music-integrated writing environment (LyricStudio lacks this) + Idea reuse syste
 
 ***
 
+#### 4.7 Studio Facilitator (AI Session Assistant)
+
+**Problem:** Artists lose valuable ideas, melodies, and structural decisions during chaotic studio sessions relying on disorganized voice memos and notes apps.
+
+**Implementation:**
+- Always-on AI listening companion for the "Studio" tab.
+- Automatically transcribes sessions and drops timestamped markers on the DAW timeline based on conversation.
+- Extracts "Idea Vault" gems (hummed melodies, spoken lyrics) from raw audio without manual saving.
+- Generates a "Morning After" session digest and smart action plan/To-Do list.
+- Conversational recall interface ("What was that line I mumbled about the rearview mirror?").
+
+**User flow:**
+1. Artist enters Studio tab → Turns on "Facilitator" toggle.
+2. AI listens to room audio + DAW playback silently.
+3. Next day, artist opens Facilitator tab to see Session Digest, Extracted Ideas, and To-Dos.
+4. Artist chats with Facilitator to recall specific moments or set up tracks based on last night's decisions.
+
+**Success metric:** 20% of power users activate Facilitator for sessions longer than 1 hour.
+
+***
+
 ## Prioritization Framework Summary
 
 **Value vs. Effort Scoring:**
@@ -625,6 +646,7 @@ Music-integrated writing environment (LyricStudio lacks this) + Idea reuse syste
 | Template Marketplace | 8 | 7 | **1.1** | 4 |
 | AI Voice Cloning | 9 | 9 | **1.0** | 4 |
 | Producer Network | 10 | 10 | **1.0** | 4 |
+| Studio Facilitator (AI Assistant) | 10 | 9 | **1.1** | 4 |
 
 *Priority Score = Value ÷ Effort (higher is better)*
 

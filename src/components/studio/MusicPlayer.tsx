@@ -102,17 +102,20 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       vocalAudioCtxRef.current?.resume();
       
       if (vocal.paused && hasVocals) {
-        vocal.play().catch(() => { });
+        vocal.play().catch(() => setIsPlaying(false));
         
         if (beat.paused && hasBeat) {
           // Sync beat to vocal start position + offset
           beat.currentTime = vocal.currentTime + beatOffset;
-          beat.play().catch(() => { });
+          beat.play().catch(() => {
+            // If beat fails, we might still want to play vocal, but let's be safe
+            console.error("Beat playback failed");
+          });
         }
       }
     } else {
-      if (!beat.paused && hasBeat) beat.pause();
-      if (!vocal.paused && hasVocals) vocal.pause();
+      if (beat && !beat.paused) beat.pause();
+      if (vocal && !vocal.paused) vocal.pause();
     }
 
     return () => {

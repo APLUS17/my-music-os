@@ -323,8 +323,11 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     if (!audio) return;
 
     if (isPlaying) {
-      audio.play().catch(() => setIsPlaying(false));
-      if (backingAudio && backingTrackSrc) {
+      if (audio.paused) {
+        audio.play().catch(() => setIsPlaying(false));
+      }
+      
+      if (backingAudio && backingTrackSrc && backingAudio.paused) {
         const compensatedStartOffset = Math.max(0, recordingStartOffsetRef.current - (latencyCompensation / 1000));
         const beatPos = getBeatPosition(audio.currentTime, compensatedStartOffset);
         backingAudio.currentTime = beatPos;
@@ -332,9 +335,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         backingAudio.play().catch(console.error);
       }
     } else {
-      audio.pause();
+      if (!audio.paused) audio.pause();
       // Only pause the backing beat when reviewing a recording (not on initial mount or during recording)
-      if (backingAudio && recordedBlob) {
+      if (backingAudio && recordedBlob && !backingAudio.paused) {
         backingAudio.pause();
       }
     }
@@ -394,7 +397,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     // Play all unmuted existing layers
     existingLayers.forEach((layer) => {
       const audio = layerAudioRefs.current.get(layer.id);
-      if (audio && !layer.isMuted) {
+      if (audio && !layer.isMuted && audio.paused) {
         audio.currentTime = 0;
         audio.volume = layer.gain ?? 1;
         audio.play().catch(console.error);
@@ -667,7 +670,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
-            <div className={`px-4 pt-2 pb-4 flex flex-col items-center gap-2 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.15)]' : ''}`}>
+            <div className={`px-4 pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] flex flex-col items-center gap-2 transition-all duration-700 ${isRecording ? 'shadow-[0_0_80px_rgba(220,38,38,0.15)]' : ''}`}>
 
               {/* Layer mode indicator */}
               {layerMode && (
