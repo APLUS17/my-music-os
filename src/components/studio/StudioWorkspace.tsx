@@ -414,6 +414,10 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
     useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
 
+    // Pending resume after session switch — consumed by onLoadedMetadata
+    const pendingPlayRef = useRef(false);
+    const pendingSeekRef = useRef<number | null>(null);
+
     // Persistent Beat Playback State (Lifted from BeatUploader)
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
@@ -426,6 +430,32 @@ const StudioWorkspace: React.FC = () => {
     const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
 
     const [showTour, setShowTour] = useState(false);
+
+    // Select a session, pausing playback first if needed (used by card taps)
+    const handleSelectSession = (id: string) => {
+        const newId = activeSessionId === id ? null : id;
+        if (isPlaying && newId !== null && newId !== activeSessionId) {
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+            pendingPlayRef.current = true;
+        }
+        setActiveSessionId(newId);
+    };
+
+    // Select a session and start playing once it loads (used by play buttons)
+    const handleSelectSessionAndPlay = (id: string, seekTime?: number) => {
+        if (isPlaying) {
+            vocalAudioRef.current?.pause();
+            beatAudioRef.current?.pause();
+            setIsPlaying(false);
+            setIsBeatPlaying(false);
+        }
+        pendingPlayRef.current = true;
+        if (seekTime !== undefined) pendingSeekRef.current = seekTime;
+        setActiveSessionId(id);
+    };
 
     // Sync Vocal and Beat
     const togglePlayback = (play?: boolean) => {
@@ -442,10 +472,11 @@ const StudioWorkspace: React.FC = () => {
 
             // 2. Play Beat if available
             if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId);
+                const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
                 if (session && vocalAudioRef.current) {
                     const offset = session.beatOffset || 0;
-                    beatAudioRef.current.currentTime = vocalAudioRef.current.currentTime + offset;
+                    const beat = beatAudioRef.current;
+                    if (beat.readyState >= 1) beat.currentTime = vocalAudioRef.current.currentTime + offset;
                 }
                 beatAudioRef.current.play().catch(console.error);
                 setIsBeatPlaying(true);
@@ -465,13 +496,14 @@ const StudioWorkspace: React.FC = () => {
         if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
 
         if (beatAudioRef.current) {
-            const session = sessions.find(s => s.id === activeSessionId);
-            if (session) {
-                const offset = session.beatOffset || 0;
-                beatAudioRef.current.currentTime = clamped + offset;
-            } else if (!vocalAudioRef.current || sessions.length === 0) {
-                // If no vocal, seek beat directly
-                beatAudioRef.current.currentTime = clamped;
+            const beat = beatAudioRef.current;
+            const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            if (beat.readyState >= 1) {
+                if (session) {
+                    beat.currentTime = clamped + (session.beatOffset || 0);
+                } else if (!vocalAudioRef.current || sessions.length === 0) {
+                    beat.currentTime = clamped;
+                }
             }
         }
         setCurrentTime(clamped);
@@ -1628,7 +1660,7 @@ const StudioWorkspace: React.FC = () => {
 
                             {/* Lyrics & Takes tabs — scrollable content */}
                             {activeTab !== 'player' && (
-                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-40">
+                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
                                         {activeTab === 'lyrics' ? (
                                             <>
@@ -1741,18 +1773,15 @@ const StudioWorkspace: React.FC = () => {
                                             <RecordingThread
                                                 sessions={sessions}
                                                 activeSessionId={activeSessionId}
-                                                onSelectSession={(id) => setActiveSessionId(prev => prev === id ? null : id)}
+                                                onSelectSession={handleSelectSession}
+                                                onPlaySession={handleSelectSessionAndPlay}
                                                 onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
                                                 onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
                                                 onOpenSplitEditor={(id) => {
                                                     setRecordingToSplit(id);
                                                     setSplitEditorOpen(true);
                                                 }}
-                                                onAddLayer={(sessionId) => {
-                                                    // Open recorder in layer mode for this session
-                                                    setLayerModeSessionId(sessionId);
-                                                    setShowRecorder(true);
-                                                }}
+
                                                 onDeleteSession={handleDeleteSession}
                                                 beatSrc={uploadedBeat}
                                                 beatVolume={beatVolume}
@@ -1782,7 +1811,7 @@ const StudioWorkspace: React.FC = () => {
 
 
     return (
-        <div className="h-screen w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
+        <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
             <main
                 className="w-full flex-1 max-w-lg relative bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out"
             >
@@ -1793,8 +1822,28 @@ const StudioWorkspace: React.FC = () => {
                 <audio
                     ref={vocalAudioRef}
                     src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || '') : ''}
-                    onLoadedMetadata={e => setDuration(e.currentTarget.duration)}
-                    onEnded={() => { setIsPlaying(false); setIsBeatPlaying(false); beatAudioRef.current?.pause(); }}
+                    onLoadedMetadata={e => {
+                        setDuration(e.currentTarget.duration);
+                        if (pendingPlayRef.current) {
+                            pendingPlayRef.current = false;
+                            const seekTime = pendingSeekRef.current;
+                            pendingSeekRef.current = null;
+                            if (seekTime !== null) seekTo(seekTime);
+                            togglePlayback(true);
+                        }
+                    }}
+                    onEnded={() => {
+                        setIsPlaying(false);
+                        setIsBeatPlaying(false);
+                        if (beatAudioRef.current) {
+                            beatAudioRef.current.pause();
+                            const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current)
+                                ?? sessionsRef.current[0];
+                            if (beatAudioRef.current.readyState >= 1) {
+                                beatAudioRef.current.currentTime = session?.beatOffset ?? 0;
+                            }
+                        }
+                    }}
                     className="hidden"
                 />
 
@@ -1858,12 +1907,12 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 )}
 
-                <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
-                        <div className="flex justify-center" style={{ marginTop: '-62px' }}>
-                            <div className="relative flex flex-col items-center">
+                        <div className="flex justify-center relative">
+                            <div className="absolute bottom-1 flex flex-col items-center">
                                 {showNavHint && (
                                     <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-medium pl-3 pr-1.5 py-1.5 rounded-full shadow-lg z-10 flex items-center gap-1">
                                         <span>Tap • Hold to record</span>

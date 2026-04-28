@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge, ChevronDown, Layers, Plus, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge, ChevronDown, Plus, Volume2 } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
-import { RecordingSession, AutoSection, RecordingLayer } from '@/types';
+import { RecordingSession, AutoSection } from '@/types';
 import { cn } from '@/lib/utils';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,12 @@ interface RecordingThreadProps {
     sessions: RecordingSession[];
     activeSessionId: string | null;
     onSelectSession: (id: string) => void;
+    onPlaySession?: (id: string, seekTime?: number) => void;
     onUpdateSession: (id: string, updates: Partial<RecordingSession>) => void;
     onDeleteSession: (id: string) => void;
     onUpdateSection: (sessionId: string, sectionId: string, updates: Partial<AutoSection>) => void;
     onOpenSplitEditor: (sessionId: string) => void;
-    onAddLayer?: (sessionId: string) => void;  // Open recorder in layer mode for this session
+
     beatSrc?: string | null;
     beatVolume?: number;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
@@ -36,11 +37,12 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     sessions,
     activeSessionId,
     onSelectSession,
+    onPlaySession,
     onUpdateSession,
     onDeleteSession,
     onUpdateSection,
     onOpenSplitEditor,
-    onAddLayer,
+
     beatSrc,
     beatVolume = 1,
     onBeatPlaybackChange,
@@ -59,11 +61,12 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
                     session={session}
                     isActive={session.id === activeSessionId}
                     onSelect={() => onSelectSession(session.id)}
+                    onPlaySession={onPlaySession ? (seekTime) => onPlaySession(session.id, seekTime) : undefined}
                     onUpdate={(updates) => onUpdateSession(session.id, updates)}
                     onDelete={() => onDeleteSession(session.id)}
                     onUpdateSection={(sectionId, updates) => onUpdateSection(session.id, sectionId, updates)}
                     onOpenSplitEditor={() => onOpenSplitEditor(session.id)}
-                    onAddLayer={() => onAddLayer?.(session.id)}
+
                     beatSrc={beatSrc}
                     beatVolume={beatVolume}
                     onBeatPlaybackChange={onBeatPlaybackChange}
@@ -93,11 +96,12 @@ const SessionCard = ({
     session,
     isActive,
     onSelect,
+    onPlaySession,
     onUpdate,
     onDelete,
     onUpdateSection,
     onOpenSplitEditor,
-    onAddLayer,
+
     beatSrc,
     beatVolume = 1,
     onBeatPlaybackChange,
@@ -109,11 +113,12 @@ const SessionCard = ({
     session: RecordingSession;
     isActive: boolean;
     onSelect: () => void;
+    onPlaySession?: (seekTime?: number) => void;
     onUpdate: (updates: Partial<RecordingSession>) => void;
     onDelete: () => void;
     onUpdateSection: (sectionId: string, updates: Partial<AutoSection>) => void;
     onOpenSplitEditor: () => void;
-    onAddLayer: () => void;
+
     beatSrc?: string | null;
     beatVolume?: number;
     onBeatPlaybackChange?: (isPlaying: boolean) => void;
@@ -124,7 +129,7 @@ const SessionCard = ({
 }) => {
     const [playingSectionId, setPlayingSectionId] = useState<string | null>(null);
     const [isExpanded, setIsExpanded] = useState(true);
-    const layerAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+
 
     const progress = (session.duration || 0) > 0 ? (isActive ? currentTime / (session.duration || 0) : 0) : 0;
     const isThisSessionPlaying = isActive && isPlaying;
@@ -140,46 +145,17 @@ const SessionCard = ({
         }
     }, [currentTime, playingSectionId, isActive, onTogglePlay, session.sections]);
 
-    // Cleanup stale refs when layers change
-    useEffect(() => {
-        if (!session.layers) {
-            layerAudioRefs.current.clear();
-            return;
-        }
-        const layerIds = new Set(session.layers.map(l => l.id));
-        for (const layerId of layerAudioRefs.current.keys()) {
-            if (!layerIds.has(layerId)) {
-                layerAudioRefs.current.delete(layerId);
-            }
-        }
-    }, [session.layers?.length]);
 
-    // Handle Layer Sync
-    useEffect(() => {
-        if (isThisSessionPlaying && session.layers) {
-            session.layers.forEach(layer => {
-                const audio = layerAudioRefs.current.get(layer.id);
-                if (!audio || layer.isMuted) return;
-
-                // Keep layers in sync with main clock
-                if (Math.abs(audio.currentTime - currentTime) > 0.1) {
-                    audio.currentTime = currentTime;
-                }
-
-                audio.volume = layer.gain ?? 0.8;
-                audio.play().catch(() => { });
-            });
-        } else {
-            layerAudioRefs.current.forEach(audio => audio?.pause());
-        }
-    }, [isThisSessionPlaying, currentTime, session.layers]);
 
     const togglePlayAll = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!isActive) {
-            onSelect();
-            // Need a tiny delay for StudioWorkspace to update the src of vocalAudioRef
-            setTimeout(() => onTogglePlay(true), 50);
+            if (onPlaySession) {
+                onPlaySession(); // handleSelectSessionAndPlay handles pause + resume via onLoadedMetadata
+            } else {
+                onSelect();
+                setTimeout(() => onTogglePlay(true), 150);
+            }
         } else {
             onTogglePlay();
         }
@@ -189,12 +165,17 @@ const SessionCard = ({
     const playSection = (sec: AutoSection, e: React.MouseEvent) => {
         e.stopPropagation();
         if (!isActive) {
-            onSelect();
-            setTimeout(() => {
-                onSeek(sec.startTime);
-                onTogglePlay(true);
+            if (onPlaySession) {
+                onPlaySession(sec.startTime);
                 setPlayingSectionId(sec.id);
-            }, 50);
+            } else {
+                onSelect();
+                setTimeout(() => {
+                    onSeek(sec.startTime);
+                    onTogglePlay(true);
+                    setPlayingSectionId(sec.id);
+                }, 150);
+            }
         } else {
             if (playingSectionId === sec.id && isPlaying) {
                 onTogglePlay(false);
@@ -248,14 +229,7 @@ const SessionCard = ({
                 )}
                 onClick={onSelect}
             >
-                {session.layers?.map((layer) => (
-                    <audio
-                        key={layer.id}
-                        ref={el => { if (el) layerAudioRefs.current.set(layer.id, el); }}
-                        src={layer.audioUrl || layer.base64}
-                        preload="auto"
-                    />
-                ))}
+
 
                 {/* Header: Master Controls & Metadata */}
                 <div className="flex items-start gap-4">
@@ -392,106 +366,7 @@ const SessionCard = ({
                         )}
                     </div>
 
-                    {/* Layers Section */}
-                    <div className="flex flex-col gap-2 pt-2 border-t border-white/[0.05]">
-                        {session.layers && session.layers.length > 0 && (
-                            <>
-                                <div className="flex items-center gap-2 px-1">
-                                    <Layers size={14} className="text-[var(--accent)]" />
-                                    <span className="text-xs font-semibold text-white/70">
-                                        LAYERS
-                                    </span>
-                                    <span className="text-[10px] text-white/40 ml-auto">
-                                        {session.layers.filter(l => !l.isMuted).length} active
-                                    </span>
-                                </div>
 
-                                <div className="flex flex-col gap-1.5">
-                                    {session.layers.map((layer, layerIdx) => (
-                                        <div
-                                            key={layer.id}
-                                            className={cn(
-                                                "flex items-center gap-2 p-2 rounded-lg border transition-all",
-                                                layer.isMuted
-                                                    ? "bg-black/20 border-white/[0.05] opacity-50"
-                                                    : "bg-white/[0.05] border-white/10 hover:bg-white/[0.08]"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-0.5 flex-1 h-4">
-                                                {[...Array(8)].map((_, i) => {
-                                                    const seed = 12345 + layerIdx;
-                                                    const seededRandom = (idx: number) => {
-                                                        const x = Math.sin(seed + idx * 9999) * 10000;
-                                                        return x - Math.floor(x);
-                                                    };
-                                                    const height = seededRandom(i) * 70 + 30;
-                                                    return (
-                                                        <div
-                                                            key={i}
-                                                            className={cn(
-                                                                "flex-1 rounded-full transition-colors",
-                                                                layer.isMuted
-                                                                    ? "bg-white/10"
-                                                                    : "bg-[var(--accent)]"
-                                                            )}
-                                                            style={{
-                                                                height: `${height}%`
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-
-                                            <div className="flex flex-col items-end min-w-0">
-                                                <span className={cn(
-                                                    "text-xs font-medium truncate",
-                                                    layer.isMuted ? "text-white/40" : "text-white/80"
-                                                )}>
-                                                    {layer.name || `Layer ${layerIdx + 1}`}
-                                                </span>
-                                                {layer.duration && (
-                                                    <span className="text-[10px] text-white/30">
-                                                        {layer.duration.toFixed(1)}s
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => {
-                                                    if (!session.layers) return;
-                                                    const updatedLayers = session.layers.map(l =>
-                                                        l.id === layer.id ? { ...l, isMuted: !l.isMuted } : l
-                                                    );
-                                                    onUpdate({ layers: updatedLayers });
-                                                }}
-                                                className="w-7 h-7 rounded-full shrink-0 transition-colors"
-                                            >
-                                                {layer.isMuted ? (
-                                                    <VolumeX size={13} className="text-white/30" />
-                                                ) : (
-                                                    <Volume2 size={13} className="text-[var(--accent)]" />
-                                                )}
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-
-                        <Button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAddLayer();
-                            }}
-                            className="w-full mt-1 py-2 px-3 rounded-lg bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/20 text-[var(--accent)] transition-colors flex items-center justify-center gap-2"
-                            variant="ghost"
-                        >
-                            <Plus size={14} />
-                            <span className="text-xs font-semibold">ADD LAYER</span>
-                        </Button>
-                    </div>
                 </motion.div>
             </motion.div>
         </div>
