@@ -114,10 +114,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   };
 
-  // Track isPlaying in a ref for cleanup to avoid stale closures
-  const isPlayingRef = useRef(isPlaying);
-  isPlayingRef.current = isPlaying;
-
   // Keep audioContextRef in sync for cleanup
   audioContextRef.current = audioContext;
 
@@ -127,9 +123,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
-      // Use ref to get current value, avoiding stale closure
-      if (backingAudioRef?.current && isPlayingRef.current) {
-        backingAudioRef.current.pause();
+      // Restore beat volume in case it was ducked during review playback
+      if (backingAudioRef?.current) {
+        backingAudioRef.current.volume = 1.0;
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -326,19 +322,22 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (audio.paused) {
         audio.play().catch(() => setIsPlaying(false));
       }
-      
+
       if (backingAudio && backingTrackSrc && backingAudio.paused) {
         const compensatedStartOffset = Math.max(0, recordingStartOffsetRef.current - (latencyCompensation / 1000));
         const beatPos = getBeatPosition(audio.currentTime, compensatedStartOffset);
         backingAudio.currentTime = beatPos;
+        // Duck beat during vocal review so the take is audible over the beat
+        backingAudio.volume = 0.55;
         onResumeBeatAudio?.();
         backingAudio.play().catch(console.error);
       }
     } else {
       if (!audio.paused) audio.pause();
-      // Only pause the backing beat when reviewing a recording (not on initial mount or during recording)
+      // Pause and restore beat volume when review playback stops
       if (backingAudio && recordedBlob && !backingAudio.paused) {
         backingAudio.pause();
+        backingAudio.volume = 1.0;
       }
     }
 

@@ -13,6 +13,7 @@ import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { SplitEditor } from './SplitEditor';
+import { FacilitatorView } from './FacilitatorView';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,7 +41,11 @@ import {
     House,
     ListMusic,
     Archive,
-    ChartColumn
+    ChartColumn,
+    Brain,
+    Sparkles,
+    Zap,
+    Clock
 } from 'lucide-react';
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -105,7 +110,7 @@ const deleteAudioData = async (id: string) => {
     });
 };
 
-type ViewMode = 'collection' | 'studio' | 'board' | 'settings';
+type ViewMode = 'collection' | 'studio' | 'board' | 'facilitator' | 'settings';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -363,7 +368,6 @@ const StudioWorkspace: React.FC = () => {
 
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
-    const [showNavHint, setShowNavHint] = useState(true);
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
@@ -1487,6 +1491,20 @@ const StudioWorkspace: React.FC = () => {
                         onUpdateTags={(id, tags) => setScraps(prev => prev.map(s => s.id === id ? { ...s, tags } : s))}
                     />
                 );
+            case 'facilitator':
+                return (
+                    <FacilitatorView
+                        sessions={sessions}
+                        scraps={scraps}
+                        beats={beats}
+                        sections={sections}
+                        projectTitle={projectTitle}
+                        onPlaySession={handleSelectSessionAndPlay}
+                        playingSessionId={activeSessionId}
+                        currentTime={currentTime}
+                        duration={duration}
+                    />
+                );
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
@@ -1867,21 +1885,6 @@ const StudioWorkspace: React.FC = () => {
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
                         <div className="flex justify-center relative">
                             <div className="absolute bottom-1 flex flex-col items-center">
-                                {showNavHint && (
-                                    <div className="absolute -top-24 left-1/2 -translate-x-1/2 whitespace-nowrap bg-foreground text-background text-[10px] font-bold pl-3 pr-1.5 py-1.5 rounded-full shadow-2xl z-50 flex items-center gap-1 border border-white/10 animate-in fade-in slide-in-from-bottom-2 pointer-events-none">
-                                        <span>Tap • Hold to record</span>
-                                        <button
-                                            className="ml-0.5 p-0.5 rounded-full hover:bg-background/20 transition-colors"
-                                            aria-label="Dismiss hint"
-                                            onClick={() => setShowNavHint(false)}
-                                        >
-                                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                                <line x1="2" y1="2" x2="8" y2="8" />
-                                                <line x1="8" y1="2" x2="2" y2="8" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                )}
                                 <button
                                     id="tour-nav-record"
                                     onClick={() => {
@@ -1896,8 +1899,8 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<Archive className="h-5 w-5" />} label="Board" />
-                        <NavBtn active={showSearch} onClick={() => setShowSearch(true)} icon={<Search className="h-5 w-5" />} label="Search" />
+                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid className="h-5 w-5" />} label="Board" />
+                        <NavBtn active={viewMode === 'facilitator'} onClick={() => setViewMode('facilitator')} icon={<Brain className="h-5 w-5" />} label="Brain" />
                     </div>
                 </nav>
             </main>
@@ -1910,7 +1913,7 @@ const StudioWorkspace: React.FC = () => {
                     onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
-                    onResumeBeatAudio={() => beatAudioCtxRef.current?.resume()}
+                    onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}
