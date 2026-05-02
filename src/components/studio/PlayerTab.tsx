@@ -5,6 +5,7 @@ import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volu
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
+import { useActiveBeatSection } from './useActiveBeatSection';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -85,10 +86,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
       ? currentTime + activeSession.beatOffset
       : null;
+
     const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
-    const activeSectionIdx = beatSections.length > 0
-      ? beatSections.findIndex(s => beatCurrentTime! >= s.startTime && beatCurrentTime! < s.endTime)
-      : -1;
+
+    // We calculate the active index during render for O(1) performance without cascading re-renders.
+    // Since calculating the index linearly can be slow, we optimize using an index pointer cache.
+    // We wrap it in a custom hook to manage the ref logic properly and avoid lint errors.
+    const activeSectionIdx = useActiveBeatSection(beatSections, beatCurrentTime);
+
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     // Transcription Lines from the active session ONLY
