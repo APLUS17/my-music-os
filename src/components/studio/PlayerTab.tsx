@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, Languages, List, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RecordingSession, Beat, LyricSection } from '@/types';
+import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
 import { useActiveBeatSection } from './useActiveBeatSection';
-import { useActiveTimeIndex } from '@/hooks/useActiveTimeIndex';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -48,18 +47,18 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     session,
     sessions,
     beat,
-    beatSrc: _beatSrc,
+    beatSrc,
     beatVolume,
     beatMuted,
     onVolumeChange,
     onMuteChange,
     isBeatLooping,
-    beatLoopStart: _beatLoopStart,
-    beatLoopEnd: _beatLoopEnd,
-    onBeatPlaybackChange: _onBeatPlaybackChange,
+    beatLoopStart,
+    beatLoopEnd,
+    onBeatPlaybackChange,
     onSetLoopRegion,
     onClearLoop,
-    lyrics: _lyrics,
+    lyrics,
     onSelectSession,
     isAnalyzingBeat,
 
@@ -94,14 +93,21 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     // We wrap it in a custom hook to manage the ref logic properly and avoid lint errors.
     const activeSectionIdx = useActiveBeatSection(beatSections, beatCurrentTime);
 
-    const beatSections = useMemo(() => beat?.sections ?? [], [beat?.sections]);
-    const activeSectionIdx = useActiveTimeIndex(beatSections, beatCurrentTime);
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     // Transcription Lines from the active session ONLY
-    const displayLines = useMemo(() => activeSession?.lines || [], [activeSession?.lines]);
+    const displayLines = activeSession?.lines || [];
 
-    const activeLyricIdx = useActiveTimeIndex(displayLines, currentTime, 0.03);
+    const activeLyricIdx = useMemo(() => {
+        if (displayLines.length === 0) return -1;
+        const lookaheadTime = currentTime + 0.03; // ~half of the 60ms RAF interval
+        const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
+        if (idx !== -1) return idx;
+        if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
+            return displayLines.length - 1;
+        }
+        return -1;
+    }, [displayLines, currentTime]);
 
     const horizontalScrollRaf = useRef<number | null>(null);
     const lyricContainerRef = useRef<HTMLDivElement>(null);
@@ -151,9 +157,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
     // Clean up animation frames on unmount
     useEffect(() => {
-        const rafRef = horizontalScrollRaf;
         return () => {
-            if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+            if (horizontalScrollRaf.current !== null) cancelAnimationFrame(horizontalScrollRaf.current);
         };
     }, []);
 
@@ -178,7 +183,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
     // Reset list position when a new session's lyrics load
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLyricTranslateY(0);
     }, [displayLines]);
 
@@ -407,5 +411,3 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
         </div>
     );
 });
-
-PlayerTab.displayName = 'PlayerTab';

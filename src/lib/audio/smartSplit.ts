@@ -41,8 +41,16 @@ export const analyzeAudioAndSplit = async (
 
         if (data.length === 0) return 'vocal';
 
-        // Combined 1 Pass: Zero Crossing Rate (ZCR) and Simple Energy Variance
+        // 1. Zero Crossing Rate (ZCR)
         let crossings = 0;
+        for (let i = 1; i < data.length; i++) {
+            if ((data[i] >= 0 && data[i - 1] < 0) || (data[i] < 0 && data[i - 1] >= 0)) {
+                crossings++;
+            }
+        }
+        const zcr = crossings / data.length;
+
+        // 2. Simple Energy Variance
         let sum = 0;
         let sumSq = 0;
         const windowSize = 512;
@@ -52,16 +60,7 @@ export const analyzeAudioAndSplit = async (
             let winSumSq = 0;
             const winEnd = Math.min(i + windowSize, data.length);
             for (let j = i; j < winEnd; j++) {
-                const val = data[j];
-                winSumSq += val * val;
-
-                // Zero crossing logic
-                if (j > 0) {
-                    const prev = data[j - 1];
-                    if ((val >= 0 && prev < 0) || (val < 0 && prev >= 0)) {
-                        crossings++;
-                    }
-                }
+                winSumSq += data[j] * data[j];
             }
             const rms = Math.sqrt(winSumSq / (winEnd - i));
             energies.push(rms);
@@ -69,9 +68,8 @@ export const analyzeAudioAndSplit = async (
             sumSq += rms * rms;
         }
 
-        const zcr = crossings / data.length;
-        const meanEnergy = energies.length > 0 ? sum / energies.length : 0;
-        const energyVar = energies.length > 0 ? (sumSq / energies.length) - (meanEnergy * meanEnergy) : 0;
+        const meanEnergy = sum / energies.length;
+        const energyVar = (sumSq / energies.length) - (meanEnergy * meanEnergy);
 
         if (zcr > 0.15) return 'speech';
         if (energyVar > 0.02) return 'speech'; // Transients
