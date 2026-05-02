@@ -86,7 +86,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
       ? currentTime + activeSession.beatOffset
       : null;
-
     const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
 
     // We calculate the active index during render for O(1) performance without cascading re-renders.
