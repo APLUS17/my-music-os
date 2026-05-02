@@ -12,7 +12,6 @@ import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
-import { SplitEditor } from './SplitEditor';
 import { FacilitatorView } from './FacilitatorView';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
@@ -20,7 +19,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutGrid,
     PenTool,
-    Library,
     Search,
     X,
     ChevronRight,
@@ -33,24 +31,11 @@ import {
     Pause,
     Trash2,
     MessageSquare,
-    Save,
-    Mic,
-    FileMusic,
-    History,
-    Type,
     House,
     ListMusic,
-    Archive,
-    ChartColumn,
-    Brain,
-    Sparkles,
-    Zap,
-    Clock
+    Brain
 } from 'lucide-react';
 import { toast } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChevronDown, CheckCircle2 } from 'lucide-react';
 
