@@ -5,6 +5,7 @@ import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volu
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
+import { findTimeIndex } from '@/lib/utils/search';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -86,8 +87,8 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
       ? currentTime + activeSession.beatOffset
       : null;
     const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
-    const activeSectionIdx = beatSections.length > 0
-      ? beatSections.findIndex(s => beatCurrentTime! >= s.startTime && beatCurrentTime! < s.endTime)
+    const activeSectionIdx = beatSections.length > 0 && beatCurrentTime !== null
+      ? findTimeIndex(beatSections, beatCurrentTime)
       : -1;
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -97,7 +98,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
         const lookaheadTime = currentTime + 0.03; // ~half of the 60ms RAF interval
-        const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
+        const idx = findTimeIndex(displayLines, lookaheadTime);
         if (idx !== -1) return idx;
         if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
             return displayLines.length - 1;
