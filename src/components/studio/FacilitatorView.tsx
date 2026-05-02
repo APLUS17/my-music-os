@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { chatWithFacilitator, type FacilitatorContext } from '../../app/actions';
 import {
     Mic, Play, Pause, CheckCircle2, Circle,
     ArrowUpRight, MoreVertical, Plus, Send, Zap,
@@ -191,9 +192,7 @@ export const FacilitatorView: React.FC<FacilitatorViewProps> = ({
         handleUserSubmission(`I want to use "${mostRecentScrap.text}" for the bridge.`);
     };
 
-    // TODO(llm): replace this keyword router with a Gemini call once the
-    // Facilitator gets its own system prompt + tool definitions.
-    const handleUserSubmission = (text: string) => {
+    const handleUserSubmission = async (text: string) => {
         const trimmed = text.trim();
         if (!trimmed) return;
 
@@ -202,33 +201,28 @@ export const FacilitatorView: React.FC<FacilitatorViewProps> = ({
         setInputValue('');
         setIsTyping(true);
 
-        setTimeout(() => {
-            const lower = trimmed.toLowerCase();
-            const aiResponse: FacilitatorMessage = { id: `a-${Date.now()}`, type: 'ai', content: '' };
+        const context: FacilitatorContext = {
+            projectTitle,
+            sections: sections.map(s => ({ type: s.type, text: s.text })),
+            scraps: scraps.map(s => ({ text: s.text })),
+            recentSessions: sessions.slice(-3).map(s => ({
+                name: s.name || 'Untitled',
+                duration: s.duration || 0,
+                timestamp: s.timestamp
+            }))
+        };
 
-            if (lower.includes('recall') || lower.includes('line')) {
-                aiResponse.content = mostRecentSession
-                    ? `Your most recent take is "${mostRecentSession.name ?? 'Untitled'}" from ${formatRelativeTime(mostRecentSession.timestamp)}. Want me to play it?`
-                    : "I don't have a take to recall yet. Record something and I'll remember it for you.";
-                if (mostRecentSession) aiResponse.action = 'Play Latest Take';
-            } else if (lower.includes('bridge') && lower.includes('mirror')) {
-                aiResponse.content = "Great choice. I've moved that lyric to your active sketchpad. Let's build around it using the 'Zoom-in Method'.";
-            } else if (lower.includes('bridge')) {
-                aiResponse.content = "Let's try the 'Familiar Flip' method — take the main theme of your chorus and reverse the perspective. Or use the 'Verse 2 Cheat Code' to focus on a different sensory detail. Which direction feels better?";
-            } else if (lower.includes('rhyme') || lower.includes('distance')) {
-                aiResponse.content = "Since the theme is 'moving on', here are some couplets playing off 'distance':\n\n1. 'Lost my guidance / Drowning in the silence'\n2. 'Pushing for resistance / But I can't close the distance'\n\nWant to drop one of these into the session?";
-            } else if (lower.includes('booth') || lower.includes('arm')) {
-                aiResponse.content = "I'd love to arm the booth for you, but recording controls live in the Studio tab. Tap the red mic in the bottom nav to start a take.";
-            } else if (lower.includes('add step') || lower.includes('task')) {
-                setTasks((prev) => [...prev, { id: Date.now(), text: 'Review new vocal takes', completed: false }]);
-                aiResponse.content = "I've added that to your Action Plan.";
-            } else {
-                aiResponse.content = "I've logged that note. Want to tackle the next item on your Action Plan, or review some audio from last night?";
-            }
+        const response = await chatWithFacilitator(trimmed, context);
 
-            setMessages((prev) => [...prev, aiResponse]);
-            setIsTyping(false);
-        }, 1200 + Math.random() * 800);
+        const aiResponse: FacilitatorMessage = { id: `a-${Date.now()}`, type: 'ai', content: response.reply };
+
+        // Keep the action plan injection feature if the user talks about tasks
+        if (trimmed.toLowerCase().includes('add step') || trimmed.toLowerCase().includes('task')) {
+             setTasks((prev) => [...prev, { id: Date.now(), text: 'Review new vocal takes', completed: false }]);
+        }
+
+        setMessages((prev) => [...prev, aiResponse]);
+        setIsTyping(false);
     };
 
     // Audio progress derived from real playback state
