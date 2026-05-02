@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState, useLayoutEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
 import { Mic, Play, Pause, GripVertical, Trash2, X } from 'lucide-react';
 import { LyricSection, RecordingSession } from '@/types';
 import { randomId } from '@/lib/utils/id';
@@ -88,15 +88,6 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   if (lines.length === 0) {
     lines.push({ id: 'initial', text: '', sectionId: sections[0]?.id || 'default' });
   }
-
-  // Pre-calculate session map to optimize O(N*M) lookup in render loop
-  const sessionMap = useMemo(() => {
-    const map = new Map<string, RecordingSession>();
-    for (const session of sessions) {
-      map.set(session.id, session);
-    }
-    return map;
-  }, [sessions]);
 
   const handleLineChange = (lineId: string, newText: string) => {
     const lineIndex = lines.findIndex(l => l.id === lineId);
@@ -267,7 +258,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       )}
 
       {lines.map((line, index) => {
-        const session = line.sessionId ? sessionMap.get(line.sessionId) ?? null : null;
+        const session = line.sessionId ? sessions.find(t => t.id === line.sessionId) : null;
         const isPlaying = session && currentlyPlayingSessionId === session.id;
 
         const isLastLineOfSection = lines[index + 1]?.sectionId !== line.sectionId;
