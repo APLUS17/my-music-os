@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react';
-import { LyricSection } from '@/types';
 
-export function useActiveBeatSection(sections: LyricSection[], time: number | null): number {
+export function useActiveBeatSection(sections: Array<{ startTime: number; endTime: number }>, time: number | null): number {
     const lastIdxRef = useRef(-1);
 
     let activeIdx = -1;
