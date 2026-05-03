@@ -403,6 +403,10 @@ const StudioWorkspace: React.FC = () => {
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
     const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
 
+    const activeSession = useMemo(() => sessions.find(s => s.id === activeSessionId) || null, [sessions, activeSessionId]);
+    const displaySession = useMemo(() => activeSession || sessions[0] || null, [activeSession, sessions]);
+    const activeBeat = useMemo(() => beats.find(b => b.id === uploadedBeatId) || null, [beats, uploadedBeatId]);
+
     // Vocal FX - only initialize when panel is open
     useVocalFX(vocalAudioRef, fxSettings, showFXPanel);
 
@@ -476,7 +480,7 @@ const StudioWorkspace: React.FC = () => {
 
             // 2. Play Beat if available
             if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+                const session = displaySession;
                 if (session && vocalAudioRef.current) {
                     const offset = session.beatOffset || 0;
                     const beat = beatAudioRef.current;
@@ -501,7 +505,7 @@ const StudioWorkspace: React.FC = () => {
 
         if (beatAudioRef.current) {
             const beat = beatAudioRef.current;
-            const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            const session = displaySession;
             if (beat.readyState >= 1) {
                 if (session) {
                     beat.currentTime = clamped + (session.beatOffset || 0);
@@ -516,7 +520,7 @@ const StudioWorkspace: React.FC = () => {
     const handleBeatSeek = (beatTime: number) => {
         if (!beatAudioRef.current) return;
         
-        const session = sessions.find(s => s.id === activeSessionId);
+        const session = activeSession;
         if (session && vocalAudioRef.current) {
             const offset = session.beatOffset || 0;
             const vocalTime = Math.max(0, beatTime - offset);
@@ -1633,10 +1637,10 @@ const StudioWorkspace: React.FC = () => {
                                 <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
                                     <PlayerTab
                                         projectTitle={projectTitle || "Untitled Project"}
-                                        session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        session={displaySession}
                                         onOpenFX={() => setShowFXPanel(true)}
                                         sessions={sessions}
-                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
+                                        beat={activeBeat}
                                         beatSrc={uploadedBeat}
                                         beatVolume={beatVolume}
                                         beatMuted={beatMuted}
@@ -1840,7 +1844,7 @@ const StudioWorkspace: React.FC = () => {
                 {/* Persistent Vocal Session Audio */}
                 <audio
                     ref={vocalAudioRef}
-                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || '') : ''}
+                    src={displaySession ? (displaySession.audioUrl || displaySession.base64 || '') : ''}
                     onLoadedMetadata={e => {
                         setDuration(e.currentTarget.duration);
                         if (pendingPlayRef.current) {
