@@ -110,3 +110,22 @@ export const COLORS = {
     wavePlayed: '#A58BFF',
     waveFuture: '#2D2D2D'
 };
+
+export type EnergyLevel = 'Low' | 'Medium' | 'High';
+
+export interface Ritual {
+    id: string;
+    title: string;
+    category: string;
+    durationMinutes: number;
+    timeOfDay: string;
+    description: string;
+    energyLevel: EnergyLevel;
+    prepSteps: string[];
+}
+
+export interface RitualStat {
+    ritualId: string;
+    completedAt: string; // ISO date string
+    durationMinutes: number;
+}
