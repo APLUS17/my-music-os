@@ -135,9 +135,9 @@ export type FacilitatorContext = {
 
 export async function chatWithFacilitator(userPrompt: string, context: FacilitatorContext) {
     try {
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            console.warn("GEMINI_API_KEY is not set. Using fallback response.");
+            console.warn("GOOGLE_API_KEY is not set. Using fallback response.");
             return {
                 reply: "I am ready to help, but the Gemini API key is missing from the server environment.",
                 success: false
