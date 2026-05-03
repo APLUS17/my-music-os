@@ -1479,10 +1479,56 @@ const StudioWorkspace: React.FC = () => {
                 );
             case 'rituals':
                 return (
-                    <RitualsView
-                        stats={ritualStats}
-                        onCompleteRitual={handleCompleteRitual}
-                    />
+                    <div className="h-full relative">
+                        <div className="absolute top-4 right-4 z-[60]">
+                            <BeatUploader
+                                audioSrc={uploadedBeat}
+                                audioRef={beatAudioRef}
+                                beatName={uploadedBeatName}
+                                isPlaying={isBeatPlaying}
+                                setIsPlaying={setIsBeatPlaying}
+                                volume={beatVolume}
+                                setVolume={setBeatVolume}
+                                loopStart={beatLoopStart}
+                                setLoopStart={setBeatLoopStart}
+                                loopEnd={beatLoopEnd}
+                                setLoopEnd={setBeatLoopEnd}
+                                onUpload={async (file) => {
+                                                const url = URL.createObjectURL(file);
+                                                setUploadedBeat(url);
+                                                const name = file.name.replace(/\\.w+$/, '');
+                                                setUploadedBeatName(name);
+                                                const base64 = await blobToBase64(file);
+                                                const id = randomId();
+                                                setUploadedBeatId(id);
+                                                const audio = new Audio(url);
+                                                audio.onloadedmetadata = () => {
+                                                    const dur = audio.duration;
+                                                    const mins = Math.floor(dur / 60);
+                                                    const secs = Math.floor(dur % 60);
+                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                                    const newBeat: Beat = {
+                                                        id, name, duration: durationStr,
+                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                                    };
+                                                    setBeats(prev => [newBeat, ...prev]);
+                                                };
+                                            }}
+                                onClear={() => {
+                                                setUploadedBeat(null);
+                                                setUploadedBeatName('');
+                                                setIsBeatPlaying(false);
+                                                setUploadedBeatId(null);
+                                            }}
+                                isLooping={isBeatLooping}
+                                setIsLooping={setIsBeatLooping}
+                            />
+                        </div>
+                        <RitualsView
+                            stats={ritualStats}
+                            onCompleteRitual={handleCompleteRitual}
+                        />
+                    </div>
                 );
             case 'vault':
                 return (
@@ -1842,7 +1888,7 @@ const StudioWorkspace: React.FC = () => {
                 {/* Persistent Vocal Session Audio */}
                 <audio
                     ref={vocalAudioRef}
-                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || '') : ''}
+                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || undefined) : undefined}
                     onLoadedMetadata={e => {
                         setDuration(e.currentTarget.duration);
                         if (pendingPlayRef.current) {
