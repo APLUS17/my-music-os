@@ -403,8 +403,8 @@ const StudioWorkspace: React.FC = () => {
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
     const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
 
-    // Vocal FX
-    useVocalFX(vocalAudioRef, fxSettings, true);
+    // Vocal FX - only initialize when panel is open
+    useVocalFX(vocalAudioRef, fxSettings, showFXPanel);
 
     // Persistent Audio State
     const [isPlaying, setIsPlaying] = useState(false);
