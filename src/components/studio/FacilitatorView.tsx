@@ -107,16 +107,6 @@ export const FacilitatorView: React.FC<FacilitatorViewProps> = ({
 
     const titleDisplay = projectTitle?.trim() || 'this song';
 
-    const digest = useMemo(() => {
-        if (!mostRecentSession) {
-            return `No takes yet for "${titleDisplay}". When you record something, I'll have a session to brief you on.`;
-        }
-        const takeCount = sessions.length;
-        const totalText = totalDuration > 0 ? `${formatTotalTime(totalDuration)} of audio` : 'a session';
-        const latest = formatRelativeTime(mostRecentSession.timestamp);
-        return `Last time you spent ${totalText} on "${titleDisplay}". You captured ${takeCount} take${takeCount === 1 ? '' : 's'}. Latest take was ${latest}.`;
-    }, [mostRecentSession, sessions.length, totalDuration, titleDisplay]);
-
     // TODO(llm): replace static themes with Gemini-derived themes from session transcripts.
     const storyThemes = ['Late-night thoughts', 'Moving on', 'Distance'];
     const storyMood = mostRecentSession ? 'Atmospheric / Reflective' : 'Yet to find';
@@ -150,34 +140,6 @@ export const FacilitatorView: React.FC<FacilitatorViewProps> = ({
         // Re-seed when underlying data changes; user edits within a session are preserved
         // until the underlying sections/sessions list changes shape.
     }, [seedTasks]);
-
-    // --- Initial reveal sequence ---
-    useEffect(() => {
-        const timeoutIds: ReturnType<typeof setTimeout>[] = [];
-        const sequence: { delay: number; msg: FacilitatorMessage }[] = [
-            { delay: 600, msg: { id: 'm1', type: 'ai', content: digest, label: 'Session Digest' } },
-            { delay: 1500, msg: { id: 'm2', type: 'ai', component: 'vault', label: 'Idea Vault' } },
-            { delay: 2200, msg: { id: 'm3', type: 'ai', component: 'story', label: 'Song Story' } },
-            { delay: 2800, msg: { id: 'm4', type: 'ai', component: 'actionPlan', label: 'Action Plan' } },
-        ];
-
-        setIsTyping(true);
-        let cumulative = 0;
-        sequence.forEach(({ delay, msg }) => {
-            cumulative += delay;
-            const tid = setTimeout(() => {
-                setMessages((prev) => [...prev, msg]);
-                if (msg.id === 'm4') setIsTyping(false);
-            }, cumulative);
-            timeoutIds.push(tid);
-        });
-
-        return () => timeoutIds.forEach(clearTimeout);
-        // Intentionally empty deps — the digest is computed once at mount; if the
-        // underlying data changes mid-session we keep the original digest until
-        // the user navigates away and back.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
