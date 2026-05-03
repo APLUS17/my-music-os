@@ -13,6 +13,8 @@ import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { FacilitatorView } from './FacilitatorView';
+import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
+import { useVocalFX } from '@/hooks/useVocalFX';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -358,6 +360,8 @@ const StudioWorkspace: React.FC = () => {
     const [showSearch, setShowSearch] = useState(false);
     const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
+    const [showFXPanel, setShowFXPanel] = useState(false);
+    const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -398,6 +402,9 @@ const StudioWorkspace: React.FC = () => {
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
     const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
+
+    // Vocal FX
+    useVocalFX(vocalAudioRef, fxSettings, true);
 
     // Persistent Audio State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -1627,6 +1634,7 @@ const StudioWorkspace: React.FC = () => {
                                     <PlayerTab
                                         projectTitle={projectTitle || "Untitled Project"}
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                        onOpenFX={() => setShowFXPanel(true)}
                                         sessions={sessions}
                                         beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                         beatSrc={uploadedBeat}
@@ -1921,6 +1929,17 @@ const StudioWorkspace: React.FC = () => {
                         beatSrc={uploadedBeat}
                         vocalSessions={sessions}
                         projectTitle={projectTitle || "Untitled"}
+                    />
+                )}
+            </AnimatePresence>
+
+            {/* Vocal FX Panel */}
+            <AnimatePresence>
+                {showFXPanel && (
+                    <FXPanel
+                        onClose={() => setShowFXPanel(false)}
+                        settings={fxSettings}
+                        onUpdate={(key, value) => setFxSettings(prev => ({ ...prev, [key]: value }))}
                     />
                 )}
             </AnimatePresence>

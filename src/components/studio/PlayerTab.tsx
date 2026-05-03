@@ -27,6 +27,7 @@ interface PlayerTabProps {
     onSelectSession?: (id: string) => void;
     isAnalyzingVocal?: boolean;
     isAnalyzingBeat?: boolean;
+    onOpenFX?: () => void;
 
     // Lifted State Props
     isPlaying: boolean;
@@ -61,6 +62,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     lyrics: _lyrics,
     onSelectSession,
     isAnalyzingBeat,
+    onOpenFX,
 
     // Lifted
     isPlaying,
@@ -359,7 +361,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Controls ──────────────────────────────────────────── */}
             <div className="flex items-center justify-center gap-10 py-5">
-                <button className="text-white/40 active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
+                <button onClick={onOpenFX} className="text-white/40 active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
                 <button onClick={() => skip(-10)} className="text-white active:opacity-60 transition-opacity"><Rewind size={34} fill="white" /></button>
                 <button onClick={togglePlay} className="w-20 h-20 bg-white rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
                     {isPlaying ? <Pause size={40} className="text-black" fill="black" /> : <Play size={40} className="text-black ml-1" fill="black" />}
