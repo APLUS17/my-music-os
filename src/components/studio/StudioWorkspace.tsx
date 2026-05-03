@@ -1238,14 +1238,31 @@ const StudioWorkspace: React.FC = () => {
         const q = searchQuery.toLowerCase();
         const results: SearchResult[] = [];
 
+        const findMatchedLine = (text: string, query: string) => {
+            const lowerText = text.toLowerCase();
+            const index = lowerText.indexOf(query);
+            if (index === -1) return '';
+            const start = text.lastIndexOf('\n', index);
+            const end = text.indexOf('\n', index);
+            return text.substring(
+                start === -1 ? 0 : start + 1,
+                end === -1 ? text.length : end
+            );
+        };
+
         if (searchFilter === 'all' || searchFilter === 'songs') {
             savedProjects.forEach(p => {
                 const nameMatch = p.name.toLowerCase().includes(q);
-                const lyricsMatch = p.sections.some(s => s.text.toLowerCase().includes(q));
-                if (nameMatch || lyricsMatch) {
-                    const matchedLine = lyricsMatch && !nameMatch
-                        ? p.sections.find(s => s.text.toLowerCase().includes(q))?.text.split('\n').find(l => l.toLowerCase().includes(q))
-                        : undefined;
+                let matchedLine: string | undefined;
+
+                if (!nameMatch) {
+                    const sectionWithMatch = p.sections.find(s => s.text.toLowerCase().includes(q));
+                    if (sectionWithMatch) {
+                        matchedLine = findMatchedLine(sectionWithMatch.text, q);
+                    }
+                }
+
+                if (nameMatch || matchedLine !== undefined) {
                     results.push({
                         id: p.id, type: 'song', title: p.name,
                         desc: matchedLine ? `"...${matchedLine.trim().substring(0, 50)}..."` : `${p.sections.length} sections`,
@@ -1257,8 +1274,8 @@ const StudioWorkspace: React.FC = () => {
 
         if (searchFilter === 'all' || searchFilter === 'sections') {
             sections.forEach(s => {
-                if (s.text.toLowerCase().includes(q)) {
-                    const matchedLine = s.text.split('\n').find(l => l.toLowerCase().includes(q)) || '';
+                const matchedLine = findMatchedLine(s.text, q);
+                if (matchedLine) {
                     results.push({
                         id: s.id, type: 'section', title: `${s.type} (current project)`,
                         desc: `"...${matchedLine.trim().substring(0, 50)}..."`,
