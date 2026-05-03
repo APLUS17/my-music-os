@@ -25,6 +25,14 @@ export function useActiveBeatSection(sections: Array<{ startTime: number; endTim
             }
         }
 
+        // Fast path 3: Check if moved to the previous section (reverse traversal)
+        if (activeIdx === -1 && lastIdx - 1 >= 0 && lastIdx - 1 < sections.length) {
+            const s = sections[lastIdx - 1];
+            if (time >= s.startTime && time < s.endTime) {
+                activeIdx = lastIdx - 1;
+            }
+        }
+
         // Fallback: Full linear search
         if (activeIdx === -1) {
             activeIdx = sections.findIndex(s => time >= s.startTime && time < s.endTime);
