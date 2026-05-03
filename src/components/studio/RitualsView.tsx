@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical } from 'lucide-react';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 
@@ -13,6 +13,8 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [endTime, setEndTime] = useState<number | null>(null);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+    const [prepStepsOpen, setPrepStepsOpen] = useState(false);
+    const [ritualNotes, setRitualNotes] = useState("");
 
     // Timer logic
     useEffect(() => {
@@ -42,6 +44,8 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         const now = new Date().getTime();
         setEndTime(now + ritual.durationMinutes * 60 * 1000);
         setCompletedSteps(new Set());
+        setRitualNotes("");
+        setPrepStepsOpen(true);
     };
 
     const handleCompleteRitual = () => {
@@ -97,7 +101,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </button>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
+                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center pb-[120px]">
                     <div className="my-8 text-center">
                         <div className="text-6xl font-light tracking-tighter mb-2 font-mono">
                             {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
@@ -105,38 +109,52 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         <p className="text-[var(--text-secondary)] text-sm">{activeRitual.description}</p>
                     </div>
 
-                    <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-6">
-                        <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-[var(--accent)]" />
-                            Prep Steps
+                    <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
+                        <button
+                            onClick={() => setPrepStepsOpen(!prepStepsOpen)}
+                            className="w-full p-4 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                            <h3 className="text-sm font-medium flex items-center gap-2">
+                                <CheckCircle2 size={16} className="text-[var(--accent)]" />
+                                Prep Steps
+                            </h3>
+                            {prepStepsOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]"/> : <ChevronDown size={16} className="text-[var(--text-secondary)]"/>}
+                        </button>
+                        {prepStepsOpen && (
+                            <div className="px-4 pb-4 space-y-2">
+                                {activeRitual.prepSteps.map((step, idx) => {
+                                    const isDone = completedSteps.has(idx);
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => toggleStep(idx)}
+                                            className={`w-full flex items-start gap-3 text-left p-3 rounded-xl transition-all ${isDone ? 'bg-[var(--bg-main)] text-[var(--text-tertiary)] line-through opacity-70' : 'hover:bg-[var(--bg-hover)]'}`}
+                                        >
+                                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isDone ? 'bg-[var(--accent)] border-[var(--accent)] text-black' : 'border-[var(--text-tertiary)]'}`}>
+                                                {isDone && <CheckCircle2 size={12} />}
+                                            </div>
+                                            <span className="text-sm">{step}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="w-full max-w-md mt-4 flex-1 flex flex-col min-h-[200px]">
+                        <h3 className="text-sm font-medium mb-2 text-[var(--text-secondary)] px-1">
+                            {activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
                         </h3>
-                        <div className="space-y-3">
-                            {activeRitual.prepSteps.map((step, idx) => {
-                                const isDone = completedSteps.has(idx);
-                                return (
-                                    <button
-                                        key={idx}
-                                        onClick={() => toggleStep(idx)}
-                                        className={`w-full flex items-start gap-3 text-left p-3 rounded-xl transition-all ${
-                                            isDone
-                                            ? 'bg-[var(--bg-main)] text-[var(--text-tertiary)] line-through opacity-70'
-                                            : 'hover:bg-[var(--bg-hover)]'
-                                        }`}
-                                    >
-                                        <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                                            isDone ? 'bg-[var(--accent)] border-[var(--accent)] text-black' : 'border-[var(--text-tertiary)]'
-                                        }`}>
-                                            {isDone && <CheckCircle2 size={12} />}
-                                        </div>
-                                        <span className="text-sm">{step}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <textarea
+                            value={ritualNotes}
+                            onChange={(e) => setRitualNotes(e.target.value)}
+                            placeholder={activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
+                            className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+                        />
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border-main)] glass">
+                <div className="p-6 pb-[120px] border-t border-[var(--border-main)] glass">
                     <button
                         onClick={handleCompleteRitual}
                         className="w-full py-4 rounded-xl font-medium bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 transition-opacity"
@@ -155,7 +173,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                 <p className="text-sm text-[var(--text-tertiary)]">Time-boxed sessions to build momentum.</p>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-[120px]">
                 {['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'].map(category => {
                     const categoryRituals = MASTER_RITUALS.filter(r => r.category === category);
                     if (categoryRituals.length === 0) return null;

@@ -82,7 +82,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-[120px]">
 
                 {/* Stats Section */}
                 <section>
