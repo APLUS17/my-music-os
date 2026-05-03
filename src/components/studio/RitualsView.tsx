@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
+import { formatTime } from '@/lib/utils/time';
 
 interface RitualsViewProps {
     stats: RitualStat[];
@@ -31,12 +32,6 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
         return () => clearInterval(timer);
     }, [endTime]);
-
-    const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    };
 
     const handleStartRitual = (ritual: Ritual) => {
         setActiveRitual(ritual);

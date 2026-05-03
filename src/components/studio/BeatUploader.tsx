@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatTime } from "@/lib/utils/time";
 
 interface BeatUploaderProps {
   audioSrc: string | null;
@@ -199,13 +200,6 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
       setLoopEnd(null);
       onUpload(file);
     }
-  };
-
-  const formatTime = (t: number) => {
-    if (!t) return "0:00";
-    const mins = Math.floor(t / 60);
-    const secs = Math.floor(t % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (!audioSrc) {

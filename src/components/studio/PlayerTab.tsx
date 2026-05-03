@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
 import { useActiveBeatSection } from './useActiveBeatSection';
+import { formatTime } from '@/lib/utils/time';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -36,12 +37,6 @@ interface PlayerTabProps {
     onTogglePlay: (play?: boolean) => void;
     onSeek: (time: number) => void;
 }
-
-const formatTime = (secs: number): string => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-};
 
 export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     projectTitle,

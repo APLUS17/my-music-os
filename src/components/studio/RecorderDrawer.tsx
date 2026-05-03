@@ -21,6 +21,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { RecordingLayer } from '@/types';
+import { formatTime } from '@/lib/utils/time';
 
 interface RecorderDrawerProps {
   onClose: () => void;
@@ -376,12 +377,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
     }
   }, [isMonitoring, isRecording, audioContext]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Start playback of existing layers (parent + layers) for overdub recording
   const startLayerPlayback = () => {
