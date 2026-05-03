@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Play, Pause, Volume2, SkipBack, SkipForward } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession } from '@/types';
+import { formatTime } from '@/lib/utils/time';
 
 interface MusicPlayerProps {
   onClose: () => void;
@@ -158,13 +159,6 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     if (currentTrackIndex > 0) {
       setCurrentTrackIndex(currentTrackIndex - 1);
     }
-  };
-
-  const formatTime = (seconds: number) => {
-    if (!seconds || !isFinite(seconds)) return '0:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
