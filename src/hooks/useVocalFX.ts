@@ -30,7 +30,9 @@ function createReverbImpulse(context: AudioContext, duration: number, decay: num
 export function useVocalFX(
   audioRef: React.RefObject<HTMLAudioElement | null>,
   settings: FXSettings,
-  isActive: boolean
+  isActive: boolean,
+  isPlaying: boolean,
+  currentTime: number
 ) {
   const contextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -225,14 +227,74 @@ export function useVocalFX(
     }
   }, [isActive, initFX, audioRef]);
 
-  // Resume suspended context only on activation
+  // Suspend/Resume based on isPlaying and isActive
   useEffect(() => {
-    if (isActive && contextRef.current?.state === 'suspended') {
-      contextRef.current.resume().catch(err => {
-        console.warn('Could not resume AudioContext:', err);
-      });
+    const ctx = contextRef.current;
+    if (!ctx) return;
+
+    if (isActive && isPlaying) {
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(err => console.warn('Could not resume AudioContext:', err));
+      }
+    } else {
+      if (ctx.state === 'running') {
+        ctx.suspend().catch(err => console.warn('Could not suspend AudioContext:', err));
+      }
     }
-  }, [isActive]);
+  }, [isActive, isPlaying]);
+
+  // Handle seeks/scrubbing by clearing delay/reverb buffers when a time jump occurs
+  const lastTimeRef = useRef(currentTime);
+  useEffect(() => {
+    if (!isInitializedRef.current || !isActive) {
+      lastTimeRef.current = currentTime;
+      return;
+    }
+
+    const delta = Math.abs(currentTime - lastTimeRef.current);
+    // If the time jumps by more than 0.5s, it's a seek/scrub, not normal playback
+    if (delta > 0.5) {
+      const ctx = contextRef.current;
+      const delay = delayRef.current;
+      const delayDry = delayDryRef.current;
+      const comp = compRef.current;
+      const convolver = convolverRef.current;
+      const reverbWet = reverbWetRef.current;
+
+      if (ctx && delay && delayDry && comp && convolver && reverbWet) {
+        // True flush in Web Audio: Disconnect the nodes and reconnect them,
+        // OR reset the delay time momentarily. Recreating nodes is the most foolproof,
+        // but resetting the delayTime property forces the delay buffer to clear in most browsers.
+        const currentDelayTime = delay.delayTime.value;
+        const now = ctx.currentTime;
+
+        // Temporarily mute input to avoid pops, then reset buffer by changing delay time to 0 and back
+        delay.delayTime.cancelScheduledValues(now);
+        delay.delayTime.setValueAtTime(currentDelayTime, now);
+        delay.delayTime.setValueAtTime(0, now + 0.01);
+        delay.delayTime.setValueAtTime(currentDelayTime, now + 0.05);
+
+        // For convolver, disconnecting and reconnecting is the only way to clear its internal state
+        // safely without re-fetching/re-assigning the buffer which is expensive.
+        try {
+          comp.disconnect(convolver);
+          convolver.disconnect(reverbWet);
+
+          // Reconnect after a tiny delay using a setTimeout since we can't schedule disconnects
+          setTimeout(() => {
+            if (compRef.current && convolverRef.current && reverbWetRef.current) {
+               compRef.current.connect(convolverRef.current);
+               convolverRef.current.connect(reverbWetRef.current);
+            }
+          }, 50);
+        } catch (e) {
+          // ignore disconnect errors
+        }
+      }
+    }
+
+    lastTimeRef.current = currentTime;
+  }, [currentTime, isActive, settings]);
 
   // Apply settings
   useEffect(() => {

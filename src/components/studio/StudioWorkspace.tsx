@@ -408,12 +408,12 @@ const StudioWorkspace: React.FC = () => {
     const globalAudioRef = useRef<HTMLAudioElement | null>(null);
     const vocalAudioRef = useRef<HTMLAudioElement | null>(null);
 
-    // Vocal FX - only initialize when panel is open
-    useVocalFX(vocalAudioRef, fxSettings, showFXPanel);
-
     // Persistent Audio State
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
+
+    // Vocal FX - only initialize when panel is open
+    useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime);
     const [duration, setDuration] = useState(0);
 
     // Stable refs so the RAF loop reads current values without restarting
@@ -446,6 +446,7 @@ const StudioWorkspace: React.FC = () => {
         if (isPlaying && newId !== null && newId !== activeSessionId) {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
+            beatAudioCtxRef.current?.suspend();
             setIsPlaying(false);
             setIsBeatPlaying(false);
             pendingPlayRef.current = true;
@@ -458,6 +459,7 @@ const StudioWorkspace: React.FC = () => {
         if (isPlaying) {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
+            beatAudioCtxRef.current?.suspend();
             setIsPlaying(false);
             setIsBeatPlaying(false);
         }
@@ -495,6 +497,7 @@ const StudioWorkspace: React.FC = () => {
         } else {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
+            beatAudioCtxRef.current?.suspend();
             setIsBeatPlaying(false);
             setIsPlaying(false);
         }
@@ -1708,6 +1711,7 @@ const StudioWorkspace: React.FC = () => {
                                         onBeatPlaybackChange={(isP) => {
                                             if (isP && isBeatPlaying && beatAudioRef.current) {
                                                 beatAudioRef.current.pause();
+                                                beatAudioCtxRef.current?.suspend();
                                                 setIsBeatPlaying(false);
                                             }
                                         }}
@@ -1855,6 +1859,7 @@ const StudioWorkspace: React.FC = () => {
                                                 onBeatPlaybackChange={(isP) => {
                                                     if (isP && isBeatPlaying && beatAudioRef.current) {
                                                         beatAudioRef.current.pause();
+                                                        beatAudioCtxRef.current?.suspend();
                                                         setIsBeatPlaying(false);
                                                     }
                                                 }}
@@ -1902,6 +1907,7 @@ const StudioWorkspace: React.FC = () => {
                     onEnded={() => {
                         setIsPlaying(false);
                         setIsBeatPlaying(false);
+                        beatAudioCtxRef.current?.suspend();
                         if (beatAudioRef.current) {
                             beatAudioRef.current.pause();
                             const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current)
