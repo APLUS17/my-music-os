@@ -11,7 +11,7 @@ interface Step {
 
 interface OnboardingTourProps {
     onComplete: () => void;
-    setViewMode: (v: 'collection' | 'studio' | 'board' | 'settings') => void;
+    setViewMode: (v: 'collection' | 'studio' | 'rituals' | 'vault' | 'settings') => void;
     setShowRecorder: (b: boolean) => void;
     setRecorderMinimized: (b: boolean) => void;
     viewMode: string;

@@ -1,25 +1,25 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer } from '../../types';
+import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
-import { PuzzleView } from './PuzzleView';
+import { RitualsView } from "./RitualsView";
+import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
-import { FacilitatorView } from './FacilitatorView';
 import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutGrid,
+    Clock,
     PenTool,
     Search,
     X,
@@ -35,7 +35,7 @@ import {
     MessageSquare,
     House,
     ListMusic,
-    Brain
+    Library
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -97,7 +97,7 @@ const deleteAudioData = async (id: string) => {
     });
 };
 
-type ViewMode = 'collection' | 'studio' | 'board' | 'facilitator' | 'settings';
+type ViewMode = 'collection' | 'studio' | 'rituals' | 'vault' | 'settings';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -351,6 +351,11 @@ const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
     const [theme, setTheme] = useState<Theme>('dark');
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
+    const [ritualStats, setRitualStats] = useState<RitualStat[]>([]);
+    const handleCompleteRitual = (stat: RitualStat) => {
+        setRitualStats(prev => [...prev, stat]);
+        toast.success("Ritual completed!");
+    };
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
     const [showRecorder, setShowRecorder] = useState(false);
@@ -646,6 +651,8 @@ const StudioWorkspace: React.FC = () => {
 
         const loadState = async () => {
             const savedData = localStorage.getItem('studio-pro-data-v2');
+            const savedRitualStats = localStorage.getItem('lyriq_ritual_stats');
+            if (savedRitualStats) setRitualStats(JSON.parse(savedRitualStats));
             if (savedData) {
                 try {
                     const parsed = JSON.parse(savedData);
@@ -748,13 +755,15 @@ const StudioWorkspace: React.FC = () => {
             };
             try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
             catch (e) { console.error("Storage full or error", e); }
+            try { localStorage.setItem('lyriq_ritual_stats', JSON.stringify(ritualStats)); }
+            catch (e) { console.error("Rituals Storage error", e); }
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             saveTimeoutRef.current = window.setTimeout(() => setSaveIndicator('saved'), 300);
         };
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -1468,33 +1477,26 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'board':
+            case 'rituals':
                 return (
-                    <PuzzleView
-                        scraps={scraps}
-                        onAdd={(text, type) => setScraps([{ id: String(Date.now()), text, type }, ...scraps])}
-                        onUpdateType={(id, type) => setScraps(prev => prev.map(s => s.id === id ? { ...s, type } : s))}
-                        onStartProject={(text, type) => handleStartFromScrap(text, type)}
-                        onSendToStudio={(text) => {
-                            setSections(prev => [...prev, { id: randomId(), type: 'verse', repeats: 1, text }]);
-                            setViewMode('studio');
-                            toast.success('Idea added to your current project.');
-                        }}
-                        onUpdateTags={(id, tags) => setScraps(prev => prev.map(s => s.id === id ? { ...s, tags } : s))}
+                    <RitualsView
+                        stats={ritualStats}
+                        onCompleteRitual={handleCompleteRitual}
                     />
                 );
-            case 'facilitator':
+            case 'vault':
                 return (
-                    <FacilitatorView
+                    <VaultView
                         sessions={sessions}
                         scraps={scraps}
                         beats={beats}
-                        sections={sections}
+
                         projectTitle={projectTitle}
                         onPlaySession={handleSelectSessionAndPlay}
                         playingSessionId={activeSessionId}
                         currentTime={currentTime}
                         duration={duration}
+                        ritualStats={ritualStats}
                     />
                 );
             case 'studio':
@@ -1892,8 +1894,8 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <NavBtn id="tour-nav-board" active={viewMode === 'board'} onClick={() => setViewMode('board')} icon={<LayoutGrid className="h-5 w-5" />} label="Board" />
-                        <NavBtn active={viewMode === 'facilitator'} onClick={() => setViewMode('facilitator')} icon={<Brain className="h-5 w-5" />} label="Brain" />
+                        <NavBtn id="tour-nav-rituals" active={viewMode === 'rituals'} onClick={() => setViewMode('rituals')} icon={<Clock className="h-5 w-5" />} label="Rituals" />
+                        <NavBtn active={viewMode === 'vault'} onClick={() => setViewMode('vault')} icon={<Library className="h-5 w-5" />} label="Vault" />
                     </div>
                 </nav>
             </main>
