@@ -71,9 +71,13 @@ export const analyzeAudioAndSplit = async (
         const meanEnergy = sum / energies.length;
         const energyVar = (sumSq / energies.length) - (meanEnergy * meanEnergy);
 
-        if (zcr > 0.15) return 'speech';
-        if (energyVar > 0.02) return 'speech'; // Transients
-        if (zcr < 0.05 && energyVar < 0.01) return 'instrumental';
+        // Refined thresholds to avoid aggressive 'instrumental' classification
+        if (zcr > 0.18) return 'speech';
+        if (energyVar > 0.03) return 'speech'; // Transients
+
+        // Only classify as instrumental if it's very consistent AND low zero-crossing
+        // (suggesting a steady synth or bass rather than vocal texture)
+        if (zcr < 0.03 && energyVar < 0.005) return 'instrumental';
 
         return 'vocal'; // Default to vocal (singing) for music app
     };

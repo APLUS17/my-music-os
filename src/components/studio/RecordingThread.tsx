@@ -313,7 +313,7 @@ const SessionCard = ({
                                     <div
                                         onClick={(e) => playSection(sec, e)}
                                         className={cn(
-                                            "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer",
+                                            "flex-1 flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer",
                                             isThisSectionPlaying
                                                 ? "bg-white/10 border-white/20 shadow-inner"
                                                 : "bg-black/20 border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10"
@@ -322,16 +322,26 @@ const SessionCard = ({
                                         <div className="flex flex-col min-w-0 pr-4">
                                             <div className="flex items-center gap-2">
                                                 <span className={cn(
-                                                    "text-sm font-semibold truncate transition-colors",
-                                                    isThisSectionPlaying ? "text-white" : "text-white/80 group-hover/sec:text-white"
+                                                    "text-sm font-bold truncate transition-colors",
+                                                    isThisSectionPlaying ? "text-white" : "text-white/90 group-hover/sec:text-white"
                                                 )}>
                                                     {sec.label || sec.type}
                                                 </span>
-                                                {sec.isBest && <Heart size={10} className="text-white/60" />}
+                                                {sec.isBest && <Heart size={10} className="text-red-400 fill-red-400" />}
                                             </div>
-                                            <span className="text-xs text-white/40 font-mono tracking-tighter mt-0.5">
-                                                {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
-                                            </span>
+                                            {sec.summary && (
+                                                <p className="text-[10px] text-white/50 line-clamp-1 mb-1 italic">
+                                                    {sec.summary}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-white/30 font-mono tracking-tighter">
+                                                    {sec.startTime.toFixed(1)}s - {sec.endTime.toFixed(1)}s
+                                                </span>
+                                                <span className="text-[10px] text-white/20 px-1 border border-white/5 rounded uppercase">
+                                                    {sec.type}
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <div className="flex items-center gap-2 shrink-0">
