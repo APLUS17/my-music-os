@@ -1902,11 +1902,11 @@ const StudioWorkspace: React.FC = () => {
     return (
         <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
             <main
-                className="w-full flex-1 max-w-lg relative bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out"
+                className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
             >
                 {/* Persistent Studio Beat Audio */}
                 <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
-                
+
                 {/* Persistent Vocal Session Audio */}
                 <audio
                     ref={vocalAudioRef}
@@ -1937,13 +1937,13 @@ const StudioWorkspace: React.FC = () => {
                     className="hidden"
                 />
 
-                {getActiveView()}
-
-
+                <div className="flex-1 overflow-hidden">
+                    {getActiveView()}
+                </div>
 
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-                <nav className={`absolute bottom-0 left-0 right-0 z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
