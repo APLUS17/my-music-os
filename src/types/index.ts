@@ -37,6 +37,7 @@ export interface AutoSection {
     type: 'vocal' | 'instrumental' | 'speech' | 'silence';
     label?: string;
     transcription?: string;
+    summary?: string;
     emojiTag?: string;
     isBest: boolean;
     isFavorited: boolean;
