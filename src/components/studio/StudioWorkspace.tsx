@@ -870,7 +870,8 @@ const StudioWorkspace: React.FC = () => {
                 isLoopSession: !!uploadedBeat && isBeatLooping,
                 sections,
                 loopStart: beatLoopStart || undefined,
-                loopEnd: beatLoopEnd || undefined
+                loopEnd: beatLoopEnd || undefined,
+                projectId: activeProjectId || undefined
             };
             setSessions(prev => [newSession, ...prev]);
             setActiveSessionId(id); // Auto-select the latest take
@@ -1058,11 +1059,12 @@ const StudioWorkspace: React.FC = () => {
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
+        const projectSessions = sessions.filter(s => !s.projectId || s.projectId === activeProjectId);
         const newProject: SavedProject = {
             id: randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
-            sections, scraps, sessions, beats: []
+            sections, scraps, sessions: projectSessions, beats: []
         };
         setSavedProjects(prev => [newProject, ...prev]);
     };
@@ -1565,7 +1567,14 @@ const StudioWorkspace: React.FC = () => {
                         ritualStats={ritualStats}
                     />
                 );
-            case 'studio':
+            case 'studio': {
+                const displaySessions = useMemo(() =>
+                    sessions.filter(s =>
+                        !s.projectId ||  // Show sessions without projectId (floating/old)
+                        s.projectId === activeProjectId  // Show sessions for current project
+                    ),
+                    [sessions, activeProjectId]
+                );
                 return (
                     <div className="h-full flex flex-col relative">
                         <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
@@ -1859,7 +1868,7 @@ const StudioWorkspace: React.FC = () => {
                                             </>
                                         ) : activeTab === 'takes' ? (
                                             <RecordingThread
-                                                sessions={sessions}
+                                                sessions={displaySessions}
                                                 activeSessionId={activeSessionId}
                                                 onSelectSession={handleSelectSession}
                                                 onPlaySession={handleSelectSessionAndPlay}
@@ -1894,6 +1903,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
+            }
             default: return null;
         }
     };
