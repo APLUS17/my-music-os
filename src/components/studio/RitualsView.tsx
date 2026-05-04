@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders2 } from 'lucide-react';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { formatTime } from '@/lib/utils/time';
@@ -240,7 +240,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     onClick={() => setShowFilters(!showFilters)}
                     className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}
                 >
-                    <Sliders2 size={20} className={showFilters ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
+                    <Sliders size={20} className={showFilters ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
                 </button>
             </header>
 
