@@ -73,6 +73,7 @@ export interface RecordingSession {
     duration?: number;
     beatOffset?: number; // The currentTime of the beat when recording started
     layers?: RecordingLayer[]; // Additional vocal layers (harmonies, ad-libs, etc.)
+    projectId?: string; // Links session to specific project; undefined for floating/legacy sessions
 }
 
 export interface Beat {
