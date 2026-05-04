@@ -278,12 +278,6 @@ describe('PlayerTab — transcription per active take', () => {
 // ═════════════════════════════════════════════════════════════════════════
 
 describe('Beat offset sync calculation (PlayerTab formula)', () => {
-    // Replicate the exact formula from PlayerTab.tsx line 85-87:
-    //   const beatCurrentTime = activeSession?.beatOffset !== null &&
-    //                           activeSession?.beatOffset !== undefined
-    //     ? currentTime + activeSession.beatOffset
-    //     : null;
-
     function computeBeatCurrentTime(beatOffset: number | undefined | null, currentTime: number): number | null {
         return beatOffset !== null && beatOffset !== undefined
             ? currentTime + beatOffset
