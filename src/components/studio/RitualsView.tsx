@@ -143,12 +143,12 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
                     <div className="w-full max-w-md mt-4 flex-1 flex flex-col min-h-[200px]">
                         <h3 className="text-sm font-medium mb-2 text-[var(--text-secondary)] px-1">
-                            {activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
+                            {activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
                         </h3>
                         <textarea
                             value={ritualNotes}
                             onChange={(e) => setRitualNotes(e.target.value)}
-                            placeholder={activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
+                            placeholder={activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
                             className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
                         />
                     </div>
