@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useTransform, useMotionValue } from 'framer-motion';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
@@ -416,6 +417,36 @@ const StudioWorkspace: React.FC = () => {
     // Vocal FX - only initialize when panel is open
     useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime);
     const [duration, setDuration] = useState(0);
+
+    // Search Reveal via Swipe detection
+    const pullDistance = useMotionValue(0);
+    const searchPullOpacity = useTransform(pullDistance, [20, 60], [0, 1]);
+    const searchPullScale = useTransform(pullDistance, [20, 60], [0.8, 1]);
+    const pullStartY = useRef<number | null>(null);
+
+    const handlePullMove = (e: React.PointerEvent) => {
+        if (viewMode !== 'collection' || showSearch) return;
+        const target = e.currentTarget as HTMLElement;
+
+        if (target.scrollTop <= 0) {
+            if (pullStartY.current === null) {
+                pullStartY.current = e.clientY;
+            } else {
+                const diff = e.clientY - pullStartY.current;
+                if (diff > 0) {
+                    pullDistance.set(Math.min(100, diff));
+                    if (diff > 80) {
+                        setShowSearch(true);
+                        pullDistance.set(0);
+                        pullStartY.current = null;
+                    }
+                }
+            }
+        } else {
+            pullStartY.current = null;
+            pullDistance.set(0);
+        }
+    };
 
     // Stable refs so the RAF loop reads current values without restarting
     const animFrameRef = useRef<number | null>(null);
@@ -1290,9 +1321,12 @@ const StudioWorkspace: React.FC = () => {
                 let matchedLine: string | undefined;
 
                 if (!nameMatch) {
-                    const sectionWithMatch = p.sections.find(s => s.text.toLowerCase().includes(q));
-                    if (sectionWithMatch) {
-                        matchedLine = findMatchedLine(sectionWithMatch.text, q);
+                    for (const section of p.sections) {
+                        const line = findMatchedLine(section.text, q);
+                        if (line) {
+                            matchedLine = line;
+                            break;
+                        }
                     }
                 }
 
@@ -1322,13 +1356,26 @@ const StudioWorkspace: React.FC = () => {
         if (searchFilter === 'all' || searchFilter === 'recordings') {
             sessions.forEach(t => {
                 const nameMatch = (t.name || `Recording ${t.id}`).toLowerCase().includes(q);
-                const transMatch = (t.transcription || '').toLowerCase().includes(q);
-                const sectionMatch = t.sections.some(s => (s.label || '').toLowerCase().includes(q));
 
-                if (nameMatch || transMatch || sectionMatch) {
+                let matchedLine: string | undefined;
+                let matchedLabel: string | undefined;
+
+                if (!nameMatch) {
+                    matchedLine = findMatchedLine(t.transcription || '', q);
+                    if (!matchedLine) {
+                        for (const section of t.sections) {
+                            if ((section.label || '').toLowerCase().includes(q)) {
+                                matchedLabel = section.label;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (nameMatch || matchedLine || matchedLabel) {
                     let desc = `${t.duration?.toFixed(1) || '0.0'}s - ${new Date(t.timestamp).toLocaleDateString()}`;
-                    if (transMatch) desc = `"...${t.transcription?.substring(0, 50)}..."`;
-                    else if (sectionMatch) desc = `Contains: ${t.sections.find(s => (s.label || '').toLowerCase().includes(q))?.label}`;
+                    if (matchedLine) desc = `"...${matchedLine.trim().substring(0, 50)}..."`;
+                    else if (matchedLabel) desc = `Contains: ${matchedLabel}`;
 
                     results.push({
                         id: t.id, type: 'recording', title: t.name || `Recording ${t.id}`,
@@ -1481,7 +1528,24 @@ const StudioWorkspace: React.FC = () => {
                                 <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
+                        <div
+                            onPointerMove={handlePullMove}
+                            onPointerUp={() => { pullDistance.set(0); pullStartY.current = null; }}
+                            onPointerLeave={() => { pullDistance.set(0); pullStartY.current = null; }}
+                            className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide relative"
+                        >
+                            <motion.div
+                                style={{ opacity: searchPullOpacity, scale: searchPullScale, y: useTransform(pullDistance, [0, 80], [-20, 20]) }}
+                                className="absolute top-0 left-0 right-0 flex justify-center pointer-events-none z-50"
+                            >
+                                <div className="flex flex-col items-center gap-1 mt-4">
+                                    <div className="w-8 h-8 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] shadow-lg">
+                                        <Search size={14} />
+                                    </div>
+                                    <span className="text-[8px] mono uppercase tracking-widest text-[var(--text-tertiary)]">Pull to Search</span>
+                                </div>
+                            </motion.div>
+
                             {libraryTab === 'beats' && (
                                 <div className="space-y-4">
                                     {beats.map(beat => (
