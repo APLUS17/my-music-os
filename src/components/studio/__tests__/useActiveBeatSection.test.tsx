@@ -95,6 +95,74 @@ describe('useActiveBeatSection', () => {
         expect(spy).not.toHaveBeenCalled(); // Fast path 3
     });
 
+    it('falls back to linear search when jumping multiple sections backward', () => {
+        const { result, rerender } = renderHook(
+            ({ time }) => useActiveBeatSection(sections, time),
+            { initialProps: { time: 25 } }
+        );
+
+        expect(result.current).toBe(2);
+
+        const spy = vi.spyOn(sections, 'findIndex');
+        rerender({ time: 5 });
+        expect(result.current).toBe(0);
+        expect(spy).toHaveBeenCalledTimes(1); // Jumped backwards over section 1
+    });
+
+    it('returns -1 when time is before any section', () => {
+        const { result } = renderHook(() => useActiveBeatSection(sections, -5));
+        expect(result.current).toBe(-1);
+    });
+
+    it('returns -1 when time is after all sections', () => {
+        const { result } = renderHook(() => useActiveBeatSection(sections, 35));
+        expect(result.current).toBe(-1);
+    });
+
+    it('handles changing the sections array', () => {
+        const { result, rerender } = renderHook(
+            ({ sections, time }) => useActiveBeatSection(sections, time),
+            { initialProps: { sections, time: 5 } }
+        );
+
+        expect(result.current).toBe(0);
+
+        const newSections = [
+            { startTime: 0, endTime: 5 },
+            { startTime: 5, endTime: 10 },
+        ];
+
+        rerender({ sections: newSections, time: 7 });
+        expect(result.current).toBe(1);
+    });
+
+    it('resumes using fast paths after a fallback', () => {
+        const { result, rerender } = renderHook(
+            ({ time }) => useActiveBeatSection(sections, time),
+            { initialProps: { time: 5 } }
+        );
+
+        expect(result.current).toBe(0);
+
+        // Fallback jump
+        const spy = vi.spyOn(sections, 'findIndex');
+        rerender({ time: 25 });
+        expect(result.current).toBe(2);
+        expect(spy).toHaveBeenCalledTimes(1);
+
+        // Fast path 1 (same section)
+        spy.mockClear();
+        rerender({ time: 27 });
+        expect(result.current).toBe(2);
+        expect(spy).not.toHaveBeenCalled();
+
+        // Fast path 3 (previous section)
+        spy.mockClear();
+        rerender({ time: 15 });
+        expect(result.current).toBe(1);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
     it('handles floating point boundaries correctly', () => {
         const { result } = renderHook(() => useActiveBeatSection(sections, 10));
         expect(result.current).toBe(1); // [10, 20)
