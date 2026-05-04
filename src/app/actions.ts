@@ -123,6 +123,65 @@ export async function getCreativeSuggestion(prompt: string) {
     }
 }
 
+// --- Audio Intelligence (Gemini 2.0 Flash) ---
+
+export interface GeminiSection {
+    startTime: number;
+    endTime: number;
+    label: string;
+    type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+    emoji: string;
+    summary?: string;
+}
+
+export async function analyzeAudioStructure(audioBase64: string, lyricsContext?: string) {
+    try {
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) throw new Error("API Key missing");
+
+        const ai = new GoogleGenAI({ apiKey });
+
+        // Strip data URL prefix if present
+        const base64Data = audioBase64.includes('base64,')
+            ? audioBase64.split('base64,')[1]
+            : audioBase64;
+
+        const prompt = `Analyze this audio recording. It is a songwriting take.
+Identify the logical sections of the song (e.g., Intro, Verse, Chorus, Bridge, Outro, or just "Idea" if it's informal).
+Provide the start and end timestamps in seconds for each section.
+Also classify each section as either 'vocal', 'instrumental', 'speech', or 'silence'.
+Suggest a descriptive label and a relevant emoji for each section.
+
+${lyricsContext ? `Contextual Lyrics for reference:\n${lyricsContext}` : ''}
+
+Return the results ONLY as a JSON array of objects with this structure:
+[{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
+
+        const result = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: [
+                { text: prompt },
+                {
+                    inlineData: {
+                        mimeType: "audio/webm",
+                        data: base64Data
+                    }
+                }
+            ]
+        });
+
+        const responseText = result.text || "";
+        // Clean up markdown code blocks if Gemini returns them
+        const jsonText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const detectedSections = JSON.parse(jsonText) as GeminiSection[];
+
+        return { success: true, sections: detectedSections };
+    } catch (error) {
+        console.error("Gemini Audio Analysis Error:", error);
+        return { success: false, error: "Failed to analyze audio structure" };
+    }
+}
+
 
 // --- Facilitator AI (Gemini) ---
 

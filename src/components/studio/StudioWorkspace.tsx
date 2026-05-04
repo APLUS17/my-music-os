@@ -17,6 +17,7 @@ import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioStructure } from '@/app/actions';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Clock,
@@ -787,11 +788,14 @@ const StudioWorkspace: React.FC = () => {
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 
+        const lyricsContextString = sections.map(s => `[${s.type}]: ${s.text}`).join('\n');
+        const structurePromise = analyzeAudioStructure(base64, lyricsContextString);
+
         await saveAudioData(id, base64);
 
         const timestamp = new Date().toISOString();
 
-        let sections: AutoSection[] = [];
+        let initialSections: AutoSection[] = [];
         try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
             try {
@@ -802,7 +806,7 @@ const StudioWorkspace: React.FC = () => {
                     ? Math.max(1, Math.ceil(duration / (beatLoopEnd - beatLoopStart)))
                     : 1;
 
-                sections = await analyzeAudioAndSplit(audioBuffer, {
+                initialSections = await analyzeAudioAndSplit(audioBuffer, {
                     isLoopSession,
                     loopStart: beatLoopStart || 0,
                     loopEnd: beatLoopEnd || 0,
@@ -868,7 +872,7 @@ const StudioWorkspace: React.FC = () => {
             const newSession: RecordingSession = {
                 id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: compensatedOffset,
                 isLoopSession: !!uploadedBeat && isBeatLooping,
-                sections,
+                sections: initialSections,
                 loopStart: beatLoopStart || undefined,
                 loopEnd: beatLoopEnd || undefined,
                 projectId: activeProjectId || undefined
@@ -881,23 +885,48 @@ const StudioWorkspace: React.FC = () => {
             }
 
             toast.success('Recording saved');
-            const recordingToastId = toast.loading('Transcribing lyrics...');
-            transcriptionPromise.then(aiResult => {
+            const recordingToastId = toast.loading('Processing audio intelligence...');
+
+            // Wait for both Gemini structure and Groq transcription
+            Promise.all([transcriptionPromise, structurePromise]).then(([aiResult, structureResult]) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 toast.dismiss(recordingToastId);
-                if (aiResult) {
-                    setSessions(prev => prev.map(s => {
-                        if (s.id === id) {
-                            return {
-                                ...s,
-                                transcription: aiResult.transcription || s.transcription,
-                                lines: aiResult.lines || s.lines
-                                // Do NOT overwrite sections — keep smartSplit sections for RecordingThread
-                            };
+
+                setSessions(prev => prev.map(s => {
+                    if (s.id === id) {
+                        let finalSections = s.sections;
+                        let newName = s.name;
+
+                        if (structureResult.success && structureResult.sections && structureResult.sections.length > 0) {
+                            finalSections = structureResult.sections.map(gs => ({
+                                id: randomId(),
+                                startTime: gs.startTime,
+                                endTime: gs.endTime,
+                                type: gs.type,
+                                label: gs.label,
+                                emojiTag: gs.emoji,
+                                summary: gs.summary,
+                                isBest: false,
+                                isFavorited: false
+                            }));
+
+                            // Auto-name based on the first major section found
+                            const firstSection = structureResult.sections.find(sec => sec.type === 'vocal') || structureResult.sections[0];
+                            if (firstSection) {
+                                newName = `${firstSection.emoji} ${firstSection.label} Take`;
+                            }
                         }
-                        return s;
-                    }));
-                }
+
+                        return {
+                            ...s,
+                            name: newName,
+                            transcription: aiResult?.transcription || s.transcription,
+                            lines: aiResult?.lines || s.lines,
+                            sections: finalSections
+                        };
+                    }
+                    return s;
+                }));
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 toast.error(err.message, { id: recordingToastId });
