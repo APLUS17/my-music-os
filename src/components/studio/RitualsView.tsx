@@ -96,7 +96,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </button>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center pb-[120px]">
+                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
                     <div className="my-8 text-center">
                         <div className="text-6xl font-light tracking-tighter mb-2 font-mono">
                             {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
@@ -149,7 +149,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </div>
                 </div>
 
-                <div className="p-6 pb-[120px] border-t border-[var(--border-main)] glass">
+                <div className="p-6 border-t border-[var(--border-main)] glass">
                     <button
                         onClick={handleCompleteRitual}
                         className="w-full py-4 rounded-xl font-medium bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 transition-opacity"
@@ -168,7 +168,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                 <p className="text-sm text-[var(--text-tertiary)]">Time-boxed sessions to build momentum.</p>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 pb-[120px]">
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
                 {['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'].map(category => {
                     const categoryRituals = MASTER_RITUALS.filter(r => r.category === category);
                     if (categoryRituals.length === 0) return null;
