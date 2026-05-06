@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" log --oneline -5)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" remote -v)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" log --oneline -5)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" remote -v)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" status --short)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" status --short)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" branch -a)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" branch -a)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" log --oneline origin/main..HEAD)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" log --oneline origin/main..HEAD)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os\" log --oneline origin/main -5)",
+      "Bash(git -C \"c:/Users/ayoomo01/my-music-os/my-music-os\" log --oneline origin/main -5)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(awk '{print $NF}')",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(grep -n \"recordingStartOffsetRef\\\\|onSave\\\\|backingAudioRef\\\\|MediaRecorder\" c:\\\\\\\\Users\\\\\\\\ayoomo01\\\\\\\\my-music-os\\\\\\\\src\\\\\\\\components\\\\\\\\studio\\\\\\\\StudioWorkspace.tsx)",
+      "Bash(git -C my-music-os checkout -b feature/facilitator-screen)",
+      "Bash(git -C my-music-os status)",
+      "Bash(git checkout *)",
+      "Bash(npm run *)",
+      "Bash(git -C /c/Users/ayoomo01/my-music-os rev-parse --show-toplevel)",
+      "Bash(git -C /c/Users/ayoomo01/my-music-os/my-music-os rev-parse --show-toplevel)",
+      "Bash(git -C /c/Users/ayoomo01/my-music-os remote -v)",
+      "Bash(git -C /c/Users/ayoomo01/my-music-os/my-music-os remote -v)",
+      "Bash(npx tsc *)",
+      "Bash(gh pr create --title 'fix\\(studio\\): resolve beat timing desync, volume balance, and remove record hint' --body ' *)"
+    ]
+  }
+}
