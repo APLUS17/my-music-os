@@ -1,6 +1,39 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-let supabaseInstance: any = null;
+export type Database = {
+  public: {
+    Tables: {
+      projects: {
+        Row: {
+          id: string
+          title: string
+          status: string
+          description: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          status?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          status?: string
+          description?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+    }
+  }
+}
+
+let supabaseInstance: SupabaseClient<Database> | null = null;
 
 export const getSupabaseClient = () => {
   if (supabaseInstance) return supabaseInstance;
@@ -14,9 +47,10 @@ export const getSupabaseClient = () => {
     );
   }
 
-  supabaseInstance = createClient<any>(supabaseUrl, supabaseAnonKey);
-  return supabaseInstance!;
+  supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey);
+  return supabaseInstance;
 };
 
-export const supabase: any = getSupabaseClient()!;
-export const db: any = supabase;
+export const supabase = getSupabaseClient()!;
+export const db = supabase;
+
