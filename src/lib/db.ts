@@ -51,6 +51,6 @@ export const getSupabaseClient = () => {
   return supabaseInstance;
 };
 
-export const supabase = getSupabaseClient()!;
+export const supabase = getSupabaseClient() as any;
 export const db = supabase;
 
