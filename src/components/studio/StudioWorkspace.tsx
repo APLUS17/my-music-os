@@ -9,7 +9,6 @@ import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
-import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
@@ -33,7 +32,6 @@ import {
     Play,
     Pause,
     Trash2,
-    MessageSquare,
     House,
     ListMusic,
     Library
@@ -364,7 +362,6 @@ const StudioWorkspace: React.FC = () => {
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
-    const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
     const [showFXPanel, setShowFXPanel] = useState(false);
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
@@ -1492,7 +1489,6 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--accent)] bg-[var(--bg-secondary)] border border-[var(--border-main)] transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></button>
                                 <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
                             </div>
                         </div>
@@ -1987,8 +1983,6 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
                 <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
@@ -2035,8 +2029,6 @@ const StudioWorkspace: React.FC = () => {
                     parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
                 />
             )}
-
-            {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
             {/* Music Player Modal */}
             <AnimatePresence>

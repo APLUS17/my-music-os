@@ -28,7 +28,7 @@ Add the "Zap" button back to the header (next to `BeatUploader`):
 ```
 
 ### 4. Render the Component
-Add the drawers back near the bottom of the return statement (before `FeedbackModal`):
+Add the drawers back near the bottom of the return statement:
 ```tsx
 {showMuse && (
     <MuseDrawer 

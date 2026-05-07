@@ -74,8 +74,7 @@ src/
 │   │   ├── SpectralEQ.tsx          # Visual EQ panel (UI only)
 │   │   ├── FXPanel.tsx             # Effects controls (reverb, delay, compression)
 │   │   ├── MuseDrawer.tsx          # AI assistant — DISABLED for beta
-│   │   ├── OnboardingTour.tsx      # 6-step interactive walkthrough
-│   │   └── FeedbackModal.tsx       # In-app feedback submission
+│   │   └── OnboardingTour.tsx      # 6-step interactive walkthrough
 │   └── ui/                     # shadcn/ui primitives (button, sheet, slider, etc.)
 ├── lib/
 │   ├── db.ts                   # Supabase client
