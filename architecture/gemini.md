@@ -74,7 +74,6 @@ src/
 │   ├── SplitEditor.tsx
 │   ├── PlayerTab.tsx
 │   ├── Waveform.tsx
-│   ├── FeedbackModal.tsx
 │   └── MusicPlayer.tsx
 ├── components/ui/                # shadcn/ui primitives
 └── lib/
@@ -114,7 +113,6 @@ src/
 | Onboarding tour (6 steps) | `OnboardingTour.tsx` |
 | Theme system (5 themes) | CSS variables |
 | Global search | Filter tabs across all content |
-| Feedback modal | `FeedbackModal.tsx` |
 | Supabase backend connected | `db.ts` + `actions.ts` |
 | Datamuse API (rhymes) | `creative.ts` |
 | Mobile-first responsive | Touch + swipe gestures |

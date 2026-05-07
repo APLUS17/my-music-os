@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
@@ -401,7 +401,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Bottom action bar ────── */}
             <div className="flex items-center justify-evenly pb-8 pt-3">
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><MessageSquare size={20} className="text-white/60" /></button>
                 <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><Languages size={20} className="text-white/60" /></button>
                 <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><List size={20} className="text-white/60" /></button>
             </div>

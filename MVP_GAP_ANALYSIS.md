@@ -29,7 +29,6 @@
 | **Onboarding Tour** | ✅ Shipped | `OnboardingTour.tsx` - 6-step interactive walkthrough. Restartable from Settings |
 | **Theme System** | ✅ Shipped | 5 themes: Dark, Light, Midnight, Matrix, Sonar. CSS variables for live switching |
 | **Search** | ✅ Shipped | Global search across projects, takes, beats, scraps with filter tabs |
-| **Feedback Modal** | ✅ Shipped | `FeedbackModal.tsx` - In-app feedback submission |
 | **Supabase Backend** | ✅ Connected | `db.ts` + `actions.ts` - CRUD for projects via Supabase. Server actions pattern |
 | **Datamuse API (Rhymes)** | ✅ Connected | `creative.ts` - getRhymes, getSynonyms, getRelatedConcepts via Datamuse API |
 | **Responsive/Mobile Design** | ✅ Shipped | Mobile-first layout, touch-friendly controls, swipe gestures |
