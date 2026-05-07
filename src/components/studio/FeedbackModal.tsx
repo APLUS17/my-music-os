@@ -19,14 +19,14 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ onClose }) => {
 
     return (
         <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
-            <DialogContent className="max-w-md h-[80vh] p-0 overflow-hidden flex flex-col bg-[var(--bg-card)] border-[var(--border-main)]">
-                <DialogHeader className="p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)] space-y-0">
-                    <DialogTitle className="text-sm font-medium text-[var(--text-main)] ml-2">
+            <DialogContent className="max-w-md h-[80vh] p-0 overflow-hidden flex flex-col bg-card border-border">
+                <DialogHeader className="p-4 border-b border-border bg-secondary space-y-0">
+                    <DialogTitle className="text-sm font-medium text-foreground ml-2">
                         Beta Feedback
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="flex-1 bg-[var(--bg-main)]">
+                <div className="flex-1 bg-background">
                     <iframe
                         src={TALLY_FORM_URL}
                         width="100%"

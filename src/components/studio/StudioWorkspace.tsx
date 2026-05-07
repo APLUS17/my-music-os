@@ -36,11 +36,13 @@ import {
     MessageSquare,
     House,
     ListMusic,
-    Library
+    Library,
+    ChevronDown,
+    CheckCircle2
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -128,22 +130,29 @@ interface NavBtnProps {
 }
 
 const NavBtn = ({ active, onClick, icon, label, id }: NavBtnProps) => (
-    <button
+    <Button
         id={id}
+        variant="ghost"
         onClick={onClick}
-        className={`flex flex-col items-center justify-center gap-1 py-1.5 px-1 transition-all duration-300 relative ${active ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}
+        className={cn(
+            "flex flex-col h-auto items-center justify-center gap-1 py-1.5 px-1 transition-all duration-300 relative group bg-transparent hover:bg-transparent",
+            active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+        )}
     >
-        <div className={`p-2 rounded-xl transition-all duration-300 ${active ? 'bg-[var(--accent)]/10' : 'hover:bg-white/5'}`}>
+        <div className={cn(
+            "p-2 rounded-xl transition-all duration-300",
+            active ? 'bg-primary/10' : 'hover:bg-accent'
+        )}>
             {icon}
         </div>
-        <span className="text-[8px] mono uppercase tracking-[0.1em] font-bold">{label}</span>
+        <span className="text-metadata">{label}</span>
         {active && (
             <motion.div 
                 layoutId="nav-pill" 
-                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" 
+                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary shadow-[0_0_10px_var(--accent-dim)]"
             />
         )}
-    </button>
+    </Button>
 );
 
 interface SwipeableProjectCardProps {
@@ -207,8 +216,8 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
     return (
         <div className="relative mb-2 select-none overflow-hidden rounded-lg">
             <div className="absolute inset-0 flex items-center justify-end bg-red-500/10 rounded-lg pr-4 z-0">
-                <button
-                    type="button"
+                <Button
+                    variant={confirmDelete ? "default" : "outline"}
                     onClick={(e) => {
                         e.stopPropagation();
                         if (confirmDelete) {
@@ -217,16 +226,18 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
                             setConfirmDelete(true);
                         }
                     }}
-                    className={`flex items-center justify-center rounded-full shadow-sm border transition-all duration-200 cursor-pointer ${confirmDelete
-                        ? 'w-20 h-10 bg-red-500 text-[var(--bg-main)] border-red-600'
-                        : 'w-10 h-10 bg-[var(--bg-card)] text-red-500 border-red-500/20 active:scale-95 hover:bg-red-50'
-                        }`}
+                    className={cn(
+                        "rounded-full transition-all duration-200",
+                        confirmDelete
+                            ? 'w-20 h-10 bg-red-500 text-black border-red-600'
+                            : 'w-10 h-10 bg-card text-red-500 border-red-500/20 hover:bg-red-500/10'
+                    )}
                 >
                     {confirmDelete ? <span className="text-xs font-bold">Confirm</span> : <Trash2 size={18} />}
-                </button>
+                </Button>
             </div>
             <div
-                className="relative z-10 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg p-4 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y"
+                className="relative z-10 bg-card border border-border rounded-lg p-4 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y"
                 style={{ transform: `translateX(${offset}px)` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -235,10 +246,10 @@ const SwipeableProjectCard = ({ project, onClick, onDelete }: SwipeableProjectCa
                 onClick={handleClick}
             >
                 <div>
-                    <h3 className="text-sm font-medium text-[var(--text-main)] mb-1">{project.name || "Untitled Project"}</h3>
-                    <p className="text-xs mono text-[var(--text-tertiary)]">{project.lastModified}</p>
+                    <h3 className="text-sm font-medium text-foreground mb-1">{project.name || "Untitled Project"}</h3>
+                    <p className="text-metadata">{project.lastModified}</p>
                 </div>
-                <ChevronRight size={14} className="text-[var(--text-tertiary)]" />
+                <ChevronRight size={14} className="text-muted-foreground" />
             </div>
         </div>
     );
@@ -307,14 +318,14 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
                     }}
                     className={`flex items-center justify-center rounded-full shadow-sm border transition-all duration-200 cursor-pointer ${confirmDelete
                         ? 'w-20 h-10 bg-red-500 text-[var(--bg-main)] border-red-600'
-                        : 'w-10 h-10 bg-[var(--bg-card)] text-red-500 border-red-500/20 active:scale-95 hover:bg-red-50'
+                        : 'w-10 h-10 bg-card text-red-500 border-red-500/20 active:scale-95 hover:bg-red-50'
                         }`}
                 >
                     {confirmDelete ? <span className="text-xs font-bold">Confirm</span> : <Trash2 size={18} />}
                 </button>
             </div>
             <div
-                className={`relative z-10 bg-[var(--bg-card)] border ${isPlaying ? 'border-[var(--accent)]' : 'border-[var(--border-main)]'} rounded-lg p-3 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y`}
+                className={`relative z-10 bg-card border ${isPlaying ? 'border-primary' : 'border-border'} rounded-lg p-3 flex items-center justify-between transition-transform duration-200 ease-out touch-pan-y`}
                 style={{ transform: `translateX(${offset}px)` }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -322,15 +333,15 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
                 onPointerCancel={handlePointerUp}
             >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                    <button onClick={(e) => { e.stopPropagation(); onPlay(); }} className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all">
+                    <button onClick={(e) => { e.stopPropagation(); onPlay(); }} className="w-10 h-10 rounded-full flex items-center justify-center bg-secondary text-muted-foreground hover:text-foreground active:scale-95 transition-all">
                         {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                     </button>
                     <div className="min-w-0 pointer-events-none">
-                        <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{beat.name}</h4>
-                        <p className="text-xs mono text-[var(--text-tertiary)]">{beat.duration}</p>
+                        <h4 className="text-sm font-medium text-foreground truncate">{beat.name}</h4>
+                        <p className="text-metadata">{beat.duration}</p>
                     </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); onWrite(); }} className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] text-xs mono uppercase tracking-wider text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] transition-all">Write</button>
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onWrite(); }} className="rounded-full text-metadata">Write</Button>
             </div>
         </div>
     );
@@ -1414,37 +1425,37 @@ const StudioWorkspace: React.FC = () => {
                 return (
                     <div className="h-full flex flex-col pt-12 animate-in fade-in duration-500 px-6">
                         <div className="flex items-center gap-3 mb-8">
-                            <button onClick={() => setViewMode('collection')} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors">
+                            <button onClick={() => setViewMode('collection')} className="text-muted-foreground hover:text-foreground transition-colors">
                                 <ChevronRight size={20} className="rotate-180" />
                             </button>
-                            <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">Settings</h1>
+                            <h1 className="text-2xl font-medium tracking-tight text-foreground">Settings</h1>
                         </div>
                         <div className="space-y-8 overflow-y-auto pb-20">
                             <section>
-                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Appearance</h2>
+                                <h2 className="text-xs mono uppercase tracking-wide text-muted-foreground mb-4">Appearance</h2>
                                 <div className="grid grid-cols-1 gap-3">
                                     {['dark', 'light', 'midnight', 'matrix', 'sonar'].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => setTheme(t as Theme)}
-                                            className={`p-4 rounded-lg border flex items-center justify-between transition-all capitalize ${theme === t ? 'bg-[var(--bg-card)] border-[var(--accent)]' : 'bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)]'}`}
+                                            className={`p-4 rounded-lg border flex items-center justify-between transition-all capitalize ${theme === t ? 'bg-card border-primary' : 'bg-card border-border hover:border-[var(--text-secondary)]'}`}
                                         >
-                                            <span className="text-sm font-medium text-[var(--text-main)]">{t}</span>
-                                            {theme === t && <Check size={16} className="text-[var(--accent)]" />}
+                                            <span className="text-sm font-medium text-foreground">{t}</span>
+                                            {theme === t && <Check size={16} className="text-primary" />}
                                         </button>
                                     ))}
                                 </div>
                             </section>
 
                             <section className="pt-4">
-                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Audio Engineering</h2>
-                                <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] space-y-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-muted-foreground mb-4">Audio Engineering</h2>
+                                <div className="p-4 rounded-lg border bg-card border-border space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Latency Compensation</h3>
-                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[200px]">Adjust if your recordings feel slightly delayed compared to the beat.</p>
+                                            <h3 className="text-sm font-medium text-foreground">Latency Compensation</h3>
+                                            <p className="text-xs text-muted-foreground max-w-[200px]">Adjust if your recordings feel slightly delayed compared to the beat.</p>
                                         </div>
-                                        <div className="text-sm font-bold text-[var(--accent)] mono">{latencyCompensation}ms</div>
+                                        <div className="text-sm font-bold text-primary mono">{latencyCompensation}ms</div>
                                     </div>
                                     <input
                                         type="range"
@@ -1453,16 +1464,16 @@ const StudioWorkspace: React.FC = () => {
                                         step="5"
                                         value={latencyCompensation}
                                         onChange={(e) => setLatencyCompensation(parseInt(e.target.value))}
-                                        className="w-full h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+                                        className="w-full h-1 bg-secondary rounded-lg appearance-none cursor-pointer slider"
                                     />
-                                    <div className="flex justify-between text-xs mono text-[var(--text-tertiary)]">
+                                    <div className="flex justify-between text-xs mono text-muted-foreground">
                                         <span>0ms</span>
                                         <span>500ms</span>
                                     </div>
                                 </div>
                             </section>
                             <section className="pt-4">
-                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Help</h2>
+                                <h2 className="text-xs mono uppercase tracking-wide text-muted-foreground mb-4">Help</h2>
                                 <div className="grid grid-cols-1 gap-3">
                                     <button
                                         onClick={() => {
@@ -1470,10 +1481,10 @@ const StudioWorkspace: React.FC = () => {
                                             setShowTour(true);
                                             setViewMode('collection');
                                         }}
-                                        className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
+                                        className="p-4 rounded-lg border bg-card border-border hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
                                     >
-                                        <span className="text-sm font-medium text-[var(--text-main)]">Restart Tour</span>
-                                        <ChevronRight size={16} className="text-[var(--text-secondary)]" />
+                                        <span className="text-sm font-medium text-foreground">Restart Tour</span>
+                                        <ChevronRight size={16} className="text-muted-foreground" />
                                     </button>
                                 </div>
                             </section>
@@ -1485,15 +1496,15 @@ const StudioWorkspace: React.FC = () => {
                     <div className="h-full flex flex-col pt-12">
                         <div className="px-6 mb-8 flex items-center justify-between">
                             <div>
-                                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
-                                <div className="flex border-b border-[var(--border-main)]">
-                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
-                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
+                                <h1 className="text-2xl font-medium tracking-tight text-foreground mb-6">Library</h1>
+                                <div className="flex border-b border-border">
+                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-foreground border-b border-primary' : 'text-muted-foreground hover:text-muted-foreground'}`}>Projects</button>
+                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-foreground border-b border-primary' : 'text-muted-foreground hover:text-muted-foreground'}`}>Beats</button>
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--accent)] bg-[var(--bg-secondary)] border border-[var(--border-main)] transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></button>
-                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
+                                <Button size="icon" onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full hover:bg-accent text-primary bg-secondary border border-border transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full text-muted-foreground"><Settings size={18} /></Button>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
@@ -1524,12 +1535,12 @@ const StudioWorkspace: React.FC = () => {
                             <div className="pointer-events-auto flex flex-col items-end gap-3">
                                 <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-out origin-bottom-right ${fabOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}>
                                     <button onClick={handleNewProject} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
+                                        <span className={`bg-card border border-border px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-foreground shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
+                                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shadow-lg border border-border group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
                                     </button>
                                     <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
+                                        <span className={`bg-card border border-border px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-foreground shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
+                                        <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shadow-lg border border-border group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
                                         <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
                                     </button>
                                 </div>
@@ -1614,7 +1625,7 @@ const StudioWorkspace: React.FC = () => {
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
+                        <div className="glass z-20 sticky top-0 border-b border-border">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -1623,12 +1634,12 @@ const StudioWorkspace: React.FC = () => {
                                             <input
                                                 value={projectTitle}
                                                 onChange={(e) => setProjectTitle(e.target.value)}
-                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate pr-8"
+                                                className="bg-transparent border-none text-xl font-bold text-foreground focus:outline-none w-full placeholder:text-muted-foreground truncate pr-8"
                                                 placeholder="Untitled Project"
                                             />
                                             <button 
                                                 onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
-                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-white transition-colors"
+                                                className="absolute right-0 p-1 text-muted-foreground hover:text-white transition-colors"
                                             >
                                                 <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
                                             </button>
@@ -1639,39 +1650,41 @@ const StudioWorkspace: React.FC = () => {
                                                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                        className="absolute top-full left-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-2xl p-2 z-[60] backdrop-blur-xl"
+                                                        className="absolute top-full left-0 mt-2 w-64 bg-card border border-border rounded-xl shadow-2xl p-2 z-[60] backdrop-blur-xl"
                                                     >
                                                         <div className="max-h-60 overflow-y-auto scrollbar-hide py-1">
-                                                            <div className="px-3 py-2 text-[10px] mono uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-main)] mb-1">Your Projects</div>
+                                                            <div className="px-3 py-2 text-metadata border-b border-border mb-1">Your Projects</div>
                                                             {savedProjects.length > 0 ? (
                                                                 savedProjects.map(p => (
-                                                                    <button
+                                                                    <Button
                                                                         key={p.id}
+                                                                        variant="ghost"
                                                                         onClick={() => {
                                                                             loadProject(p);
                                                                             setIsProjectSelectorOpen(false);
                                                                         }}
                                                                         className={cn(
-                                                                            "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between group",
-                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-white"
+                                                                            "w-full justify-between h-auto px-3 py-2 rounded-lg text-sm transition-colors flex items-center group",
+                                                                            activeProjectId === p.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                                                                         )}
                                                                     >
                                                                         <span className="truncate">{p.name || "Untitled"}</span>
                                                                         {activeProjectId === p.id && <CheckCircle2 size={14} />}
-                                                                    </button>
+                                                                    </Button>
                                                                 ))
                                                             ) : (
-                                                                <div className="px-3 py-4 text-xs italic text-[var(--text-tertiary)] text-center">No saved projects</div>
+                                                                <div className="px-3 py-4 text-xs italic text-muted-foreground text-center">No saved projects</div>
                                                             )}
-                                                            <button 
+                                                            <Button
+                                                                variant="ghost"
                                                                 onClick={() => {
                                                                     handleNewProject();
                                                                     setIsProjectSelectorOpen(false);
                                                                 }}
-                                                                className="w-full mt-2 flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black rounded-lg transition-all"
+                                                                className="w-full mt-2 justify-start h-auto gap-2 px-3 py-2 text-xs font-medium text-primary hover:bg-primary hover:text-primary-foreground rounded-lg transition-all"
                                                             >
                                                                 <Plus size={14} /> New Project
-                                                            </button>
+                                                            </Button>
                                                         </div>
                                                     </motion.div>
                                                 )}
@@ -1736,15 +1749,15 @@ const StudioWorkspace: React.FC = () => {
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Toggle For Tabs */}
-                            <div className="flex items-center border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
-                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
-                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
+                            <div className="flex items-center border-b border-border sticky top-0 bg-background z-10 px-6">
+                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-foreground border-b border-primary' : 'text-muted-foreground hover:text-muted-foreground'}`}>Lyrics</button>
+                                <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-foreground border-b border-primary' : 'text-muted-foreground hover:text-muted-foreground'}`}>Takes</button>
+                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-foreground border-b border-primary' : 'text-muted-foreground hover:text-muted-foreground'}`}>Player</button>
                             </div>
 
                             {/* Player Tab — full height, no scroll padding */}
                             {activeTab === 'player' && (
-                                <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
+                                <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-background">
                                     <PlayerTab
                                         projectTitle={projectTitle || "Untitled Project"}
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
@@ -1794,7 +1807,7 @@ const StudioWorkspace: React.FC = () => {
 
                             {/* Lyrics & Takes tabs — scrollable content */}
                             {activeTab !== 'player' && (
-                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-background px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
                                         {activeTab === 'lyrics' ? (
                                             <>
@@ -1808,19 +1821,19 @@ const StudioWorkspace: React.FC = () => {
                                                             className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                         >
                                                             {/* Abstract Background Shapes */}
-                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                            <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-primary opacity-[0.03] blur-[100px] rounded-full" />
+                                                            <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-primary opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
                                                             
-                                                            <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                            <div className="w-32 h-32 rounded-[40px] border border-border flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                <div className="absolute inset-0 bg-gradient-to-br from-primary to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
                                                                 <div className="absolute inset-0 rounded-[40px] border border-white/5" />
-                                                                <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                                <PenTool size={40} className="text-primary opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
                                                                 
                                                                 {/* Orbiting particles animation */}
                                                                 <motion.div 
                                                                     animate={{ rotate: 360 }}
                                                                     transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                    className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                    className="absolute inset-0 border border-dashed border-primary/10 rounded-full scale-150 pointer-events-none"
                                                                 />
                                                             </div>
 
@@ -1837,7 +1850,7 @@ const StudioWorkspace: React.FC = () => {
                                                                 initial={{ opacity: 0, y: 10 }}
                                                                 animate={{ opacity: 1, y: 0 }}
                                                                 transition={{ delay: 0.3 }}
-                                                                className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                className="text-base text-muted-foreground leading-relaxed mb-12 max-w-sm mx-auto"
                                                             >
                                                                 Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
                                                             </motion.p>
@@ -1857,18 +1870,19 @@ const StudioWorkspace: React.FC = () => {
                                                                 initial={{ opacity: 0 }}
                                                                 animate={{ opacity: 1 }}
                                                                 transition={{ delay: 0.6 }}
-                                                                className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                className="mt-16 flex items-center gap-6 text-muted-foreground"
                                                             >
                                                                 <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
                                                                 <div className="flex gap-4">
                                                                     {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                        <button 
+                                                                        <Button
                                                                             key={type}
+                                                                            variant="link"
                                                                             onClick={addSection}
-                                                                            className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                            className="text-xs h-auto p-0 hover:text-primary transition-colors no-underline"
                                                                         >
                                                                             {type}
-                                                                        </button>
+                                                                        </Button>
                                                                     ))}
                                                                 </div>
                                                             </motion.div>
@@ -1893,11 +1907,11 @@ const StudioWorkspace: React.FC = () => {
                                                             ))}
                                                             <button
                                                                 onClick={addSection}
-                                                                className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                                                className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
                                                             >
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-border to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                                                 <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+ Add Section</span>
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-border to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                                             </button>
                                                         </motion.div>
                                                     )}
@@ -1946,9 +1960,9 @@ const StudioWorkspace: React.FC = () => {
 
 
     return (
-        <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
+        <div className="h-[100dvh] w-full bg-background text-foreground flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
             <main
-                className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
+                className="w-full flex-1 max-w-lg overflow-hidden bg-background border-x border-border shadow-2xl transition-all duration-500 ease-out flex flex-col"
             >
                 {/* Persistent Studio Beat Audio */}
                 <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
@@ -1989,24 +2003,25 @@ const StudioWorkspace: React.FC = () => {
 
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-                <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                <nav className={`z-[110] transition-all duration-500 bg-card backdrop-blur-3xl border-t border-border pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
                         <div className="flex justify-center relative">
                             <div className="absolute bottom-1 flex flex-col items-center">
-                                <button
+                                <Button
                                     id="tour-nav-record"
+                                    variant="record"
                                     onClick={() => {
                                         setShowRecorder(true);
                                         setRecorderMinimized(true);
                                         setRecorderAutoStart(isBeatPlaying);
                                     }}
-                                    className="relative flex items-center justify-center w-[72px] h-[72px] sm:w-[82px] sm:h-[82px] rounded-full transition-all duration-300 select-none border-[6px] sm:border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 active:scale-95 shadow-[0_4px_20px_rgba(239,68,68,0.4)]"
+                                    className="w-[72px] h-[72px] sm:w-[82px] sm:h-[82px]"
                                     style={{ touchAction: 'none' }}
                                 >
                                     <Plus className="h-5 w-5 text-white" />
-                                </button>
+                                </Button>
                             </div>
                         </div>
                         <NavBtn id="tour-nav-rituals" active={viewMode === 'rituals'} onClick={() => setViewMode('rituals')} icon={<Clock className="h-5 w-5" />} label="Rituals" />
@@ -2062,20 +2077,20 @@ const StudioWorkspace: React.FC = () => {
             </AnimatePresence>
 
             {showSearch && (
-                <div className="fixed inset-0 z-[200] bg-[var(--bg-main)]/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[200] bg-background/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300">
                     <div className="max-w-lg mx-auto h-full flex flex-col pt-[env(safe-area-inset-top)]">
                         <div className="px-6 pt-8 pb-6 flex items-center gap-4">
                             <div className="flex-1 relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={18} />
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                                 <input
                                     autoFocus
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search songs, lyrics, recordings, beats..."
-                                    className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                                    className="w-full bg-card border border-border rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-primary transition-all"
                                 />
                             </div>
-                                <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors text-[var(--text-secondary)]"><X size={20} /></button>
+                                <Button variant="ghost" size="icon" onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="w-10 h-10 rounded-full text-muted-foreground"><X size={20} /></Button>
                         </div>
 
                         <div className="px-6 flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
@@ -2083,7 +2098,7 @@ const StudioWorkspace: React.FC = () => {
                                 <button
                                     key={f}
                                     onClick={() => setSearchFilter(f as SearchFilter)}
-                                    className={`px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
+                                    className={`px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wider border transition-all whitespace-nowrap ${searchFilter === f ? 'bg-primary border-primary text-[var(--bg-main)]' : 'bg-secondary border-border text-muted-foreground'}`}
                                 >{f}</button>
                             ))}
                         </div>
@@ -2099,16 +2114,16 @@ const StudioWorkspace: React.FC = () => {
                                         if (res.type === 'section') { setViewMode('studio'); }
                                         setShowSearch(false);
                                     }}
-                                    className="w-full text-left bg-[var(--bg-card)] border border-[var(--border-main)] p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
+                                    className="w-full text-left bg-card border border-border p-4 rounded-xl hover:bg-[var(--bg-hover)] transition-all flex items-center justify-between group"
                                 >
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-xs mono px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] uppercase">{res.type}</span>
-                                            <h4 className="text-sm font-medium text-[var(--text-main)] truncate">{res.title}</h4>
+                                            <span className="text-xs mono px-1.5 py-0.5 rounded bg-secondary text-primary uppercase">{res.type}</span>
+                                            <h4 className="text-sm font-medium text-foreground truncate">{res.title}</h4>
                                         </div>
-                                        <p className="text-xs text-[var(--text-secondary)] line-clamp-1">{res.desc}</p>
+                                        <p className="text-xs text-muted-foreground line-clamp-1">{res.desc}</p>
                                     </div>
-                                    <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <ChevronRight size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </button>
                             ))}
                         </div>

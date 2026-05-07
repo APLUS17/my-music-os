@@ -54,7 +54,7 @@ const AutoResizeTextarea = ({
       onKeyDown={onKeyDown}
       onFocus={onFocus}
       rows={1}
-      className="w-full bg-transparent border-none focus:outline-none text-[var(--text-main)] text-base leading-relaxed font-sans placeholder:text-[var(--text-tertiary)] resize-none overflow-hidden py-0 whitespace-pre-wrap break-words block"
+      className="w-full bg-transparent border-none focus:outline-none text-foreground text-base leading-relaxed font-sans placeholder:text-muted-foreground resize-none overflow-hidden py-0 whitespace-pre-wrap break-words block"
       placeholder={placeholder}
       spellCheck={false}
     />
@@ -248,8 +248,8 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
     <div className="flex flex-col animate-in fade-in duration-500 relative min-h-full">
       {lines.length === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40 gap-4 px-8 text-center">
-          <span className="text-sm font-medium text-[var(--text-main)]">Start writing your lyrics</span>
-          <div className="space-y-1 text-xs mono text-[var(--text-secondary)]">
+          <span className="text-sm font-medium text-foreground">Start writing your lyrics</span>
+          <div className="space-y-1 text-xs mono text-muted-foreground">
             <p>Just type freely - no rules here</p>
             <p>Try rhyming the ends of lines</p>
             <p>Hit Enter twice to start a new section</p>
@@ -268,14 +268,14 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
         return (
           <div
             key={line.id}
-            className={`group flex items-start ${marginBottom} relative pl-3 border-l-2 border-transparent hover:border-[var(--border-main)] transition-all`}
+            className={`group flex items-start ${marginBottom} relative pl-3 border-l-2 border-transparent hover:border-border transition-all`}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleDrop(e, line.id)}
           >
             {/* Section Divider Indicator (Visual only) */}
             {isLastLineOfSection && index !== lines.length - 1 && (
               <div className="absolute -bottom-8 left-0 right-0 h-4 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="h-[1px] w-full bg-[var(--border-main)] opacity-50"></div>
+                <div className="h-[1px] w-full bg-border opacity-50"></div>
               </div>
             )}
             {/* Controls - Absolute Positioned to left of content */}
@@ -283,7 +283,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
               {!session ? (
                 <button
                   onClick={() => onRecordStart(line.id)}
-                  className="text-[var(--text-tertiary)] hover:text-red-500 transition-all hover:scale-125 p-1 active:scale-90"
+                  className="text-muted-foreground hover:text-red-500 transition-all hover:scale-125 p-1 active:scale-90"
                   title="Record Session"
                 >
                   <Mic size={14} />
@@ -295,7 +295,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
                     e.dataTransfer.setData('text/plain', session.id);
                     setDraggedSessionId(session.id);
                   }}
-                  className="cursor-grab active:cursor-grabbing text-[var(--accent)] hover:text-[var(--text-main)] p-1 transition-transform hover:scale-110"
+                  className="cursor-grab active:cursor-grabbing text-primary hover:text-foreground p-1 transition-transform hover:scale-110"
                 >
                   <GripVertical size={14} />
                 </div>
@@ -334,7 +334,7 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
                     handleLineChange(line.id, "");
                   }
                 }}
-                className="absolute -right-6 top-1 text-[var(--text-tertiary)] opacity-0 group-hover:opacity-40 hover:opacity-100 hover:text-red-500 transition-all duration-300 active:scale-90"
+                className="absolute -right-6 top-1 text-muted-foreground opacity-0 group-hover:opacity-40 hover:opacity-100 hover:text-red-500 transition-all duration-300 active:scale-90"
               >
                 <X size={12} />
               </button>
@@ -343,14 +343,14 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
             {/* Audio Pill */}
             {session && (
               <div
-                className={`flex items-center gap-2 ml-3 pr-2 pl-1 py-1 rounded-full border transition-all select-none flex-shrink-0 ${isPlaying ? 'bg-[var(--accent)] border-[var(--accent)] text-[var(--bg-main)]' : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)]'}`}
+                className={`flex items-center gap-2 ml-3 pr-2 pl-1 py-1 rounded-full border transition-all select-none flex-shrink-0 ${isPlaying ? 'bg-primary border-primary text-background' : 'bg-secondary border-border text-muted-foreground'}`}
               >
                 <button onClick={() => onPlaySession(session.id)} className="p-0.5 hover:scale-110 transition-transform">
                   {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                 </button>
                 <button
                   onClick={() => removeSessionFromLine(line.id)}
-                  className={`ml-1 hover:text-red-500 transition-colors ${isPlaying ? 'text-[var(--bg-main)] opacity-70' : 'text-[var(--text-tertiary)]'}`}
+                  className={`ml-1 hover:text-red-500 transition-colors ${isPlaying ? 'text-background opacity-70' : 'text-muted-foreground'}`}
                 >
                   <Trash2 size={10} />
                 </button>

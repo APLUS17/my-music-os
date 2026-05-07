@@ -223,9 +223,9 @@ const SessionCard = ({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={cn(
-                    "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden",
-                    "bg-[#111] border border-white/10",
-                    isActive ? "ring-1 ring-white/20 shadow-lg" : "opacity-90 hover:opacity-100 hover:border-white/15"
+                    "group relative flex flex-col p-4 gap-4 rounded-2xl overflow-hidden transition-all",
+                    "bg-card border border-border",
+                    isActive ? "ring-1 ring-primary/20 shadow-lg" : "opacity-90 hover:opacity-100 hover:border-strong"
                 )}
                 onClick={onSelect}
             >
@@ -237,10 +237,10 @@ const SessionCard = ({
                         onClick={togglePlayAll}
                         size="icon"
                         className={cn(
-                            "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-white/10",
+                                    "w-12 h-12 rounded-full shrink-0 transition-all shadow-sm border border-border",
                             (isThisSessionPlaying && !playingSectionId)
-                                ? "bg-white text-black hover:bg-white/90"
-                                : "bg-[#222] text-white hover:bg-[#333]"
+                                        ? "bg-foreground text-background hover:bg-foreground/90"
+                                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                         )}
                     >
                         {(isThisSessionPlaying && !playingSectionId) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
@@ -306,7 +306,7 @@ const SessionCard = ({
 
                             return (
                                 <div key={sec.id} className="relative flex items-center group/sec">
-                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-[#1A1A1A] border border-white/10 flex items-center justify-center text-xs shadow-sm z-10">
+                                    <div className="absolute -left-[35px] w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center text-xs shadow-sm z-10">
                                         {sec.emojiTag || getEmojiForType(sec.type)}
                                     </div>
 
@@ -360,8 +360,8 @@ const SessionCard = ({
                                             <div className={cn(
                                                 "flex justify-center items-center w-8 h-8 rounded-full border transition-all",
                                                 isThisSectionPlaying
-                                                    ? "bg-white text-black border-transparent"
-                                                    : "bg-[#222] text-white border-white/10 group-hover/sec:bg-[#333]"
+                                                    ? "bg-foreground text-background border-transparent"
+                                                    : "bg-secondary text-secondary-foreground border-border group-hover/sec:bg-secondary/80"
                                             )}>
                                                 {isThisSectionPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                                             </div>

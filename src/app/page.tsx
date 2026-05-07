@@ -4,7 +4,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 export default function Page() {
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-[var(--bg-main)]">
+            <div className="min-h-screen bg-background">
                 <StudioWorkspace />
             </div>
         </ErrorBoundary>

@@ -216,7 +216,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
+          className="h-8 rounded-xl bg-secondary border-border hover:bg-accent text-muted-foreground hover:text-foreground transition-all uppercase tracking-wide text-xs font-mono gap-2"
         >
           <Music size={12} />
           <span>Load Beat</span>
@@ -233,7 +233,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
         <div className={cn(
           "group relative h-9 rounded-xl border bg-white/5 flex items-center overflow-hidden hover:border-white/20 transition-all shadow-sm",
           isLooping && loopStart !== null && loopEnd !== null
-            ? "border-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
+            ? "border-primary shadow-[0_0_8px_var(--accent-dim)]"
             : "border-white/10"
         )}>
           <div
@@ -262,7 +262,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           </PopoverTrigger>
         </div>
 
-        <PopoverContent align="end" className="w-80 p-4 bg-[var(--bg-card)] border-white/10 shadow-2xl rounded-2xl flex flex-col gap-4">
+        <PopoverContent align="end" className="w-80 p-4 bg-card border-white/10 shadow-2xl rounded-2xl flex flex-col gap-4">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
@@ -284,7 +284,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               {/* Loop Region background */}
               {isLooping && loopStart !== null && loopEnd !== null && (
                 <div
-                  className="absolute top-0 bottom-0 bg-[var(--accent)] opacity-20 pointer-events-none"
+                  className="absolute top-0 bottom-0 bg-primary opacity-20 pointer-events-none"
                   style={{
                     left: `${(loopStart / duration) * 100}%`,
                     width: `${((loopEnd - loopStart) / duration) * 100}%`
@@ -306,8 +306,8 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
               >
-                <div className="w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
-                <div className="w-[1.5px] flex-1 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+                <div className="w-3 h-3 rounded-full bg-primary shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-[1.5px] flex-1 bg-primary shadow-[0_0_8px_var(--accent-dim)]" />
               </div>
             )}
             {isLooping && loopEnd !== null && (
@@ -344,7 +344,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onClick={() => setIsLooping(!isLooping)}
                 className={cn(
                   "h-7 rounded-lg text-xs mono uppercase tracking-wide gap-2",
-                  isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-white/10 text-white/40"
+                  isLooping ? "bg-primary text-black font-bold" : "border-white/10 text-white/40"
                 )}
               >
                 <Repeat size={10} /> {isLooping ? 'Looping' : 'Loop'}

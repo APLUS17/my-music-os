@@ -147,7 +147,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
             {/* The Spotlight Overlay */}
             {!isWelcome && rect && (
                 <div
-                    className="absolute transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) shadow-[0_0_0_9999px_rgba(0,0,0,0.85)] rounded-2xl pointer-events-none border border-[var(--accent)]"
+                    className="absolute transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) shadow-[0_0_0_9999px_rgba(0,0,0,0.85)] rounded-2xl pointer-events-none border border-primary"
                     style={{
                         top: rect.top,
                         left: rect.left,
@@ -161,7 +161,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
             {/* The Tooltip/Card */}
             <div
-                className="absolute flex flex-col p-8 rounded-3xl bg-[#121212] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
+                className="absolute flex flex-col p-8 rounded-3xl bg-[#121212] border border-border shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
                 style={{
                     top: isWelcome
                         ? '50%'
@@ -177,9 +177,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                 }}
             >
                 <div className="mb-6">
-                    <span className="text-xs mono uppercase tracking-wide text-[var(--accent)] mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
+                    <span className="text-xs mono uppercase tracking-wide text-primary mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
                     <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{params.title}</h3>
-                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">{params.content}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed font-normal">{params.content}</p>
                 </div>
 
                 <div className="flex items-center justify-between mt-2">
@@ -187,7 +187,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                         {STEPS.map((_, idx) => (
                             <div
                                 key={idx}
-                                className={`h-1 rounded-full transition-all duration-500 ${idx === currentStep ? 'w-6 bg-[var(--accent)]' : idx < currentStep ? 'w-1.5 bg-[var(--accent)]/50' : 'w-1 bg-[var(--border-main)]'}`}
+                                className={`h-1 rounded-full transition-all duration-500 ${idx === currentStep ? 'w-6 bg-primary' : idx < currentStep ? 'w-1.5 bg-primary/50' : 'w-1 bg-border'}`}
                             />
                         ))}
                     </div>
@@ -196,7 +196,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                         {currentStep > 0 && (
                             <button
                                 onClick={handleBack}
-                                className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-hover)] transition-all"
+                                className="flex items-center justify-center w-10 h-10 rounded-full bg-secondary text-muted-foreground hover:text-white hover:bg-[var(--bg-hover)] transition-all"
                             >
                                 <ChevronLeft size={18} strokeWidth={2.5} />
                             </button>
@@ -213,7 +213,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
                 <button
                     onClick={onComplete}
-                    className="absolute top-6 right-6 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors p-1"
+                    className="absolute top-6 right-6 text-[var(--text-tertiary)] hover:text-foreground transition-colors p-1"
                 >
                     <X size={18} />
                 </button>

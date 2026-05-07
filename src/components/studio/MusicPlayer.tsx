@@ -166,12 +166,12 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-[var(--bg-main)] z-50 flex flex-col items-center justify-center overflow-hidden"
+      className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center overflow-hidden"
     >
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all z-10"
+        className="absolute top-6 right-6 w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all z-10"
       >
         <X size={20} />
       </button>
@@ -183,11 +183,11 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="w-48 h-48 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center mb-12 shadow-2xl"
+          className="w-48 h-48 rounded-2xl bg-gradient-to-br from-primary to-secondary border border-border flex items-center justify-center mb-12 shadow-2xl"
         >
           <div className="text-center px-4">
-            <div className="text-3xl font-bold text-[var(--bg-main)] mb-2 truncate">{projectTitle}</div>
-            <div className="text-xs mono text-[var(--bg-main)]/70 uppercase tracking-wider">
+            <div className="text-3xl font-bold text-background mb-2 truncate">{projectTitle}</div>
+            <div className="text-xs mono text-background/70 uppercase tracking-wider">
               {hasVocals ? `${vocalSessions.length} take${vocalSessions.length > 1 ? 's' : ''}` : 'No vocals'}
             </div>
           </div>
@@ -195,9 +195,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
         {/* Title & Info */}
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-[var(--text-main)] mb-1">{projectTitle}</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-1">{projectTitle}</h2>
           {hasVocals && currentVocal && (
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm text-muted-foreground">
               Take {currentTrackIndex + 1} of {vocalSessions.length} • {currentVocal.duration}
             </p>
           )}
@@ -212,9 +212,9 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             step="0.1"
             value={progress}
             onChange={(e) => handleProgressChange(parseFloat(e.target.value))}
-            className="w-full h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-1 bg-secondary rounded-lg appearance-none cursor-pointer slider"
           />
-          <div className="flex items-center justify-between text-xs tabular-nums mono text-[var(--text-tertiary)] mt-2">
+          <div className="flex items-center justify-between text-xs tabular-nums mono text-muted-foreground mt-2">
             <span>{formatTime(progress)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -228,7 +228,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileTap={{ scale: 0.95 }}
             onClick={handlePrevVocal}
             disabled={currentTrackIndex === 0 || !hasVocals}
-            className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <SkipBack size={18} />
           </motion.button>
@@ -239,7 +239,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileTap={{ scale: 0.92 }}
             onClick={handlePlayPause}
             disabled={!hasBeat && !hasVocals}
-            className="w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-16 h-16 rounded-full bg-primary text-background flex items-center justify-center shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
           </motion.button>
@@ -250,7 +250,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileTap={{ scale: 0.95 }}
             onClick={handleNextVocal}
             disabled={currentTrackIndex === vocalSessions.length - 1 || !hasVocals}
-            className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-10 h-10 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <SkipForward size={18} />
           </motion.button>
@@ -259,7 +259,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
         {/* Volume Control */}
         <div className="w-full max-w-xs">
           <div className="flex items-center gap-3">
-            <Volume2 size={14} className="text-[var(--text-secondary)]" />
+            <Volume2 size={14} className="text-muted-foreground" />
             <input
               type="range"
               min="0"
@@ -267,7 +267,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
               step="0.05"
               value={volume}
               onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="flex-1 h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+              className="flex-1 h-1 bg-secondary rounded-lg appearance-none cursor-pointer slider"
               style={{ touchAction: 'none' }}
             />
           </div>
@@ -279,7 +279,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
 
         {/* Status Messages */}
         {!hasBeat && !hasVocals && (
-          <div className="text-center text-[var(--text-tertiary)] text-sm">
+          <div className="text-center text-muted-foreground text-sm">
             Upload a beat or record a vocal to get started
           </div>
         )}
@@ -291,14 +291,14 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
           width: 12px;
           height: 12px;
           border-radius: 50%;
-          background: var(--accent);
+          background: var(--primary);
           cursor: pointer;
         }
         .slider::-moz-range-thumb {
           width: 12px;
           height: 12px;
           border-radius: 50%;
-          background: var(--accent);
+          background: var(--primary);
           cursor: pointer;
           border: none;
         }

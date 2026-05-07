@@ -5,6 +5,8 @@ import {
     Activity, Play, Pause, Library, LayoutGrid, Clock, CheckCircle2, Music
 } from 'lucide-react';
 import { LyricScrap, RecordingSession, Beat, RitualStat } from '../../types';
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface VaultViewProps {
     sessions: RecordingSession[];
@@ -68,16 +70,16 @@ export const VaultView: React.FC<VaultViewProps> = ({
     const totalRitualMinutes = ritualStats.reduce((acc, stat) => acc + stat.durationMinutes, 0);
 
     return (
-        <div className="relative flex flex-col h-full bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden">
+        <div className="relative flex flex-col h-full bg-background text-foreground overflow-hidden">
             {/* Header */}
-            <header className="px-6 pt-12 pb-6 border-b border-[var(--border-main)] flex flex-col gap-4 bg-gradient-to-b from-[var(--accent)]/10 to-transparent z-10 glass">
+            <header className="px-6 pt-12 pb-6 border-b border-border flex flex-col gap-4 bg-gradient-to-b from-primary/10 to-transparent z-10 glass">
                 <div className="flex justify-between items-end">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <Library size={14} className="text-[var(--accent)]" />
-                            <h2 className="text-[10px] mono uppercase tracking-widest text-[var(--accent)] font-bold">The Vault</h2>
+                            <Library size={14} className="text-primary" />
+                            <h2 className="text-metadata text-primary">The Vault</h2>
                         </div>
-                        <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">{titleDisplay}</h1>
+                        <h1 className="text-2xl font-medium tracking-tight text-foreground">{titleDisplay}</h1>
                     </div>
                 </div>
             </header>
@@ -86,52 +88,52 @@ export const VaultView: React.FC<VaultViewProps> = ({
 
                 {/* Stats Section */}
                 <section>
-                    <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
                         <Activity size={16} /> Ritual Stats
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 flex flex-col justify-between">
-                            <span className="text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1"><CheckCircle2 size={12}/> Completed</span>
+                        <div className="bg-secondary border border-border rounded-2xl p-6 flex flex-col justify-between">
+                            <span className="text-metadata mb-2 flex items-center gap-1"><CheckCircle2 size={12}/> Completed</span>
                             <span className="text-3xl font-light">{ritualStats.length}</span>
                         </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 flex flex-col justify-between">
-                            <span className="text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1"><Clock size={12}/> Time Spent</span>
-                            <span className="text-3xl font-light">{Math.floor(totalRitualMinutes / 60)}<span className="text-lg text-[var(--text-tertiary)] ml-1">hrs</span> {totalRitualMinutes % 60}<span className="text-lg text-[var(--text-tertiary)] ml-1">m</span></span>
+                        <div className="bg-secondary border border-border rounded-2xl p-6 flex flex-col justify-between">
+                            <span className="text-metadata mb-2 flex items-center gap-1"><Clock size={12}/> Time Spent</span>
+                            <span className="text-3xl font-light">{Math.floor(totalRitualMinutes / 60)}<span className="text-lg text-muted-foreground ml-1">hrs</span> {totalRitualMinutes % 60}<span className="text-lg text-muted-foreground ml-1">m</span></span>
                         </div>
                     </div>
                 </section>
 
                 {/* Project Assets */}
                 <section>
-                    <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
                         <LayoutGrid size={16} /> Project Assets
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
+                        <div className="bg-secondary border border-border rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground">
                                 <Activity size={18} />
                             </div>
                             <div>
                                 <div className="text-xl font-medium">{sessions.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Recordings</div>
+                                <div className="text-xs text-muted-foreground">Recordings</div>
                             </div>
                         </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
+                        <div className="bg-secondary border border-border rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground">
                                 <LayoutGrid size={18} />
                             </div>
                             <div>
                                 <div className="text-xl font-medium">{scraps.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Ideas</div>
+                                <div className="text-xs text-muted-foreground">Ideas</div>
                             </div>
                         </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
+                        <div className="bg-secondary border border-border rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-muted-foreground">
                                 <Music size={18} />
                             </div>
                             <div>
                                 <div className="text-xl font-medium">{beats.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Beats</div>
+                                <div className="text-xs text-muted-foreground">Beats</div>
                             </div>
                         </div>
                     </div>
@@ -140,30 +142,32 @@ export const VaultView: React.FC<VaultViewProps> = ({
                 {/* Recent Activity */}
                 {mostRecentSession && (
                     <section>
-                        <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4">Recent Recording</h3>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4">
+                        <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Recording</h3>
+                        <div className="bg-secondary border border-border rounded-2xl p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <div>
-                                    <div className="font-medium text-sm">{mostRecentSession.name || 'Untitled Take'}</div>
-                                    <div className="text-xs text-[var(--text-tertiary)]">{formatRelativeTime(mostRecentSession.timestamp)}</div>
+                                    <div className="font-medium text-sm text-foreground">{mostRecentSession.name || 'Untitled Take'}</div>
+                                    <div className="text-metadata">{formatRelativeTime(mostRecentSession.timestamp)}</div>
                                 </div>
-                                <button
+                                <Button
+                                    size="icon"
                                     onClick={() => onPlaySession(mostRecentSession.id)}
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                                        isVaultPlaying ? 'bg-[var(--accent)] text-black' : 'bg-[var(--bg-main)] border border-[var(--border-main)] hover:border-[var(--text-secondary)]'
-                                    }`}
+                                    className={cn(
+                                        "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                                        isVaultPlaying ? 'bg-primary text-primary-foreground' : 'bg-background border border-border hover:border-muted-foreground'
+                                    )}
                                 >
                                     {isVaultPlaying ? <Pause size={18} className="fill-current" /> : <Play size={18} className="fill-current ml-1" />}
-                                </button>
+                                </Button>
                             </div>
                             {/* Audio Progress */}
-                            <div className="relative h-1.5 bg-[var(--bg-main)] rounded-full overflow-hidden mt-4">
+                            <div className="relative h-1.5 bg-background rounded-full overflow-hidden mt-4">
                                 <div
-                                    className="absolute top-0 left-0 h-full bg-[var(--accent)] transition-all duration-100"
+                                    className="absolute top-0 left-0 h-full bg-primary transition-all duration-100"
                                     style={{ width: `${audioProgress}%` }}
                                 />
                             </div>
-                            <div className="flex justify-between mt-2 text-[10px] text-[var(--text-tertiary)] font-mono">
+                            <div className="flex justify-between mt-2 text-metadata">
                                 <span>{isVaultPlaying ? formatDuration(currentTime) : '0:00'}</span>
                                 <span>{formatDuration(vaultDurationSecs)}</span>
                             </div>

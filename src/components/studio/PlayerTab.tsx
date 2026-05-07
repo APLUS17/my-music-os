@@ -5,6 +5,7 @@ import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volu
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
+import { Button } from "@/components/ui/button";
 import { useActiveBeatSection } from './useActiveBeatSection';
 import { formatTime } from '@/lib/utils/time';
 
@@ -198,23 +199,24 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     }, [activeLyricIdx]);
 
     return (
-        <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
+        <div className="flex flex-col h-full bg-background select-none">
             {/* ── Integrated Header ───────────────────────────────────── */}
             <div className="flex items-center justify-between px-6 pt-6 pb-2 z-30">
                 <div className="flex flex-col">
-                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-white/40 mb-0.5">Now Playing</span>
+                    <span className="text-metadata text-white/40 mb-0.5">Now Playing</span>
                     <h2 className="text-sm font-bold text-white tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
                 </div>
 
                 {sessions && sessions.length > 0 && (
                     <div className="relative">
-                        <button 
+                        <Button
+                            variant="ghost"
                             onClick={() => setShowTakeList(!showTakeList)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95"
+                            className="flex items-center h-auto gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95"
                         >
-                            <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessions.length - sessionIdx}</span>
+                            <span className="text-metadata text-primary">TAKE {sessions.length - sessionIdx}</span>
                             <ChevronDown size={14} className={cn("text-white/40 transition-transform duration-300", showTakeList && "rotate-180")} />
-                        </button>
+                        </Button>
 
                         <AnimatePresence>
                             {showTakeList && (
@@ -227,20 +229,21 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                         className="absolute right-0 mt-2 w-40 bg-[#1A1A1A] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
                                     >
                                         {sessions.map((s, i) => (
-                                            <button
+                                            <Button
                                                 key={s.id}
+                                                variant="ghost"
                                                 onClick={() => {
                                                     onSelectSession?.(s.id);
                                                     setShowTakeList(false);
                                                 }}
                                                 className={cn(
-                                                    "w-full text-left px-4 py-3 text-xs font-semibold transition-colors flex items-center justify-between",
-                                                    activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-white/60 hover:bg-white/5"
+                                                    "w-full justify-between h-auto px-4 py-3 text-xs font-semibold transition-colors flex items-center",
+                                    activeSession?.id === s.id ? "text-primary bg-primary/5" : "text-white/60 hover:bg-white/5"
                                                 )}
                                             >
                                                 <span>Take {sessions.length - i}</span>
-                                                {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />}
-                                            </button>
+                                {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_var(--accent-dim)]" />}
+                                            </Button>
                                         ))}
                                     </motion.div>
                                 </>
@@ -317,13 +320,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                     style={{ minWidth: 72 }}
                                 >
                                     <motion.span
-                                        className="text-[var(--accent)] text-xs font-bold mb-1 block"
+                                        className="text-primary text-xs font-bold mb-1 block"
                                         animate={{ opacity: isActive ? 1 : 0 }}
                                         transition={{ duration: 0.2 }}
                                     >
                                         →
                                     </motion.span>
-                                    <button
+                                    <Button
+                                        variant="ghost"
                                         onClick={() => {
                                             const vocalTime = sec.startTime - (activeSession?.beatOffset ?? 0);
                                             onSeek(Math.max(0, vocalTime));
@@ -333,14 +337,14 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                             }
                                         }}
                                         className={cn(
-                                            'w-full px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
+                                            'w-full h-auto px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
                                             isActive
-                                                ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
-                                                : 'border-white/20 text-white/70 bg-white/[0.07]'
+                                                ? 'border-primary text-primary bg-primary/10 hover:bg-primary/20 hover:text-primary'
+                                                : 'border-white/20 text-white/70 bg-white/[0.07] hover:bg-white/10'
                                         )}
                                     >
                                         {sec.label || sec.type}
-                                    </button>
+                                    </Button>
                                 </div>
                             );
                         })}
@@ -368,21 +372,23 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Controls ──────────────────────────────────────────── */}
             <div className="flex items-center justify-center gap-10 py-5">
-                <button onClick={onOpenFX} className="text-white/40 active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
-                <button onClick={() => skip(-10)} className="text-white active:opacity-60 transition-opacity"><Rewind size={34} fill="white" /></button>
-                <button onClick={togglePlay} className="w-20 h-20 bg-white rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
+                <Button variant="ghost" size="icon" onClick={onOpenFX} className="text-white/40 active:opacity-60 transition-opacity hover:bg-transparent"><SlidersHorizontal size={26} /></Button>
+                <Button variant="ghost" size="icon" onClick={() => skip(-10)} className="text-white active:opacity-60 transition-opacity hover:bg-transparent"><Rewind size={34} fill="white" /></Button>
+                <Button variant="default" onClick={togglePlay} className="w-20 h-20 bg-white text-black rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl hover:bg-white/90 border-none">
                     {isPlaying ? <Pause size={40} className="text-black" fill="black" /> : <Play size={40} className="text-black ml-1" fill="black" />}
-                </button>
-                <button onClick={() => skip(10)} className="text-white active:opacity-60 transition-opacity"><FastForward size={34} fill="white" /></button>
-                <button
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => skip(10)} className="text-white active:opacity-60 transition-opacity hover:bg-transparent"><FastForward size={34} fill="white" /></Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => {
                         if (isBeatLooping) onClearLoop?.();
                         else { const sec = activeSectionIdx >= 0 ? beatSections[activeSectionIdx] : null; if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime); }
                     }}
-                    className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-white/40')}
+                    className={cn('active:opacity-60 transition-opacity hover:bg-transparent', isBeatLooping ? 'text-primary' : 'text-white/40')}
                 >
                     <Repeat2 size={28} />
-                </button>
+                </Button>
             </div>
 
             {/* ── Volume ─────── */}
@@ -401,9 +407,9 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Bottom action bar ────── */}
             <div className="flex items-center justify-evenly pb-8 pt-3">
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><MessageSquare size={20} className="text-white/60" /></button>
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><Languages size={20} className="text-white/60" /></button>
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><List size={20} className="text-white/60" /></button>
+                <Button variant="ghost" size="icon" className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform hover:bg-white/20"><MessageSquare size={20} className="text-white/60" /></Button>
+                <Button variant="ghost" size="icon" className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform hover:bg-white/20"><Languages size={20} className="text-white/60" /></Button>
+                <Button variant="ghost" size="icon" className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform hover:bg-white/20"><List size={20} className="text-white/60" /></Button>
             </div>
         </div>
     );
