@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
 import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { formatTime } from '@/lib/utils/time';
@@ -9,8 +9,13 @@ interface RitualsViewProps {
     onCompleteRitual: (stat: RitualStat) => void;
 }
 
+const CATEGORIES = ['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'];
+
 export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitual }) => {
     const [activeRitual, setActiveRitual] = useState<Ritual | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterCategory, setFilterCategory] = useState<string | null>(null);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [endTime, setEndTime] = useState<number | null>(null);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -138,12 +143,12 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
                     <div className="w-full max-w-md mt-4 flex-1 flex flex-col min-h-[200px]">
                         <h3 className="text-sm font-medium mb-2 text-[var(--text-secondary)] px-1">
-                            {activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
+                            {activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
                         </h3>
                         <textarea
                             value={ritualNotes}
                             onChange={(e) => setRitualNotes(e.target.value)}
-                            placeholder={activeRitual.category.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
+                            placeholder={activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
                             className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
                         />
                     </div>
@@ -161,62 +166,126 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         );
     }
 
+    // Rituals in selected category view
+    if (selectedCategory && !activeRitual) {
+        const categoryRituals = MASTER_RITUALS.filter(r => r.category === selectedCategory);
+
+        return (
+            <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
+                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
+                    <button
+                        onClick={() => setSelectedCategory(null)}
+                        className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
+                    >
+                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
+                    </button>
+                    <h2 className="text-lg font-medium">{selectedCategory}</h2>
+                    <button className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -mr-2 opacity-0 pointer-events-none">
+                        <MoreVertical size={20} />
+                    </button>
+                </header>
+
+                <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {categoryRituals.map(ritual => {
+                        const isCompletedToday = stats.some(s =>
+                            s.ritualId === ritual.id &&
+                            new Date(s.completedAt).toDateString() === new Date().toDateString()
+                        );
+
+                        return (
+                            <button
+                                key={ritual.id}
+                                onClick={() => handleStartRitual(ritual)}
+                                className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 hover:border-[var(--text-tertiary)] transition-colors group flex flex-col relative overflow-hidden"
+                            >
+                                <div className="flex justify-between items-start mb-3">
+                                    <h3 className="font-medium">{ritual.title}</h3>
+                                    {isCompletedToday && (
+                                        <CheckCircle2 size={16} className="text-green-400" />
+                                    )}
+                                </div>
+
+                                <p className="text-sm text-[var(--text-secondary)] mb-6 flex-1">
+                                    {ritual.description}
+                                </p>
+
+                                <div className="flex items-center gap-2 mt-auto">
+                                    <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] bg-[var(--bg-main)] px-2 py-1 rounded-md">
+                                        <Clock size={12} />
+                                        {ritual.durationMinutes}m
+                                    </span>
+                                    <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${getEnergyColor(ritual.energyLevel)}`}>
+                                        <Zap size={10} className="fill-current" />
+                                        {ritual.energyLevel}
+                                    </span>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+
+    // Category selection view (main view)
+    const categoriesToShow = filterCategory && filterCategory !== 'All'
+        ? CATEGORIES.filter(c => c === filterCategory)
+        : CATEGORIES;
+
     return (
         <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-            <header className="px-6 py-8 border-b border-[var(--border-main)] glass z-10 sticky top-0">
-                <h1 className="text-2xl font-medium tracking-tight mb-1">Rituals</h1>
-                <p className="text-sm text-[var(--text-tertiary)]">Time-boxed sessions to build momentum.</p>
+            <header className="px-6 py-8 border-b border-[var(--border-main)] glass z-10 sticky top-0 flex items-center justify-between">
+                <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}
+                >
+                    <Sliders size={20} className={showFilters ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
+                </button>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                {['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'].map(category => {
-                    const categoryRituals = MASTER_RITUALS.filter(r => r.category === category);
-                    if (categoryRituals.length === 0) return null;
+            {/* Filter pills */}
+            <div className={`overflow-hidden transition-all duration-200 ${showFilters ? 'max-h-12' : 'max-h-0'}`}>
+                <div className="px-6 py-3 border-b border-[var(--border-main)] glass sticky top-[80px] z-10">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                        <button
+                            onClick={() => setFilterCategory(null)}
+                            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+                                !filterCategory
+                                    ? 'bg-[var(--accent)] text-[var(--bg-main)]'
+                                    : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
+                            }`}
+                        >
+                            All
+                        </button>
+                        {CATEGORIES.map(category => (
+                            <button
+                                key={category}
+                                onClick={() => setFilterCategory(category)}
+                                className={`shrink-0 rounded-full px-4 py-1.5 text-sm transition-colors whitespace-nowrap ${
+                                    filterCategory === category
+                                        ? 'bg-[var(--accent)] text-[var(--bg-main)] font-medium'
+                                        : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
+                                }`}
+                            >
+                                {category}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
 
-                    return (
-                        <div key={category} className="space-y-4">
-                            <h2 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider">{category}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {categoryRituals.map(ritual => {
-                                    const isCompletedToday = stats.some(s =>
-                                        s.ritualId === ritual.id &&
-                                        new Date(s.completedAt).toDateString() === new Date().toDateString()
-                                    );
-
-                                    return (
-                                        <button
-                                            key={ritual.id}
-                                            onClick={() => handleStartRitual(ritual)}
-                                            className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 hover:border-[var(--text-tertiary)] transition-colors group flex flex-col relative overflow-hidden"
-                                        >
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h3 className="font-medium">{ritual.title}</h3>
-                                                {isCompletedToday && (
-                                                    <CheckCircle2 size={16} className="text-green-400" />
-                                                )}
-                                            </div>
-
-                                            <p className="text-sm text-[var(--text-secondary)] mb-6 flex-1">
-                                                {ritual.description}
-                                            </p>
-
-                                            <div className="flex items-center gap-2 mt-auto">
-                                                <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] bg-[var(--bg-main)] px-2 py-1 rounded-md">
-                                                    <Clock size={12} />
-                                                    {ritual.durationMinutes}m
-                                                </span>
-                                                <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border ${getEnergyColor(ritual.energyLevel)}`}>
-                                                    <Zap size={10} className="fill-current" />
-                                                    {ritual.energyLevel}
-                                                </span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
+            {/* Category cards grid */}
+            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {categoriesToShow.map(category => (
+                    <button
+                        key={category}
+                        onClick={() => setSelectedCategory(category)}
+                        className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-8 hover:border-[var(--text-tertiary)] transition-colors flex items-center justify-center min-h-[160px]"
+                    >
+                        <h2 className="text-xl font-medium text-center">{category}</h2>
+                    </button>
+                ))}
             </div>
         </div>
     );

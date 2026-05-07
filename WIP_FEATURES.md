@@ -40,6 +40,15 @@ Add the drawers back near the bottom of the return statement (before `FeedbackMo
 
 ---
 
+## 🎙️ Studio Facilitator (AI Assistant)
+We have implemented the core backend for the **Studio Facilitator** in `src/app/actions.ts`:
+*   **Audio Structure Analysis**: Uses Gemini 2.0 Flash to identify Verse/Chorus/Bridge from uploaded audio.
+*   **Conversational Logic**: `chatWithFacilitator` action provides a high-velocity songwriting coach framework.
+*   **WIP Frontend**: The `FacilitatorView` component is currently being polished for better integration with the Studio tab.
+
+---
+
 ## 🎹 Other Hidden Features
-*   **Share Button**: Currently removed from the header to reduce clutter. Code for sharing logic (generating link/image) needs to be implemented.
-*   **BPM & Key Display**: Currently removed as it was using mock data. Needs to be connected to real project metadata or beat analysis.
+*   **Share Button**: Currently removed from the header. Needs link-generation logic.
+*   **BPM & Key Display**: Needs connection to real project metadata.
+*   **Supabase Types**: Backend is connected but requires manual type casting (`as any`) until full schema generation is integrated.

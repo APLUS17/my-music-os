@@ -22,7 +22,7 @@ export const analyzeAudioAndSplit = async (
         loopStart = 0,
         loopEnd = 0,
         startOffset = 0,
-        passCount = 1
+        passCount: _passCount = 1
     } = options;
 
     const sections: AutoSection[] = [];

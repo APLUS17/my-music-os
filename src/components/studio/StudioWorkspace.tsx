@@ -417,6 +417,14 @@ const StudioWorkspace: React.FC = () => {
     useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime);
     const [duration, setDuration] = useState(0);
 
+    const displaySessions = useMemo(() =>
+        sessions.filter(s =>
+            !s.projectId ||  // Show sessions without projectId (floating/old)
+            s.projectId === activeProjectId  // Show sessions for current project
+        ),
+        [sessions, activeProjectId]
+    );
+
     // Stable refs so the RAF loop reads current values without restarting
     const animFrameRef = useRef<number | null>(null);
     const sessionsRef = useRef(sessions);
@@ -656,7 +664,14 @@ const StudioWorkspace: React.FC = () => {
         const loadState = async () => {
             const savedData = localStorage.getItem('studio-pro-data-v2');
             const savedRitualStats = localStorage.getItem('lyriq_ritual_stats');
-            if (savedRitualStats) setRitualStats(JSON.parse(savedRitualStats));
+            if (savedRitualStats) {
+                try {
+                    setRitualStats(JSON.parse(savedRitualStats));
+                } catch (error) {
+                    console.warn('Failed to parse ritual stats from localStorage, clearing corrupted data', error);
+                    localStorage.removeItem('lyriq_ritual_stats');
+                }
+            }
             if (savedData) {
                 try {
                     const parsed = JSON.parse(savedData);
@@ -1596,14 +1611,7 @@ const StudioWorkspace: React.FC = () => {
                         ritualStats={ritualStats}
                     />
                 );
-            case 'studio': {
-                const displaySessions = useMemo(() =>
-                    sessions.filter(s =>
-                        !s.projectId ||  // Show sessions without projectId (floating/old)
-                        s.projectId === activeProjectId  // Show sessions for current project
-                    ),
-                    [sessions, activeProjectId]
-                );
+            case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
                         <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
@@ -1932,7 +1940,6 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
-            }
             default: return null;
         }
     };
