@@ -596,7 +596,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           >
             <div className="w-full glass rounded-full p-2 pl-3 shadow-2xl flex items-center justify-between gap-3 border border-white/10">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <button onClick={onMinimizeToggle} className="p-1.5 rounded-full hover:bg-white/10 text-[var(--text-secondary)] transition-colors">
+                <button onClick={onMinimizeToggle} className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground transition-colors">
                   <ChevronUp size={16} />
                 </button>
 
@@ -622,20 +622,20 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   </div>
                 ) : (
                   <div className="flex-1 h-8 rounded-md relative flex items-center justify-center px-2">
-                    <div className="text-xs mono text-[var(--text-secondary)] uppercase tracking-wide opacity-50">
+                    <div className="text-xs mono text-muted-foreground uppercase tracking-wide opacity-50">
                       {isRecording ? "Recording..." : "Ready"}
                     </div>
                   </div>
                 )}
 
-                <div className="text-xs mono tabular-nums text-[var(--text-secondary)] w-10 text-right">
+                <div className="text-xs mono tabular-nums text-muted-foreground w-10 text-right">
                   {formatTime(isRecording ? duration : (progress * duration))}
                 </div>
               </div>
 
               <div className="flex items-center gap-2 pl-2 border-l border-white/10">
                 {recordedBlob && !isRecording && (
-                  <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 rounded-full hover:bg-white/10 text-[var(--text-main)]">
+                  <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 rounded-full hover:bg-white/10 text-foreground">
                     {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
                   </button>
                 )}
@@ -644,7 +644,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     <Check size={16} strokeWidth={3} />
                   </button>
                 ) : (
-                  <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 text-[var(--text-secondary)] flex items-center justify-center hover:bg-white/10">
+                  <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 text-muted-foreground flex items-center justify-center hover:bg-white/10">
                     <X size={16} />
                   </button>
                 )}
@@ -657,7 +657,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       <Sheet open={!isMinimized} onOpenChange={(open) => { if (!open) onClose(); }}>
         <SheetContent
           side="bottom"
-          className="p-0 border-t border-[var(--border-main)] bg-[var(--bg-card)] rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[80vh] flex flex-col"
+          className="p-0 border-t border-border bg-card rounded-t-[2.5rem] overflow-hidden sm:max-w-xl mx-auto max-h-[80vh] flex flex-col"
         >
           <SheetHeader className="hidden">
             <SheetTitle>Recorder</SheetTitle>
@@ -668,12 +668,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
               {/* Layer mode indicator */}
               {layerMode && (
-                <div className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-xl mb-1">
-                  <Layers size={14} className="text-[var(--accent)]" />
-                  <span className="text-xs font-medium text-[var(--accent)]">
+                <div className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-primary/10 border border-primary/20 rounded-xl mb-1">
+                  <Layers size={14} className="text-primary" />
+                  <span className="text-xs font-medium text-primary">
                     Recording Layer {(existingLayers?.length || 0) + 2}
                   </span>
-                  <span className="text-[10px] text-[var(--text-secondary)]">
+                  <span className="text-[10px] text-muted-foreground">
                     ({existingLayers.length + 1} playing)
                   </span>
                 </div>
@@ -683,7 +683,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
               <div className="w-10 h-1 bg-white/20 rounded-full cursor-pointer hover:bg-white/30 transition-colors" onClick={onMinimizeToggle} />
 
               {/* Spectral EQ visualizer - prominent placement */}
-              <div className="w-full bg-[var(--bg-secondary)] rounded-2xl relative overflow-hidden border border-[var(--border-main)] shadow-inner p-3 mt-1">
+              <div className="w-full bg-secondary rounded-2xl relative overflow-hidden border border-border shadow-inner p-3 mt-1">
                 <SpectralEQ
                   analyserRef={analyserRef}
                   dataArrayRef={dataArrayRef}
@@ -717,7 +717,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   <Button
                     variant={isMonitoring ? "default" : "ghost"}
                     size="icon"
-                    className={`rounded-full h-11 w-11 transition-all ${isMonitoring ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'}`}
+                    className={`rounded-full h-11 w-11 transition-all ${isMonitoring ? 'bg-primary text-black' : 'text-muted-foreground hover:text-foreground hover:bg-white/5'}`}
                     onClick={async () => {
                       if (!isMonitoring) {
                         if (!streamRef.current) await initializeMic();
@@ -730,7 +730,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   >
                     <Headphones size={18} />
                   </Button>
-                  <span className={`text-[8px] mono uppercase tracking-wide ${isMonitoring ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
+                  <span className={`text-[8px] mono uppercase tracking-wide ${isMonitoring ? 'text-primary' : 'text-[var(--text-muted)]'}`}>
                     Monitor
                   </span>
                   {isMonitoring && (
@@ -748,7 +748,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                       onClick={handleToggleRecord}
                       className={`w-16 h-16 rounded-full border-2 p-0 flex items-center justify-center transition-all ${isRecording ? 'border-red-500/50 bg-red-500/10 scale-105' : 'border-white/10 bg-white/5 hover:border-red-500/30'}`}
                     >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-[var(--bg-main)]'}`}>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${isRecording ? 'bg-red-900/40' : 'bg-background'}`}>
                         {isRecording ? (
                           <div className="w-5 h-5 rounded-sm bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.7)]" />
                         ) : (
@@ -757,7 +757,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                       </div>
                     </Button>
                   </div>
-                  <div className="text-sm mono tabular-nums text-[var(--text-main)] font-light">
+                  <div className="text-sm mono tabular-nums text-foreground font-light">
                     {formatTime(isRecording ? duration : (recordedBlob ? progress * duration : 0))}
                   </div>
                 </div>
@@ -770,7 +770,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         variant="ghost"
                         size="icon"
                         onClick={() => setIsPlaying(!isPlaying)}
-                        className="rounded-full h-11 w-11 text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5"
+                        className="rounded-full h-11 w-11 text-muted-foreground hover:text-foreground hover:bg-white/5"
                       >
                         {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
                       </Button>
@@ -784,7 +784,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         variant="ghost"
                         size="icon"
                         onClick={handleDiscard}
-                        className="rounded-full h-11 w-11 text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-400/10"
+                        className="rounded-full h-11 w-11 text-muted-foreground hover:text-red-400 hover:bg-red-400/10"
                       >
                         <Trash2 size={18} />
                       </Button>
@@ -800,14 +800,14 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
               {/* Bottom action buttons */}
               <div className="w-full flex gap-3 mt-1">
-                <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-4 font-bold text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors uppercase tracking-wide text-xs">CANCEL</Button>
+                <Button onClick={onClose} variant="ghost" className="flex-1 rounded-2xl py-4 font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wide text-xs">CANCEL</Button>
                 <Button
                   disabled={!recordedBlob}
                   onClick={handleSave}
                   className={`flex-1 rounded-2xl py-4 font-bold hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-wide text-xs shadow-xl ${
                     layerMode
-                      ? 'bg-[var(--accent)]/80 text-[var(--bg-main)]'
-                      : 'bg-[var(--accent)] text-[var(--bg-main)]'
+                      ? 'bg-primary/80 text-[var(--bg-main)]'
+                      : 'bg-primary text-[var(--bg-main)]'
                   }`}
                 >
                   {layerMode ? 'ADD LAYER' : 'KEEP TAKE'}

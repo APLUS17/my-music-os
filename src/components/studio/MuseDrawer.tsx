@@ -143,19 +143,19 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
 
   return (
     <Sheet open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="right" className="w-[85%] max-w-sm p-0 bg-[var(--bg-card)] border-l border-[var(--border-main)] flex flex-col sm:max-w-sm">
-        <SheetHeader className="p-4 border-b border-[var(--border-main)] bg-[var(--bg-secondary)] flex-row items-center gap-3 space-y-0">
-          <Sparkles size={16} className="text-[var(--accent)]" />
+      <SheetContent side="right" className="w-[85%] max-w-sm p-0 bg-card border-l border-border flex flex-col sm:max-w-sm">
+        <SheetHeader className="p-4 border-b border-border bg-secondary flex-row items-center gap-3 space-y-0">
+          <Sparkles size={16} className="text-primary" />
           <SheetTitle className="text-sm font-medium tracking-wide">MUSE</SheetTitle>
         </SheetHeader>
 
         <div className="p-4 space-y-3">
-          <div className="flex items-center w-full h-12 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-[var(--accent)] transition-all shadow-sm">
+          <div className="flex items-center w-full h-12 bg-background border border-border rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm">
             <Popover open={isModeOpen} onOpenChange={setIsModeOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-full px-3 flex items-center gap-2 bg-[var(--bg-secondary)] border-r border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-colors rounded-none min-w-[100px] justify-between text-xs mono uppercase tracking-wider font-medium text-[var(--text-main)]"
+                  className="h-full px-3 flex items-center gap-2 bg-secondary border-r border-border hover:bg-accent transition-colors rounded-none min-w-[100px] justify-between text-xs mono uppercase tracking-wider font-medium text-foreground"
                 >
                   {activeMode.label}
                 </Button>
@@ -241,27 +241,27 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={activeMode.placeholder}
-              className="flex-1 bg-transparent px-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-tertiary)] focus:outline-none font-sans"
+              className="flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-[var(--text-tertiary)] focus:outline-none font-sans"
               autoFocus
             />
 
             <button
               onClick={handleSearch}
               disabled={loading || !query.trim() || (mode === 'fuse' && !secondQuery.trim())}
-              className="pr-3 pl-2 text-[var(--accent)] hover:scale-110 transition-transform disabled:opacity-30 disabled:hover:scale-100"
+              className="pr-3 pl-2 text-primary hover:scale-110 transition-transform disabled:opacity-30 disabled:hover:scale-100"
             >
               {loading ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={18} />}
             </button>
           </div>
 
           {mode === 'fuse' && (
-            <div className="mt-2 flex items-center w-full h-10 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg overflow-hidden shadow-sm">
+            <div className="mt-2 flex items-center w-full h-10 bg-background border border-border rounded-lg overflow-hidden shadow-sm">
               <input
                 value={secondQuery}
                 onChange={(e) => setSecondQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Enter second word..."
-                className="flex-1 bg-transparent px-3 text-xs text-[var(--text-main)] placeholder:text-[var(--text-tertiary)] focus:outline-none"
+                className="flex-1 bg-transparent px-3 text-xs text-foreground placeholder:text-[var(--text-tertiary)] focus:outline-none"
               />
             </div>
           )}
@@ -286,10 +286,10 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
               <div
                 key={i}
                 onClick={() => copyToClipboard(res)}
-                className="group relative p-3 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:shadow-[0_0_15px_var(--accent-dim)] transition-all cursor-pointer active:scale-95 animate-in slide-in-from-bottom-2 fade-in"
+                className="group relative p-3 rounded-lg bg-secondary border border-border hover:border-primary hover:shadow-[0_0_15px_var(--accent-dim)] transition-all cursor-pointer active:scale-95 animate-in slide-in-from-bottom-2 fade-in"
                 style={{ animationDelay: `${i * 50}ms` }}
               >
-                <p className="text-sm text-[var(--text-main)] line-clamp-3">{res}</p>
+                <p className="text-sm text-foreground line-clamp-3">{res}</p>
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Copy size={12} className="text-[var(--text-tertiary)]" />
                 </div>
@@ -298,7 +298,7 @@ export const MuseDrawer: React.FC<MuseDrawerProps> = ({ onClose, contextText }) 
           </div>
         </div>
 
-        <div className="p-3 text-center border-t border-[var(--border-main)]">
+        <div className="p-3 text-center border-t border-border">
           <p className="text-xs mono uppercase text-[var(--text-tertiary)]">Tap card to copy</p>
         </div>
       </SheetContent>

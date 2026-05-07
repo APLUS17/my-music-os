@@ -28,15 +28,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center justify-center p-6">
+        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6">
           <div className="text-center max-w-md">
             <h1 className="text-3xl font-bold mb-4">Application Error</h1>
-            <p className="text-[var(--text-secondary)] mb-4">
+            <p className="text-muted-foreground mb-4">
               The application encountered an error during startup. This is often due to missing environment variables or corrupted data.
             </p>
-            <details className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-lg p-4 mb-4">
+            <details className="text-left bg-secondary border border-border rounded-lg p-4 mb-4">
               <summary className="cursor-pointer font-medium mb-2">Error Details</summary>
-              <pre className="text-xs overflow-auto max-h-48 text-[var(--text-tertiary)]">
+              <pre className="text-xs overflow-auto max-h-48 text-muted-foreground">
                 {this.state.error?.message}
                 {'\n\n'}
                 {this.state.error?.stack}
@@ -47,7 +47,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 localStorage.clear();
                 window.location.reload();
               }}
-              className="px-6 py-2 rounded-lg font-medium bg-[var(--accent)] text-black hover:opacity-90 transition-opacity"
+              className="px-6 py-2 rounded-lg font-medium bg-primary text-black hover:opacity-90 transition-opacity"
             >
               Clear Cache & Retry
             </button>

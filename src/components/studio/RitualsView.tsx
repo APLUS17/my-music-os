@@ -3,6 +3,7 @@ import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, Chevron
 import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { formatTime } from '@/lib/utils/time';
+import { Button } from "@/components/ui/button";
 
 interface RitualsViewProps {
     stats: RitualStat[];
@@ -75,23 +76,23 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
             case 'High': return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
             case 'Medium': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
             case 'Low': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
-            default: return 'text-[var(--text-secondary)] bg-[var(--bg-secondary)] border-[var(--border-main)]';
+            default: return 'text-muted-foreground bg-secondary border-border';
         }
     };
 
     if (activeRitual) {
         return (
-            <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
+            <div className="h-full flex flex-col bg-background text-foreground">
+                <header className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 z-10 glass">
                     <button
                         onClick={() => setActiveRitual(null)}
                         className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
                     >
-                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
+                        <ArrowLeft size={20} className="text-muted-foreground" />
                     </button>
                     <div className="text-center">
                         <h2 className="text-sm font-medium">{activeRitual.title}</h2>
-                        <div className="text-xs text-[var(--text-tertiary)] flex items-center justify-center gap-1 mt-0.5">
+                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mt-0.5">
                             <Clock size={12} />
                             {activeRitual.durationMinutes}m Session
                         </div>
@@ -106,19 +107,19 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         <div className="text-6xl font-light tracking-tighter mb-2 font-mono">
                             {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
                         </div>
-                        <p className="text-[var(--text-secondary)] text-sm">{activeRitual.description}</p>
+                        <p className="text-muted-foreground text-sm">{activeRitual.description}</p>
                     </div>
 
-                    <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
+                    <div className="w-full max-w-md bg-secondary border border-border rounded-2xl overflow-hidden">
                         <button
                             onClick={() => setPrepStepsOpen(!prepStepsOpen)}
                             className="w-full p-4 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
                         >
                             <h3 className="text-sm font-medium flex items-center gap-2">
-                                <CheckCircle2 size={16} className="text-[var(--accent)]" />
+                                <CheckCircle2 size={16} className="text-primary" />
                                 Prep Steps
                             </h3>
-                            {prepStepsOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]"/> : <ChevronDown size={16} className="text-[var(--text-secondary)]"/>}
+                            {prepStepsOpen ? <ChevronUp size={16} className="text-muted-foreground"/> : <ChevronDown size={16} className="text-muted-foreground"/>}
                         </button>
                         {prepStepsOpen && (
                             <div className="px-4 pb-4 space-y-2">
@@ -128,9 +129,9 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                         <button
                                             key={idx}
                                             onClick={() => toggleStep(idx)}
-                                            className={`w-full flex items-start gap-3 text-left p-3 rounded-xl transition-all ${isDone ? 'bg-[var(--bg-main)] text-[var(--text-tertiary)] line-through opacity-70' : 'hover:bg-[var(--bg-hover)]'}`}
+                                            className={`w-full flex items-start gap-3 text-left p-3 rounded-xl transition-all ${isDone ? 'bg-background text-muted-foreground line-through opacity-70' : 'hover:bg-[var(--bg-hover)]'}`}
                                         >
-                                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isDone ? 'bg-[var(--accent)] border-[var(--accent)] text-black' : 'border-[var(--text-tertiary)]'}`}>
+                                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isDone ? 'bg-primary border-primary text-black' : 'border-[var(--text-tertiary)]'}`}>
                                                 {isDone && <CheckCircle2 size={12} />}
                                             </div>
                                             <span className="text-sm">{step}</span>
@@ -142,25 +143,25 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </div>
 
                     <div className="w-full max-w-md mt-4 flex-1 flex flex-col min-h-[200px]">
-                        <h3 className="text-sm font-medium mb-2 text-[var(--text-secondary)] px-1">
+                        <h3 className="text-sm font-medium mb-2 text-muted-foreground px-1">
                             {activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
                         </h3>
                         <textarea
                             value={ritualNotes}
                             onChange={(e) => setRitualNotes(e.target.value)}
                             placeholder={activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
-                            className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+                            className="flex-1 w-full bg-secondary border border-border rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-primary transition-colors"
                         />
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border-main)] glass">
-                    <button
+                <div className="p-6 border-t border-border glass">
+                    <Button
                         onClick={handleCompleteRitual}
-                        className="w-full py-4 rounded-xl font-medium bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 transition-opacity"
+                        className="w-full h-14 rounded-xl font-medium bg-foreground text-background hover:opacity-90 transition-opacity"
                     >
                         Mark Complete
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -171,13 +172,13 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         const categoryRituals = MASTER_RITUALS.filter(r => r.category === selectedCategory);
 
         return (
-            <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
+            <div className="h-full flex flex-col bg-background text-foreground">
+                <header className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 z-10 glass">
                     <button
                         onClick={() => setSelectedCategory(null)}
                         className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
                     >
-                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
+                        <ArrowLeft size={20} className="text-muted-foreground" />
                     </button>
                     <h2 className="text-lg font-medium">{selectedCategory}</h2>
                     <button className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -mr-2 opacity-0 pointer-events-none">
@@ -196,7 +197,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                             <button
                                 key={ritual.id}
                                 onClick={() => handleStartRitual(ritual)}
-                                className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 hover:border-[var(--text-tertiary)] transition-colors group flex flex-col relative overflow-hidden"
+                                className="text-left bg-secondary border border-border rounded-2xl p-6 hover:border-[var(--text-tertiary)] transition-colors group flex flex-col relative overflow-hidden"
                             >
                                 <div className="flex justify-between items-start mb-3">
                                     <h3 className="font-medium">{ritual.title}</h3>
@@ -205,12 +206,12 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                     )}
                                 </div>
 
-                                <p className="text-sm text-[var(--text-secondary)] mb-6 flex-1">
+                                <p className="text-sm text-muted-foreground mb-6 flex-1">
                                     {ritual.description}
                                 </p>
 
                                 <div className="flex items-center gap-2 mt-auto">
-                                    <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] bg-[var(--bg-main)] px-2 py-1 rounded-md">
+                                    <span className="flex items-center gap-1 text-xs text-muted-foreground bg-background px-2 py-1 rounded-md">
                                         <Clock size={12} />
                                         {ritual.durationMinutes}m
                                     </span>
@@ -233,27 +234,29 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         : CATEGORIES;
 
     return (
-        <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-            <header className="px-6 py-8 border-b border-[var(--border-main)] glass z-10 sticky top-0 flex items-center justify-between">
+        <div className="h-full flex flex-col bg-background text-foreground">
+            <header className="px-6 py-8 border-b border-border glass z-10 sticky top-0 flex items-center justify-between">
                 <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}
+                    className={cn("rounded-full transition-colors", showFilters && "bg-accent")}
                 >
-                    <Sliders size={20} className={showFilters ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
-                </button>
+                    <Sliders size={20} className={showFilters ? 'text-primary' : 'text-muted-foreground'} />
+                </Button>
             </header>
 
             {/* Filter pills */}
             <div className={`overflow-hidden transition-all duration-200 ${showFilters ? 'max-h-12' : 'max-h-0'}`}>
-                <div className="px-6 py-3 border-b border-[var(--border-main)] glass sticky top-[80px] z-10">
+                <div className="px-6 py-3 border-b border-border glass sticky top-[80px] z-10">
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         <button
                             onClick={() => setFilterCategory(null)}
                             className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
                                 !filterCategory
-                                    ? 'bg-[var(--accent)] text-[var(--bg-main)]'
-                                    : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
+                                    ? 'bg-primary text-[var(--bg-main)]'
+                                    : 'border border-border text-foreground hover:border-[var(--text-secondary)]'
                             }`}
                         >
                             All
@@ -264,8 +267,8 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                 onClick={() => setFilterCategory(category)}
                                 className={`shrink-0 rounded-full px-4 py-1.5 text-sm transition-colors whitespace-nowrap ${
                                     filterCategory === category
-                                        ? 'bg-[var(--accent)] text-[var(--bg-main)] font-medium'
-                                        : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
+                                        ? 'bg-primary text-[var(--bg-main)] font-medium'
+                                        : 'border border-border text-foreground hover:border-[var(--text-secondary)]'
                                 }`}
                             >
                                 {category}
@@ -281,7 +284,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     <button
                         key={category}
                         onClick={() => setSelectedCategory(category)}
-                        className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-8 hover:border-[var(--text-tertiary)] transition-colors flex items-center justify-center min-h-[160px]"
+                        className="text-left bg-secondary border border-border rounded-2xl p-6 hover:border-[var(--text-tertiary)] transition-colors flex items-center justify-center min-h-[160px]"
                     >
                         <h2 className="text-xl font-medium text-center">{category}</h2>
                     </button>

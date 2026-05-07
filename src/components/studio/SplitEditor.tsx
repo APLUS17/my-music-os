@@ -66,9 +66,9 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
 
     return (
         <Dialog open={true} onOpenChange={(open) => { if (!open) onCancel(); }}>
-            <DialogContent className="max-w-lg p-6 bg-[var(--bg-card)] border-white/10 rounded-3xl shadow-2xl">
+            <DialogContent className="max-w-lg p-6 bg-card border-white/10 rounded-3xl shadow-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-[var(--accent)]">Edit Splits</DialogTitle>
+                    <DialogTitle className="text-xl font-bold text-primary">Edit Splits</DialogTitle>
                     <DialogDescription className="hidden">Manual split and merge tool for audio sections.</DialogDescription>
                 </DialogHeader>
 
@@ -114,7 +114,7 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
 
                 <Button
                     onClick={() => onSave(sections)}
-                    className="w-full py-6 rounded-xl font-bold bg-[var(--accent)] text-black hover:brightness-110 active:scale-95 transition-all text-lg gap-2"
+                    className="w-full py-6 rounded-xl font-bold bg-primary text-black hover:brightness-110 active:scale-95 transition-all text-lg gap-2"
                 >
                     <Check size={20} />
                     Save Changes

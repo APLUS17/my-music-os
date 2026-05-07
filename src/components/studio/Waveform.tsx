@@ -72,7 +72,7 @@ export const Waveform: React.FC<WaveformProps> = ({ progress, onScrub }) => {
               key={i}
               style={{
                 height: `${height}px`,
-                backgroundColor: isPlayed ? 'var(--accent)' : 'var(--bg-secondary)',
+                backgroundColor: isPlayed ? 'var(--primary)' : 'var(--bg-secondary)',
                 transition: 'background-color 0.2s ease, height 0.3s ease'
               }}
               className="w-[3px] rounded-full opacity-80 group-hover:opacity-100"

@@ -26,32 +26,32 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
     <div className={`
       animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-4 py-3 rounded-xl border transition-all duration-300
       ${isFocused 
-        ? 'bg-[var(--bg-secondary)] border-[var(--shark-blue-dim)] shadow-md' 
-        : 'bg-transparent border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]'
+        ? 'bg-secondary border-primary/20 shadow-md'
+        : 'bg-transparent border-transparent hover:border-subtle hover:bg-accent/20'
       }
     `}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary border border-border text-metadata text-foreground hover:border-primary transition-colors"
           >
             {section.type}
             <ChevronDown size={10} className="opacity-70" />
           </button>
 
           <div className="flex items-center gap-1">
-            <span className="text-xs mono text-[var(--text-tertiary)] tabular-nums opacity-50 font-bold">x{section.repeats}</span>
+            <span className="text-metadata text-muted-foreground opacity-50">x{section.repeats}</span>
             <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
               <button 
                 onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: section.repeats + 1 }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                className="p-0.5 text-muted-foreground hover:text-foreground"
               >
                 <Plus size={10} />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                className="p-0.5 text-muted-foreground hover:text-foreground"
               >
                 <Minus size={10} />
               </button>
@@ -61,8 +61,8 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
 
         <div className="flex items-center gap-2">
           <div className="flex items-center mr-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
-            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
+            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-muted-foreground hover:text-foreground transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
+            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-muted-foreground hover:text-foreground transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
           </div>
           <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110 active:scale-90">
             <X size={14} />
@@ -77,7 +77,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           onChange={(e) => onUpdate(section.id, { text: e.target.value })}
-          className="w-full bg-transparent text-[var(--text-main)] text-base leading-relaxed font-sans focus:outline-none placeholder:text-[var(--text-tertiary)] placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
+          className="w-full bg-transparent text-foreground text-base leading-relaxed font-sans focus:outline-none placeholder:text-muted-foreground placeholder:opacity-40 resize-none scrollbar-hide min-h-[40px] py-1"
           placeholder={section.text === '' ? "Write your lyrics here..." : ""}
           spellCheck={false}
         />
@@ -86,12 +86,12 @@ export const LyricCard: React.FC<LyricCardProps> = ({ section, onUpdate, onDelet
       {isDropdownOpen && (
         <>
           <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsDropdownOpen(false)} />
-          <div className="absolute z-50 top-6 left-0 p-1 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-32">
+          <div className="absolute z-50 top-6 left-0 p-1 bg-card border border-border rounded-lg shadow-xl animate-in zoom-in-95 duration-200 w-32">
             {SECTION_TYPES.map((type) => (
               <button
                 key={type}
                 onClick={() => { onUpdate(section.id, { type }); setIsDropdownOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-xs mono uppercase tracking-wider rounded-md hover:bg-[var(--bg-hover)] ${section.type === type ? 'text-[var(--text-main)]' : 'text-[var(--text-secondary)]'}`}
+                className={`w-full text-left px-3 py-2 text-xs mono uppercase tracking-wider rounded-md hover:bg-accent ${section.type === type ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 {type}
               </button>
