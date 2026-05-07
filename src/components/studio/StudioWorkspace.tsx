@@ -664,7 +664,14 @@ const StudioWorkspace: React.FC = () => {
         const loadState = async () => {
             const savedData = localStorage.getItem('studio-pro-data-v2');
             const savedRitualStats = localStorage.getItem('lyriq_ritual_stats');
-            if (savedRitualStats) setRitualStats(JSON.parse(savedRitualStats));
+            if (savedRitualStats) {
+                try {
+                    setRitualStats(JSON.parse(savedRitualStats));
+                } catch (error) {
+                    console.warn('Failed to parse ritual stats from localStorage, clearing corrupted data', error);
+                    localStorage.removeItem('lyriq_ritual_stats');
+                }
+            }
             if (savedData) {
                 try {
                     const parsed = JSON.parse(savedData);
