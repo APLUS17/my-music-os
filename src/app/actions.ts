@@ -8,8 +8,8 @@ import { GoogleGenAI } from "@google/genai";
 
 export async function createProject(title: string) {
     try {
-        const { data, error } = await supabase
-            .from("projects")
+        const { data, error } = await (supabase
+            .from("projects") as any)
             .insert([{ title, status: "draft" }])
             .select()
             .single();

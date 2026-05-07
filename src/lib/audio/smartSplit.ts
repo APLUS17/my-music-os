@@ -77,7 +77,8 @@ export const analyzeAudioAndSplit = async (
 
         // Only classify as instrumental if it's very consistent AND low zero-crossing
         // (suggesting a steady synth or bass rather than vocal texture)
-        if (zcr < 0.03 && energyVar < 0.005) return 'instrumental';
+        // We also check meanEnergy to ensure it's not just silence (which defaults to vocal)
+        if (meanEnergy > 0.005 && zcr < 0.03 && energyVar < 0.005) return 'instrumental';
 
         return 'vocal'; // Default to vocal (singing) for music app
     };
@@ -97,11 +98,17 @@ export const analyzeAudioAndSplit = async (
             
             if (currentPassDuration <= 0) {
                 // Should not happen with valid loopEnd/startOffset, but safety first
+                // If this is the only pass attempt and it's invalid, break to avoid infinite loop
                 break;
             }
 
             const passEndTime = Math.min(duration, currentVocalTime + currentPassDuration);
             
+            if (passEndTime <= currentVocalTime) {
+                // Ensure we always progress
+                break;
+            }
+
             sections.push({
                 id: randomId(),
                 startTime: currentVocalTime,
