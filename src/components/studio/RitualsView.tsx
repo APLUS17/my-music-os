@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders } from 'lucide-react';
-import { Ritual, RitualStat } from '../../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
+import { Ritual, RitualStat, RitualExercise } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
+import { getRandomPrompt, getMethodById } from '../../lib/creative/SongwritingKnowledge';
+import { creative } from '../../lib/services/creative';
+import { chatWithFacilitator } from '../../app/actions';
 import { formatTime } from '@/lib/utils/time';
 
 interface RitualsViewProps {
@@ -10,6 +13,274 @@ interface RitualsViewProps {
 }
 
 const CATEGORIES = ['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'];
+
+// ─── Exercise Panel ───────────────────────────────────────────────────────────
+
+interface ExercisePanelProps {
+    exercise: RitualExercise;
+    index: number;
+}
+
+const ExercisePanel: React.FC<ExercisePanelProps> = ({ exercise, index }) => {
+    const [answers, setAnswers] = useState<Record<number, string>>({});
+
+    const setAnswer = (i: number, val: string) =>
+        setAnswers(prev => ({ ...prev, [i]: val }));
+
+    return (
+        <div className="border border-[var(--border-main)] rounded-xl overflow-hidden">
+            <div className="px-4 py-3 bg-[var(--bg-hover)]">
+                <span className="text-xs text-[var(--accent)] font-mono uppercase tracking-wider mr-2">
+                    Exercise {index + 1}
+                </span>
+                <span className="text-sm font-medium">{exercise.title}</span>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{exercise.instruction}</p>
+                {exercise.inputFields && exercise.inputFields.length > 0 ? (
+                    <div className="space-y-2">
+                        {exercise.inputFields.map((label, i) => (
+                            <div key={i}>
+                                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">{label}</label>
+                                <textarea
+                                    rows={2}
+                                    value={answers[i] ?? ''}
+                                    onChange={e => setAnswer(i, e.target.value)}
+                                    placeholder="Write here..."
+                                    className="w-full bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <textarea
+                        rows={4}
+                        value={answers[0] ?? ''}
+                        onChange={e => setAnswer(0, e.target.value)}
+                        placeholder="Write here..."
+                        className="w-full bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+                    />
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─── Live Tools Panel ─────────────────────────────────────────────────────────
+
+interface LiveToolsPanelProps {
+    ritual: Ritual;
+}
+
+const LiveToolsPanel: React.FC<LiveToolsPanelProps> = ({ ritual }) => {
+    const [wordInput, setWordInput] = useState('');
+    const [results, setResults] = useState<string[]>([]);
+    const [aiResult, setAiResult] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [activeToolType, setActiveToolType] = useState<'rhyme' | 'synonym' | null>(null);
+
+    const wordTool = ritual.liveTools?.find(t => t.type === 'rhyme' || t.type === 'synonym') ?? null;
+    const geminiTool = ritual.liveTools?.find(t => t.type === 'gemini-prompt') ?? null;
+
+    const handleWordLookup = useCallback(async () => {
+        if (!wordInput.trim() || !wordTool) return;
+        setLoading(true);
+        setResults([]);
+        setActiveToolType(wordTool.type as 'rhyme' | 'synonym');
+        try {
+            const res = wordTool.type === 'rhyme'
+                ? await creative.getRhymes(wordInput.trim())
+                : await creative.getSynonyms(wordInput.trim());
+            setResults(res.slice(0, 16));
+        } catch {
+            setResults([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [wordInput, wordTool]);
+
+    const handleGeminiSuggest = useCallback(async () => {
+        if (!geminiTool) return;
+        setLoading(true);
+        setAiResult('');
+        setActiveToolType(null);
+        try {
+            const { reply } = await chatWithFacilitator(
+                `I'm doing a "${ritual.title}" session. Give me one specific songwriting action I can take right now based on the methods for this ritual.`,
+                {
+                    projectTitle: '',
+                    sections: [],
+                    scraps: [],
+                    recentSessions: [],
+                    activeView: 'rituals',
+                    ritualContext: `${ritual.title} — ${ritual.description}`,
+                    sessionPhase: 'starting',
+                }
+            );
+            setAiResult(reply);
+        } catch {
+            setAiResult('Could not reach the AI. Try again in a moment.');
+        } finally {
+            setLoading(false);
+        }
+    }, [ritual, geminiTool]);
+
+    if (!wordTool && !geminiTool) return null;
+
+    return (
+        <div className="w-full max-w-md space-y-3">
+            <h3 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider px-1">
+                Live Tools
+            </h3>
+
+            {wordTool && (
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
+                    <p className="text-xs text-[var(--text-secondary)]">{wordTool.label}</p>
+                    <div className="flex gap-2">
+                        <input
+                            value={wordInput}
+                            onChange={e => setWordInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleWordLookup()}
+                            placeholder="Enter a word..."
+                            className="flex-1 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] transition-colors"
+                        />
+                        <button
+                            onClick={handleWordLookup}
+                            disabled={loading || !wordInput.trim()}
+                            className="px-3 py-2 bg-[var(--accent)] text-[var(--bg-main)] rounded-lg text-sm font-medium disabled:opacity-40 transition-opacity flex items-center gap-1"
+                        >
+                            {loading && activeToolType ? <RefreshCw size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                        </button>
+                    </div>
+                    {results.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                            {results.map((r, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => navigator.clipboard.writeText(r)}
+                                    title="Copy"
+                                    className="px-2.5 py-1 rounded-full bg-[var(--bg-main)] border border-[var(--border-main)] text-xs hover:border-[var(--accent)] transition-colors active:scale-95"
+                                >
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {geminiTool && (
+                <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <p className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-[var(--accent)]" />
+                            {geminiTool.label}
+                        </p>
+                        <button
+                            onClick={handleGeminiSuggest}
+                            disabled={loading}
+                            className="px-3 py-1.5 bg-[var(--accent)] text-[var(--bg-main)] rounded-lg text-xs font-medium disabled:opacity-40 transition-opacity flex items-center gap-1.5"
+                        >
+                            {loading && !activeToolType ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                            Suggest
+                        </button>
+                    </div>
+                    {aiResult && (
+                        <p className="text-sm text-[var(--text-main)] leading-relaxed border-l-2 border-[var(--accent)] pl-3">
+                            {aiResult}
+                        </p>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── Songstarter Prompt Button ────────────────────────────────────────────────
+
+interface PromptButtonProps {
+    categoryId: string;
+}
+
+const PromptButton: React.FC<PromptButtonProps> = ({ categoryId }) => {
+    const [prompt, setPrompt] = useState('');
+
+    const handleGet = () => setPrompt(getRandomPrompt(categoryId));
+
+    return (
+        <div className="w-full max-w-md">
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles size={12} className="text-[var(--accent)]" />
+                        Writing Prompt
+                    </h3>
+                    <button
+                        onClick={handleGet}
+                        className="px-3 py-1.5 border border-[var(--border-main)] hover:border-[var(--accent)] rounded-lg text-xs transition-colors flex items-center gap-1"
+                    >
+                        {prompt ? <RefreshCw size={11} /> : <Sparkles size={11} className="text-[var(--accent)]" />}
+                        {prompt ? 'New prompt' : 'Get a prompt'}
+                    </button>
+                </div>
+                {prompt && (
+                    <p className="text-sm text-[var(--text-main)] leading-relaxed italic border-l-2 border-[var(--accent)] pl-3">
+                        {prompt}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─── Method Chips ─────────────────────────────────────────────────────────────
+
+interface MethodChipsProps {
+    methodIds: string[];
+}
+
+const MethodChips: React.FC<MethodChipsProps> = ({ methodIds }) => {
+    const [expanded, setExpanded] = useState<string | null>(null);
+
+    if (methodIds.length === 0) return null;
+
+    return (
+        <div className="flex flex-wrap gap-2 justify-center">
+            {methodIds.map(id => {
+                const method = getMethodById(id);
+                if (!method) return null;
+                const isOpen = expanded === id;
+                return (
+                    <div key={id} className="flex flex-col items-center">
+                        <button
+                            onClick={() => setExpanded(isOpen ? null : id)}
+                            className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                                isOpen
+                                    ? 'bg-[var(--accent)] text-[var(--bg-main)] border-[var(--accent)]'
+                                    : 'border-[var(--border-main)] text-[var(--text-secondary)] hover:border-[var(--accent)]'
+                            }`}
+                        >
+                            {method.name}
+                        </button>
+                        {isOpen && (
+                            <div className="mt-2 max-w-xs bg-[var(--bg-secondary)] border border-[var(--accent)]/30 rounded-xl p-3 text-left space-y-1.5 z-10">
+                                <p className="text-xs text-[var(--accent)] font-medium">{method.tagline}</p>
+                                <p className="text-xs text-[var(--text-secondary)]">
+                                    <span className="text-[var(--text-tertiary)]">Formula: </span>{method.formula}
+                                </p>
+                                <p className="text-xs text-[var(--text-tertiary)]">
+                                    <span className="text-[var(--text-secondary)]">Use when: </span>{method.when}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitual }) => {
     const [activeRitual, setActiveRitual] = useState<Ritual | null>(null);
@@ -20,32 +291,28 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const [endTime, setEndTime] = useState<number | null>(null);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
     const [prepStepsOpen, setPrepStepsOpen] = useState(false);
-    const [ritualNotes, setRitualNotes] = useState("");
+    const [exercisesOpen, setExercisesOpen] = useState(true);
+    const [ritualNotes, setRitualNotes] = useState('');
 
-    // Timer logic
     useEffect(() => {
         if (endTime === null) return;
-
         const timer = setInterval(() => {
             const now = new Date().getTime();
             const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
             setTimeLeft(remaining);
-            if (remaining <= 0) {
-                setEndTime(null);
-            }
+            if (remaining <= 0) setEndTime(null);
         }, 1000);
-
         return () => clearInterval(timer);
     }, [endTime]);
 
     const handleStartRitual = (ritual: Ritual) => {
         setActiveRitual(ritual);
         setTimeLeft(ritual.durationMinutes * 60);
-        const now = new Date().getTime();
-        setEndTime(now + ritual.durationMinutes * 60 * 1000);
+        setEndTime(new Date().getTime() + ritual.durationMinutes * 60 * 1000);
         setCompletedSteps(new Set());
-        setRitualNotes("");
+        setRitualNotes('');
         setPrepStepsOpen(true);
+        setExercisesOpen(true);
     };
 
     const handleCompleteRitual = () => {
@@ -79,7 +346,12 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         }
     };
 
+    // ── Active ritual timer screen ────────────────────────────────────────────
     if (activeRitual) {
+        const hasExercises = (activeRitual.exercises?.length ?? 0) > 0;
+        const hasPromptCategory = !!activeRitual.promptCategory;
+        const hasLiveTools = (activeRitual.liveTools?.length ?? 0) > 0;
+
         return (
             <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
                 <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
@@ -101,14 +373,21 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </button>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center">
-                    <div className="my-8 text-center">
-                        <div className="text-6xl font-light tracking-tighter mb-2 font-mono">
+                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-4">
+                    {/* Timer + description */}
+                    <div className="my-4 text-center space-y-2">
+                        <div className="text-6xl font-light tracking-tighter font-mono">
                             {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
                         </div>
                         <p className="text-[var(--text-secondary)] text-sm">{activeRitual.description}</p>
                     </div>
 
+                    {/* Method chips — tappable to expand formula card */}
+                    {(activeRitual.methods?.length ?? 0) > 0 && (
+                        <MethodChips methodIds={activeRitual.methods!} />
+                    )}
+
+                    {/* Prep Steps */}
                     <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
                         <button
                             onClick={() => setPrepStepsOpen(!prepStepsOpen)}
@@ -118,7 +397,9 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                 <CheckCircle2 size={16} className="text-[var(--accent)]" />
                                 Prep Steps
                             </h3>
-                            {prepStepsOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]"/> : <ChevronDown size={16} className="text-[var(--text-secondary)]"/>}
+                            {prepStepsOpen
+                                ? <ChevronUp size={16} className="text-[var(--text-secondary)]" />
+                                : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
                         </button>
                         {prepStepsOpen && (
                             <div className="px-4 pb-4 space-y-2">
@@ -141,15 +422,53 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         )}
                     </div>
 
-                    <div className="w-full max-w-md mt-4 flex-1 flex flex-col min-h-[200px]">
-                        <h3 className="text-sm font-medium mb-2 text-[var(--text-secondary)] px-1">
-                            {activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? 'Scratchpad' : 'Session Notes'}
+                    {/* Exercises section */}
+                    {hasExercises && (
+                        <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
+                            <button
+                                onClick={() => setExercisesOpen(!exercisesOpen)}
+                                className="w-full p-4 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors"
+                            >
+                                <h3 className="text-sm font-medium flex items-center gap-2">
+                                    <Sparkles size={16} className="text-[var(--accent)]" />
+                                    Exercises
+                                </h3>
+                                {exercisesOpen
+                                    ? <ChevronUp size={16} className="text-[var(--text-secondary)]" />
+                                    : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
+                            </button>
+                            {exercisesOpen && (
+                                <div className="px-4 pb-4 space-y-3">
+                                    {activeRitual.exercises!.map((ex, i) => (
+                                        <ExercisePanel key={i} exercise={ex} index={i} />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Writing prompt */}
+                    {hasPromptCategory && (
+                        <PromptButton categoryId={activeRitual.promptCategory!} />
+                    )}
+
+                    {/* Live tools (Datamuse rhyme/synonym + Gemini) */}
+                    {hasLiveTools && (
+                        <LiveToolsPanel ritual={activeRitual} />
+                    )}
+
+                    {/* Scratchpad */}
+                    <div className="w-full max-w-md flex flex-col min-h-[180px]">
+                        <h3 className="text-xs font-medium mb-2 text-[var(--text-tertiary)] uppercase tracking-wider px-1">
+                            {activeRitual.category?.includes('Idea') ? 'Scratchpad' : 'Session Notes'}
                         </h3>
                         <textarea
                             value={ritualNotes}
-                            onChange={(e) => setRitualNotes(e.target.value)}
-                            placeholder={activeRitual.category?.includes('Idea') || activeRitual.category === 'Idea Curation' ? "Capture lyrics, ideas, and song thoughts here..." : "Jot down technical notes, practice insights, or progress..."}
-                            className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors"
+                            onChange={e => setRitualNotes(e.target.value)}
+                            placeholder={activeRitual.category?.includes('Idea')
+                                ? 'Capture lyrics, ideas, and song thoughts here...'
+                                : 'Jot down technical notes, practice insights, or progress...'}
+                            className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors min-h-[180px]"
                         />
                     </div>
                 </div>
@@ -166,7 +485,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         );
     }
 
-    // Rituals in selected category view
+    // ── Category ritual list view ─────────────────────────────────────────────
     if (selectedCategory && !activeRitual) {
         const categoryRituals = MASTER_RITUALS.filter(r => r.category === selectedCategory);
 
@@ -191,6 +510,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                             s.ritualId === ritual.id &&
                             new Date(s.completedAt).toDateString() === new Date().toDateString()
                         );
+                        const hasExtras = (ritual.exercises?.length ?? 0) > 0 || !!ritual.promptCategory || (ritual.liveTools?.length ?? 0) > 0;
 
                         return (
                             <button
@@ -200,14 +520,32 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                             >
                                 <div className="flex justify-between items-start mb-3">
                                     <h3 className="font-medium">{ritual.title}</h3>
-                                    {isCompletedToday && (
-                                        <CheckCircle2 size={16} className="text-green-400" />
-                                    )}
+                                    {isCompletedToday && <CheckCircle2 size={16} className="text-green-400" />}
                                 </div>
 
-                                <p className="text-sm text-[var(--text-secondary)] mb-6 flex-1">
+                                <p className="text-sm text-[var(--text-secondary)] mb-4 flex-1">
                                     {ritual.description}
                                 </p>
+
+                                {hasExtras && (
+                                    <div className="flex flex-wrap gap-1 mb-3">
+                                        {(ritual.exercises?.length ?? 0) > 0 && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
+                                                {ritual.exercises!.length} exercise{ritual.exercises!.length > 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                        {!!ritual.promptCategory && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-main)] border border-[var(--border-main)] text-[var(--text-tertiary)]">
+                                                prompts
+                                            </span>
+                                        )}
+                                        {(ritual.liveTools?.length ?? 0) > 0 && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-main)] border border-[var(--border-main)] text-[var(--text-tertiary)]">
+                                                live tools
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className="flex items-center gap-2 mt-auto">
                                     <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] bg-[var(--bg-main)] px-2 py-1 rounded-md">
@@ -227,7 +565,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         );
     }
 
-    // Category selection view (main view)
+    // ── Category grid (main view) ─────────────────────────────────────────────
     const categoriesToShow = filterCategory && filterCategory !== 'All'
         ? CATEGORIES.filter(c => c === filterCategory)
         : CATEGORIES;
@@ -244,7 +582,6 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                 </button>
             </header>
 
-            {/* Filter pills */}
             <div className={`overflow-hidden transition-all duration-200 ${showFilters ? 'max-h-12' : 'max-h-0'}`}>
                 <div className="px-6 py-3 border-b border-[var(--border-main)] glass sticky top-[80px] z-10">
                     <div className="flex gap-2 overflow-x-auto pb-2">
@@ -275,7 +612,6 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                 </div>
             </div>
 
-            {/* Category cards grid */}
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {categoriesToShow.map(category => (
                     <button

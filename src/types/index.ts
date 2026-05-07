@@ -115,6 +115,19 @@ export const COLORS = {
 
 export type EnergyLevel = 'Low' | 'Medium' | 'High';
 
+export interface RitualExercise {
+    title: string;
+    instruction: string;
+    inputFields?: string[];
+}
+
+export type LiveToolType = 'rhyme' | 'synonym' | 'gemini-prompt';
+
+export interface LiveTool {
+    type: LiveToolType;
+    label: string;
+}
+
 export interface Ritual {
     id: string;
     title: string;
@@ -124,6 +137,10 @@ export interface Ritual {
     description: string;
     energyLevel: EnergyLevel;
     prepSteps: string[];
+    methods?: string[];
+    exercises?: RitualExercise[];
+    promptCategory?: string;
+    liveTools?: LiveTool[];
 }
 
 export interface RitualStat {
