@@ -30,7 +30,8 @@
       "Bash(git -C /c/Users/ayoomo01/my-music-os remote -v)",
       "Bash(git -C /c/Users/ayoomo01/my-music-os/my-music-os remote -v)",
       "Bash(npx tsc *)",
-      "Bash(gh pr create --title 'fix\\(studio\\): resolve beat timing desync, volume balance, and remove record hint' --body ' *)"
+      "Bash(gh pr create --title 'fix\\(studio\\): resolve beat timing desync, volume balance, and remove record hint' --body ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ayoomo01\\\\my-music-os\" -Filter \"*.pdf\" -File)"
     ]
   }
 }

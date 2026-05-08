@@ -4,7 +4,7 @@
 
 **Lyriq Lab** (formerly "My Music OS") is a music studio web app for songwriters. It combines lyric writing, voice recording, beat playback, and AI-powered creative tools in a single offline-first, mobile-friendly interface.
 
-**Current Status**: Beta. Phase 1 readiness ~5/10. Core writing and recording features are shipped. Critical gaps: AI lyric suggestions, genre/mood selection, and export.
+**Current Status**: Beta. Phase 1 readiness ~7/10. Core writing, recording features, and AI Audio Intelligence/Facilitator are shipped. Critical gaps: AI lyric suggestions UI, genre/mood selection, and export.
 
 ---
 
@@ -145,17 +145,18 @@ MediaRecorder → Blob → base64 → IndexedDB
 | Multiple takes | ✅ Shipped | `RecordingThread` |
 | Pin take to section | ✅ Shipped | `pinnedTakeId` on `LyricSection` |
 | AI transcription | ✅ Shipped | Gemini, per-line timestamps |
-| Beat AI analysis | ✅ Shipped | Gemini, emoji section tags |
+| AI Audio Analysis | ✅ Shipped | Gemini 2.0 Flash structure analysis (AHEAD) |
+| Studio Facilitator AI | ✅ Shipped | Conversational AI coach (AHEAD) |
 | Idea banking | ✅ Shipped | `PuzzleView` |
 | 5 themes | ✅ Shipped | Dark, Light, Midnight, Matrix, Sonar |
 | Global search | ✅ Shipped | Projects, takes, beats, scraps |
 | Onboarding tour | ✅ Shipped | 6-step, restartable from Settings |
 | Rhyme finder | ⚠️ API ready | Datamuse integrated, no editor UI yet |
 | Muse AI drawer | ⚠️ Disabled | Built, disabled for beta |
-| **AI lyric suggestions** | ❌ Missing | **P0 — critical for Phase 1** |
+| **AI lyric suggestions (UX)** | ⚠️ Partial | Backend logic exists, inline UI missing |
 | **Genre/mood selection** | ❌ Missing | **P0 — critical for Phase 1** |
 | **Export (TXT/PDF/copy)** | ❌ Missing | **P0 — critical for Phase 1** |
-| Cloud sync | ⚠️ Partial | Supabase connected, auth not integrated |
+| Cloud sync | ⚠️ Partial | Supabase backend connected (CRUD working), multi-device sync pending |
 | Auth | ⚠️ Partial | Foundation laid, not enforced |
 | Recording layers (Ableton-style) | 🚧 Designed | See `ABLETON_TAKE_LANES_DESIGN.md` |
 
@@ -204,6 +205,8 @@ Test files:
 
 The real backend is Supabase (PostgreSQL) accessed via Next.js Server Actions in `app/actions.ts`:
 - `createProject`, `getProjects`, `getProject`, `deleteProject`, `updateProjectStudio`
+- Supabase client initialization and database schema types are defined in `src/lib/db.ts`, with safe bypasses to ensure TypeScript build stability.
+- Fully production-ready and deployed successfully on Vercel.
 
 The `backend/` folder contains Python scripts (`verify_connections.py`) for local API validation only — not deployed.
 
