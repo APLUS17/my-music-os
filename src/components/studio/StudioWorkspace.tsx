@@ -625,12 +625,9 @@ const StudioWorkspace: React.FC = () => {
         };
     }, []);
 
-    // Ensure beat audio loads when src changes
-    useEffect(() => {
-        const audio = beatAudioRef.current;
-        if (!audio || !uploadedBeat) return;
-        audio.load();
-    }, [uploadedBeat]);
+    // NOTE: audio.load() is intentionally omitted here.
+    // React updates the <audio src> attribute via JSX, which triggers load() automatically.
+    // Calling load() manually while playing causes a playback interrupt.
 
     // Update Beat Volume
     useEffect(() => {
@@ -1082,7 +1079,9 @@ const StudioWorkspace: React.FC = () => {
             audio.addEventListener('ended', onEnded);
         }
 
-        if (beatGainRef.current) beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
+        // Volume/mute is handled by the dedicated gain effect below — do not set here.
+        // Setting it here would cause this effect to re-run on every volume change,
+        // which calls audio.play() on an already-playing element and causes a glitch.
 
         if (isBeatPlaying) {
             if (audio.paused && audio.src) {
@@ -1099,7 +1098,7 @@ const StudioWorkspace: React.FC = () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', onEnded);
         };
-    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, beatVolume, uploadedBeat, beatMuted]);
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd]);
 
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
