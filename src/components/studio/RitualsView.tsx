@@ -4,6 +4,7 @@ import { Ritual, RitualStat } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { formatTime } from '@/lib/utils/time';
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface RitualsViewProps {
     stats: RitualStat[];
