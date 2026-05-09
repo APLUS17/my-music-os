@@ -40,6 +40,16 @@ Add the drawers back near the bottom of the return statement (before `FeedbackMo
 
 ---
 
+## 🎨 UI Toolkit (Premium Aesthetics)
+We have integrated **shadcn-glass-ui** to drive the "Sophisticated Dark Mode" look.
+- **Library**: `shadcn-glass-ui` (v2.11+)
+- **Commands**: 
+    - `npx shadcn-glass-ui list` (See all components)
+    - `npx shadcn-glass-ui info <name>` (Get component code)
+- **Reference**: [Documentation](https://yhooi2.github.io/shadcn-glass-ui-library/)
+
+---
+
 ## 🎙️ Studio Facilitator (AI Assistant)
 We have implemented the core backend for the **Studio Facilitator** in `src/app/actions.ts`:
 *   **Audio Structure Analysis**: Uses Gemini 2.0 Flash to identify Verse/Chorus/Bridge from uploaded audio.

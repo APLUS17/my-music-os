@@ -40,3 +40,6 @@ The design follows a **Sophisticated Dark Mode** aesthetic with a "Vibe-first" p
 *   **Floating Navigation:** A fixed bottom navbar that uses high-blur glassmorphism to "float" above content.
 *   **Breathability:** High-margin layouts with intentional whitespace to prevent fatigue during long creative sessions.
 *   **Transitions:** Framer Motion powered animations for all state changes (drawer openings, tab switching).
+*   **External UI Registry:** **shadcn-glass-ui** (v2.11+) - Primary source for glassmorphic and AI-friendly component templates.
+    *   Repo: [https://github.com/Yhooi2/shadcn-glass-ui-library](https://github.com/Yhooi2/shadcn-glass-ui-library)
+    *   Docs: [https://yhooi2.github.io/shadcn-glass-ui-library/](https://yhooi2.github.io/shadcn-glass-ui-library/)
