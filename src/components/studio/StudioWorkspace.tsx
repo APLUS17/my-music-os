@@ -8,6 +8,7 @@ import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
+import { AnimatedTabs } from "../ui/animated-tabs";
 import { BeatUploader } from './BeatUploader';
 import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
@@ -1485,9 +1486,15 @@ const StudioWorkspace: React.FC = () => {
                         <div className="px-6 mb-8 flex items-center justify-between">
                             <div>
                                 <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
-                                <div className="flex border-b border-[var(--border-main)]">
-                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
-                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
+                                <div className="mb-2">
+                                    <AnimatedTabs 
+                                        tabs={[
+                                            { id: 'songs', label: 'Projects' },
+                                            { id: 'beats', label: 'Beats' }
+                                        ]}
+                                        activeTab={libraryTab}
+                                        onChange={(id) => setLibraryTab(id as LibraryTab)}
+                                    />
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -1947,7 +1954,7 @@ const StudioWorkspace: React.FC = () => {
     return (
         <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
             <main
-                className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
+                className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col relative"
             >
                 {/* Persistent Studio Beat Audio */}
                 <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
@@ -1982,14 +1989,14 @@ const StudioWorkspace: React.FC = () => {
                     className="hidden"
                 />
 
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden pb-24">
                     {getActiveView()}
                 </div>
 
                 {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
-                <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
-                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
+                <nav className={`z-[110] absolute bottom-4 left-4 right-4 transition-all duration-500 bg-[var(--bg-card)]/80 backdrop-blur-3xl border border-[var(--border-main)] shadow-xl rounded-3xl pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2 pb-1 px-1">
                         <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
                         <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
                         <div className="flex justify-center relative">

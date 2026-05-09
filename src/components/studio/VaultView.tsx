@@ -5,6 +5,8 @@ import {
     Activity, Play, Pause, Library, LayoutGrid, Clock, CheckCircle2, Music
 } from 'lucide-react';
 import { LyricScrap, RecordingSession, Beat, RitualStat } from '../../types';
+import { BentoGrid, BentoGridItem } from '../ui/bento-grid';
+import { NumberTicker } from '../ui/number-ticker';
 
 interface VaultViewProps {
     sessions: RecordingSession[];
@@ -84,58 +86,48 @@ export const VaultView: React.FC<VaultViewProps> = ({
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
 
-                {/* Stats Section */}
-                <section>
-                    <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4 flex items-center gap-2">
-                        <Activity size={16} /> Ritual Stats
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 flex flex-col justify-between">
-                            <span className="text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1"><CheckCircle2 size={12}/> Completed</span>
-                            <span className="text-3xl font-light">{ritualStats.length}</span>
-                        </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 flex flex-col justify-between">
-                            <span className="text-[var(--text-tertiary)] text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1"><Clock size={12}/> Time Spent</span>
-                            <span className="text-3xl font-light">{Math.floor(totalRitualMinutes / 60)}<span className="text-lg text-[var(--text-tertiary)] ml-1">hrs</span> {totalRitualMinutes % 60}<span className="text-lg text-[var(--text-tertiary)] ml-1">m</span></span>
-                        </div>
-                    </div>
-                </section>
+                {/* Bento Dashboard */}
+                <BentoGrid className="mb-8 max-w-full">
+                    {/* Time Spent (Large) */}
+                    <BentoGridItem
+                        className="md:col-span-2"
+                        title={<><NumberTicker value={Math.floor(totalRitualMinutes / 60)} /><span className="text-sm text-[var(--text-tertiary)] ml-1">hrs</span> <NumberTicker value={totalRitualMinutes % 60} /><span className="text-sm text-[var(--text-tertiary)] ml-1">m</span></>}
+                        description="Total Time in Rituals"
+                        icon={<Clock size={16} />}
+                    />
+                    
+                    {/* Completed Rituals */}
+                    <BentoGridItem
+                        className="md:col-span-1"
+                        title={<NumberTicker value={ritualStats.length} />}
+                        description="Rituals Completed"
+                        icon={<CheckCircle2 size={16} className="text-[var(--accent)]" />}
+                    />
 
-                {/* Project Assets */}
-                <section>
-                    <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4 flex items-center gap-2">
-                        <LayoutGrid size={16} /> Project Assets
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                                <Activity size={18} />
-                            </div>
-                            <div>
-                                <div className="text-xl font-medium">{sessions.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Recordings</div>
-                            </div>
-                        </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                                <LayoutGrid size={18} />
-                            </div>
-                            <div>
-                                <div className="text-xl font-medium">{scraps.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Ideas</div>
-                            </div>
-                        </div>
-                        <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2">
-                            <div className="w-10 h-10 rounded-full bg-[var(--bg-main)] flex items-center justify-center text-[var(--text-secondary)]">
-                                <Music size={18} />
-                            </div>
-                            <div>
-                                <div className="text-xl font-medium">{beats.length}</div>
-                                <div className="text-xs text-[var(--text-tertiary)]">Beats</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                    {/* Recordings */}
+                    <BentoGridItem
+                        className="md:col-span-1"
+                        title={<NumberTicker value={sessions.length} />}
+                        description="Vocal Takes"
+                        icon={<Activity size={16} />}
+                    />
+
+                    {/* Ideas */}
+                    <BentoGridItem
+                        className="md:col-span-1"
+                        title={<NumberTicker value={scraps.length} />}
+                        description="Lyric Scraps"
+                        icon={<LayoutGrid size={16} />}
+                    />
+
+                    {/* Beats */}
+                    <BentoGridItem
+                        className="md:col-span-1"
+                        title={<NumberTicker value={beats.length} />}
+                        description="Instrumentals"
+                        icon={<Music size={16} />}
+                    />
+                </BentoGrid>
 
                 {/* Recent Activity */}
                 {mostRecentSession && (
