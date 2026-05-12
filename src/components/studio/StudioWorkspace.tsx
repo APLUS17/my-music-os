@@ -1605,6 +1605,8 @@ const StudioWorkspace: React.FC = () => {
                         projectTitle={projectTitle}
                         onPlaySession={handleSelectSessionAndPlay}
                         playingSessionId={activeSessionId}
+                        onPlayBeat={handlePlayBeat}
+                        playingBeatId={playingBeatId}
                         currentTime={currentTime}
                         duration={duration}
                         ritualStats={ritualStats}
