@@ -66,7 +66,7 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
 
     return (
         <Dialog open={true} onOpenChange={(open) => { if (!open) onCancel(); }}>
-            <DialogContent className="max-w-lg p-6 bg-[var(--bg-card)] border-white/10 rounded-3xl shadow-2xl">
+            <DialogContent className="max-w-lg p-6 bg-[var(--bg-card)] border-[var(--border-subtle)] rounded-3xl shadow-2xl">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold text-[var(--accent)]">Edit Splits</DialogTitle>
                     <DialogDescription className="hidden">Manual split and merge tool for audio sections.</DialogDescription>
@@ -93,16 +93,16 @@ export const SplitEditor: React.FC<SplitEditorProps> = ({ session, onSave, onCan
                     </Button>
                 </div>
 
-                <div className="max-h-64 overflow-y-auto pr-2 mb-6 border border-white/5 rounded-xl p-2 bg-black/20">
+                <div className="max-h-64 overflow-y-auto pr-2 mb-6 border border-[var(--border-subtle)] rounded-xl p-2 bg-[var(--bg-elevated)]">
                     <div className="text-xs uppercase tracking-wide text-white/50 mb-2 font-bold px-2">Sections</div>
                     {sections.map((sec, i) => (
-                        <div key={sec.id} className="flex items-center justify-between bg-white/5 p-3 rounded-lg mb-2">
+                        <div key={sec.id} className="flex items-center justify-between bg-[var(--bg-soft)] p-3 rounded-lg mb-2">
                             <span className="text-sm">{(sec.startTime).toFixed(2)}s - {(sec.endTime).toFixed(2)}s</span>
                             <div className="flex gap-2">
                                 {i < sections.length - 1 && (
                                     <button
                                         onClick={() => handleMerge(i)}
-                                        className="text-xs bg-white/10 px-2 py-1 rounded text-[var(--text-secondary)] hover:text-white"
+                                        className="text-xs bg-[var(--bg-hover)] px-2 py-1 rounded text-[var(--text-secondary)] hover:text-white"
                                     >
                                         Merge Next
                                     </button>

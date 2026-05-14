@@ -43,7 +43,7 @@ const CustomSlider = ({
   return (
     <motion.div
       className={cn(
-        "relative w-full h-1 bg-white/10 rounded-full cursor-pointer",
+        "relative w-full h-1 bg-[var(--bg-hover)] rounded-full cursor-pointer",
         className
       )}
       onClick={(e) => {
@@ -91,7 +91,7 @@ const VaultAudioCard = ({
     return (
         <motion.div
             className={cn(
-                "relative flex flex-col mx-auto rounded-3xl overflow-hidden bg-[#11111198] shadow-[0_0_20px_rgba(0,0,0,0.2)] backdrop-blur-md p-3 w-full h-full border border-white/5",
+                "relative flex flex-col mx-auto rounded-3xl overflow-hidden bg-[#11111198] shadow-[0_0_20px_rgba(0,0,0,0.2)] backdrop-blur-md p-3 w-full h-full border border-[var(--border-subtle)]",
                 compact && "h-auto"
             )}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -102,7 +102,7 @@ const VaultAudioCard = ({
             <motion.div className="flex flex-col relative h-full justify-between" layout>
                 {/* Cover Area */}
                 <motion.div className={cn(
-                    "bg-white/5 overflow-hidden rounded-[16px] w-full relative flex items-center justify-center",
+                    "bg-[var(--bg-soft)] overflow-hidden rounded-[16px] w-full relative flex items-center justify-center",
                     compact ? "h-[120px]" : "h-[160px]"
                 )}>
                     {cover ? (
@@ -148,7 +148,7 @@ const VaultAudioCard = ({
                     </motion.div>
 
                     <motion.div className="flex items-center justify-center w-full">
-                        <div className="flex items-center gap-1 bg-white/5 rounded-[12px] p-1 border border-white/5">
+                        <div className="flex items-center gap-1 bg-[var(--bg-soft)] rounded-[12px] p-1 border border-[var(--border-subtle)]">
                             <Button variant="ghost" size="icon" className="text-white/40 hover:text-white h-6 w-6 rounded-full">
                                 <Shuffle size={12} />
                             </Button>
@@ -159,7 +159,7 @@ const VaultAudioCard = ({
                                 }}
                                 variant="ghost"
                                 size="icon"
-                                className="text-white bg-white/10 hover:bg-white hover:text-black h-7 w-7 rounded-full transition-all"
+                                className="text-white bg-[var(--bg-hover)] hover:bg-white hover:text-black h-7 w-7 rounded-full transition-all"
                             >
                                 {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                             </Button>
@@ -388,7 +388,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                     <h1 className="text-2xl font-medium tracking-tight text-white">{titleDisplay}</h1>
                 </div>
                 <div className="flex flex-col items-end gap-3 pointer-events-auto">
-                    <div className="flex bg-white/5 p-1 rounded-full border border-white/10 backdrop-blur-md">
+                    <div className="flex bg-[var(--bg-soft)] p-1 rounded-full border border-[var(--border-subtle)] backdrop-blur-md">
                         <button 
                             onClick={() => setLayoutMode('infinite')}
                             className={cn(
@@ -419,7 +419,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="flex-1 flex flex-col items-center justify-center text-center p-10"
                     >
-                        <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center text-white/10 mb-6 border border-white/5">
+                        <div className="w-20 h-20 rounded-full bg-[var(--bg-soft)] flex items-center justify-center text-white/10 mb-6 border border-[var(--border-subtle)]">
                             <Library size={40} strokeWidth={1} />
                         </div>
                         <h3 className="text-white/60 font-medium tracking-tight text-lg">Your vault is a blank canvas</h3>
@@ -511,7 +511,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
             </AnimatePresence>
 
             {/* Instruction Overlay */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-white/5 backdrop-blur-xl rounded-full border border-white/10 text-[9px] mono uppercase tracking-[0.2em] text-white/40 pointer-events-none z-50 shadow-2xl">
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-[var(--bg-soft)] backdrop-blur-sm rounded-full border border-[var(--border-subtle)] text-[9px] mono uppercase tracking-[0.2em] text-white/40 pointer-events-none z-50 shadow-2xl">
                 {layoutMode === 'infinite' ? 'Infinite Canvas Grid' : 'Standard Grid View'}
             </div>
         </div>

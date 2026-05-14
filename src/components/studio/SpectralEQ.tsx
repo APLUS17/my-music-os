@@ -516,13 +516,13 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
         <button
           disabled={!anyActive}
           onClick={resetAll}
-          className="text-xs font-mono uppercase tracking-[0.2em] text-white/30 hover:text-white/70 disabled:opacity-20 disabled:cursor-not-allowed transition-colors px-2 py-0.5 rounded border border-white/10 hover:border-white/20"
+          className="text-xs font-mono uppercase tracking-[0.2em] text-white/30 hover:text-white/70 disabled:opacity-20 disabled:cursor-not-allowed transition-colors px-2 py-0.5 rounded border border-[var(--border-subtle)] hover:border-[var(--border-strong)]"
         >
           RESET
         </button>
       </div>
 
-      <div className="h-52 min-h-[13rem] bg-black/40 rounded-3xl overflow-hidden border border-white/5 touch-none">
+      <div className="h-52 min-h-[13rem] bg-black/40 rounded-3xl overflow-hidden border border-[var(--border-subtle)] touch-none">
         <canvas
           ref={canvasRef}
           className="w-full h-full cursor-grab active:cursor-grabbing"

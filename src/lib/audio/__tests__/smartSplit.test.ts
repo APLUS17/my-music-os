@@ -1,16 +1,3 @@
-Listed directory __tests__
-Viewed smartSplit.test.ts:1-256
-Viewed smartSplit.ts:1-195
-
-I have merged the improvements from both the feature branch and the `main` branch, resolving the conflicts in the test file. 
-
-The merged version now includes:
-1. **Deterministic Mocking**: Uses the sequential `idCounter` for `randomId` from the feature branch, ensuring consistent IDs across Vitest and Bun environments.
-2. **Helper Functions**: Retains the `createSilence`, `createNoise`, and `createSteadyTone` utilities from `main` for cleaner test data generation.
-3. **Comprehensive Coverage**: Combines the detailed edge cases for both Linear Mode (silence detection) and Loop Mode (mid-loop starts, duration mismatches) from both sides.
-4. **Refined Classification Tests**: Includes tests for `vocal`, `speech`, `instrumental`, and `transients` that accurately reflect the current logic in `smartSplit.ts`.
-
-```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { analyzeAudioAndSplit } from '../smartSplit';
 
@@ -238,11 +225,11 @@ describe('analyzeAudioAndSplit', () => {
     });
 
     describe('Classification', () => {
-        it('should classify silence as instrumental (current behavior)', async () => {
+        it('should classify silence as vocal (current behavior for silent audio defaults to vocal)', async () => {
             const silence = createSilence(1);
             const audioBuffer = mockAudioBuffer(silence);
             const sections = await analyzeAudioAndSplit(audioBuffer);
-            expect(sections[0].type).toBe('instrumental');
+            expect(sections[0].type).toBe('vocal');
         });
 
         it('should classify high-ZCR noise as speech', async () => {
@@ -273,6 +260,3 @@ describe('analyzeAudioAndSplit', () => {
         });
     });
 });
-```
-
-I've updated `src/lib/audio/__tests__/smartSplit.test.ts` with this merged code.

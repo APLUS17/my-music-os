@@ -354,7 +354,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
         return (
             <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
+                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 surface">
                     <button
                         onClick={() => setActiveRitual(null)}
                         className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
@@ -473,7 +473,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border-main)] glass">
+                <div className="p-6 border-t border-[var(--border-main)] surface">
                     <button
                         onClick={handleCompleteRitual}
                         className="w-full py-4 rounded-xl font-medium bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 transition-opacity"
@@ -491,7 +491,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
         return (
             <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 glass">
+                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 surface">
                     <button
                         onClick={() => setSelectedCategory(null)}
                         className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
@@ -572,7 +572,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
     return (
         <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-            <header className="px-6 py-8 border-b border-[var(--border-main)] glass z-10 sticky top-0 flex items-center justify-between">
+            <header className="px-6 py-8 border-b border-[var(--border-main)] surface z-10 sticky top-0 flex items-center justify-between">
                 <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
                 <button
                     onClick={() => setShowFilters(!showFilters)}
@@ -583,7 +583,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
             </header>
 
             <div className={`overflow-hidden transition-all duration-200 ${showFilters ? 'max-h-12' : 'max-h-0'}`}>
-                <div className="px-6 py-3 border-b border-[var(--border-main)] glass sticky top-[80px] z-10">
+                <div className="px-6 py-3 border-b border-[var(--border-main)] surface sticky top-[80px] z-10">
                     <div className="flex gap-2 overflow-x-auto pb-2">
                         <button
                             onClick={() => setFilterCategory(null)}
