@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
+import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
@@ -397,6 +398,28 @@ const StudioWorkspace: React.FC = () => {
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes' | 'player'>('lyrics');
+    const [showSyllables, setShowSyllables] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('lyriq_show_syllables') === 'true';
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lyriq_show_syllables', String(showSyllables));
+    }, [showSyllables]);
+
+    const totalSyllables = useMemo(() => {
+        return sections.reduce((sum, s) => sum + countSyllables(s.text), 0);
+    }, [sections]);
+
+    const totalLines = useMemo(() => {
+        return sections.reduce((sum, s) => {
+            if (!s.text) return sum;
+            return sum + s.text.split('\n').length;
+        }, 0);
+    }, [sections]);
+
     const [splitEditorOpen, setSplitEditorOpen] = useState(false);
     const [recordingToSplit, setRecordingToSplit] = useState<string | null>(null);
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1737,10 +1760,24 @@ const StudioWorkspace: React.FC = () => {
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Toggle For Tabs */}
-                            <div className="flex items-center border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
-                                <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
-                                <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
+                            <div className="flex items-center justify-between border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
+                                <div className="flex items-center">
+                                    <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
+                                    <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
+                                    <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
+                                </div>
+                                <button
+                                    onClick={() => setShowSyllables(!showSyllables)}
+                                    className={cn(
+                                        "w-8 h-8 rounded-full border flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
+                                        showSyllables 
+                                            ? "bg-[var(--accent)] border-[var(--accent)] text-black font-bold shadow-[0_0_10px_var(--accent)]/30" 
+                                            : "bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)]"
+                                    )}
+                                    title="Toggle Syllables Editor"
+                                >
+                                    T
+                                </button>
                             </div>
 
                             {/* Player Tab — full height, no scroll padding */}
@@ -1882,6 +1919,17 @@ const StudioWorkspace: React.FC = () => {
                                                             exit={{ opacity: 0 }}
                                                             className="space-y-12"
                                                         >
+                                                            {showSyllables && (
+                                                                <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] pb-3 border-b border-[var(--border-main)]/30 mb-6">
+                                                                    <div className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer select-none">
+                                                                        <span>Notes</span>
+                                                                        <ChevronDown size={12} className="opacity-70" />
+                                                                    </div>
+                                                                    <div className="tabular-nums font-bold">
+                                                                        {totalSyllables} syllables · {totalLines} lines
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                             {sections.map((section, idx) => (
                                                                 <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                     <LyricCard
@@ -1889,6 +1937,7 @@ const StudioWorkspace: React.FC = () => {
                                                                         onUpdate={updateSection}
                                                                         onDelete={deleteSection}
                                                                         onMove={moveSection}
+                                                                        showSyllables={showSyllables}
                                                                     />
                                                                 </motion.div>
                                                             ))}
