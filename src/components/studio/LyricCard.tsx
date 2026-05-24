@@ -181,28 +181,31 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-4 py-3 rounded-xl border transition-all duration-300 border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]",
       isFocused && "bg-[var(--bg-secondary)] border-[var(--shark-blue-dim)] shadow-md"
     )}>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] hover:text-white transition-all font-medium active:scale-95 cursor-pointer"
           >
             {section.type}
             <ChevronDown size={10} className="opacity-70" />
           </button>
 
-          <div className="flex items-center gap-1">
-            <span className="text-xs mono text-[var(--text-tertiary)] tabular-nums opacity-50 font-bold">x{section.repeats}</span>
-            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono text-[var(--text-secondary)] font-medium select-none">
+            <span className="tabular-nums font-bold text-[var(--text-main)]">x{section.repeats}</span>
+            <span className="w-[1px] h-3 bg-[var(--border-main)] mx-0.5" />
+            <div className="flex items-center gap-1.5">
               <button 
                 onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: section.repeats + 1 }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors hover:scale-110 active:scale-95 cursor-pointer"
+                title="Increase repeats"
               >
                 <Plus size={10} />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors hover:scale-110 active:scale-95 cursor-pointer"
+                title="Decrease repeats"
               >
                 <Minus size={10} />
               </button>
@@ -211,12 +214,29 @@ export const LyricCard: React.FC<LyricCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center mr-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
-            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
+          <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-md px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <button 
+              onClick={() => onMove(section.id, 'up')} 
+              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90 cursor-pointer"
+              title="Move up"
+            >
+              <ChevronUp size={12} />
+            </button>
+            <span className="w-[1px] h-3 bg-[var(--border-main)] mx-0.5" />
+            <button 
+              onClick={() => onMove(section.id, 'down')} 
+              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90 cursor-pointer"
+              title="Move down"
+            >
+              <ChevronDown size={12} />
+            </button>
           </div>
-          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110 active:scale-90">
-            <X size={14} />
+          <button 
+            onClick={() => onDelete(section.id)} 
+            className="p-1 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
+            title="Delete section"
+          >
+            <X size={12} />
           </button>
         </div>
       </div>

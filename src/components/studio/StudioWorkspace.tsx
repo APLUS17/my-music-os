@@ -349,6 +349,20 @@ const MISSION_PROJECT: SavedProject = {
     beats: []
 };
 
+const CATEGORIES = [
+    'Notes',
+    'Song Titles',
+    'Song Ideas + Concepts',
+    'Arrangement',
+    'Sample This',
+    'Moods',
+    'BPM',
+    'Genre/Style',
+    'Epiphanies',
+    'Chord Progressions',
+    'Lyrics'
+];
+
 const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
     const [theme, setTheme] = useState<Theme>('dark');
@@ -391,6 +405,10 @@ const StudioWorkspace: React.FC = () => {
     ]);
     const [scraps, setScraps] = useState<LyricScrap[]>([]);
 
+    const [activeCategory, setActiveCategory] = useState<string>('Notes');
+    const [categorySections, setCategorySections] = useState<Record<string, LyricSection[]>>({});
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+
 
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
 
@@ -408,6 +426,29 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('lyriq_show_syllables', String(showSyllables));
     }, [showSyllables]);
+
+    // Sync sections edits to categorySections
+    useEffect(() => {
+        setCategorySections(prev => ({
+            ...prev,
+            [activeCategory]: sections
+        }));
+    }, [sections, activeCategory]);
+
+    const handleSelectCategory = (newCategory: string) => {
+        if (newCategory === activeCategory) {
+            setIsCategoryDropdownOpen(false);
+            return;
+        }
+
+        const newSections = categorySections[newCategory] && categorySections[newCategory].length > 0
+            ? categorySections[newCategory]
+            : [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+
+        setSections(newSections);
+        setActiveCategory(newCategory);
+        setIsCategoryDropdownOpen(false);
+    };
 
     const totalSyllables = useMemo(() => {
         return sections.reduce((sum, s) => sum + countSyllables(s.text), 0);
@@ -696,6 +737,26 @@ const StudioWorkspace: React.FC = () => {
                 try {
                     const parsed = JSON.parse(savedData);
 
+                    const activeCat = parsed.activeCategory || 'Notes';
+                    setActiveCategory(activeCat);
+
+                    let activeCatSections = parsed.sections || [];
+                    if (parsed.categorySections) {
+                        setCategorySections(parsed.categorySections);
+                        activeCatSections = parsed.categorySections[activeCat] || [];
+                    } else {
+                        const newCategorySections: Record<string, LyricSection[]> = {};
+                        CATEGORIES.forEach(cat => {
+                            if (cat === 'Lyrics') {
+                                newCategorySections[cat] = parsed.sections || [];
+                            } else {
+                                 newCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+                            }
+                        });
+                        setCategorySections(newCategorySections);
+                        activeCatSections = newCategorySections[activeCat] || [];
+                    }
+
                     // Migration: clear old mock text from mission project
                     if (parsed.sections && parsed.sections.some((s: LyricSection) =>
                         s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
@@ -703,8 +764,10 @@ const StudioWorkspace: React.FC = () => {
                         // Old mock text detected, reset to empty
                         setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
                         setProjectTitle('');
+                        setActiveCategory('Notes');
+                        setCategorySections({});
                     } else if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
-                        setSections(parsed.sections);
+                        setSections(activeCatSections);
                         if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     } else {
                         // Default to empty project
@@ -786,11 +849,19 @@ const StudioWorkspace: React.FC = () => {
             setSaveIndicator('saving');
             const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
             const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            
+            const currentCategorySections = {
+                ...categorySections,
+                [activeCategory]: sections
+            };
+
             const dataToSave = {
                 sections, scraps, savedProjects,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
-                activeProjectId, uploadedBeatId
+                activeProjectId, uploadedBeatId,
+                categorySections: currentCategorySections,
+                activeCategory
             };
             try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
             catch (e) { console.error("Storage full or error", e); }
@@ -802,7 +873,7 @@ const StudioWorkspace: React.FC = () => {
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats, categorySections, activeCategory]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -823,7 +894,8 @@ const StudioWorkspace: React.FC = () => {
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 
-        const lyricsContextString = sections.map(s => `[${s.type}]: ${s.text}`).join('\n');
+        const lyricsSections = categorySections['Lyrics'] || sections;
+        const lyricsContextString = lyricsSections.map(s => `[${s.type}]: ${s.text}`).join('\n');
         const structurePromise = analyzeAudioStructure(base64, lyricsContextString);
 
         await saveAudioData(id, base64);
@@ -1126,13 +1198,38 @@ const StudioWorkspace: React.FC = () => {
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
         const projectSessions = sessions.filter(s => !s.projectId || s.projectId === activeProjectId);
+
+        // Keep categorySections up to date with the latest active sections before archiving
+        const updatedCategorySections = {
+            ...categorySections,
+            [activeCategory]: sections
+        };
+
+        // Always save the 'Lyrics' sections in the root sections property for compatibility
+        const primarySections = updatedCategorySections['Lyrics'] || [];
+
         const newProject: SavedProject = {
-            id: randomId(),
+            id: activeProjectId || randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
-            sections, scraps, sessions: projectSessions, beats: []
+            sections: primarySections,
+            scraps,
+            sessions: projectSessions,
+            beats: [],
+            categorySections: updatedCategorySections,
+            activeCategory: activeCategory
         };
-        setSavedProjects(prev => [newProject, ...prev]);
+
+        setSavedProjects(prev => {
+            const index = prev.findIndex(p => p.id === newProject.id);
+            if (index !== -1) {
+                const updated = [...prev];
+                updated[index] = newProject;
+                return updated;
+            } else {
+                return [newProject, ...prev];
+            }
+        });
     };
 
     const handleStartFromScrap = (text: string, type: SectionType) => {
@@ -1178,7 +1275,7 @@ const StudioWorkspace: React.FC = () => {
             setIsPlaying(false);
             setIsBeatPlaying(false);
 
-            setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
+            setSections([{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }]);
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
@@ -1186,6 +1283,10 @@ const StudioWorkspace: React.FC = () => {
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
+
+            setActiveCategory('Notes');
+            setCategorySections({});
+            setIsCategoryDropdownOpen(false);
         }
     };
 
@@ -1198,6 +1299,8 @@ const StudioWorkspace: React.FC = () => {
             setIsBeatPlaying(false);
 
             archiveCurrentProject();
+            
+            // Reset workspace
             setSections([]); // Empty for Flow mode
             setScraps([]);
             setSessions([]);
@@ -1207,6 +1310,11 @@ const StudioWorkspace: React.FC = () => {
             setUploadedBeat(null);
             setUploadedBeatName("");
             setActiveProjectId(null);
+            
+            setActiveCategory('Notes');
+            setCategorySections({});
+            setIsCategoryDropdownOpen(false);
+
             setViewMode('studio');
             setStudioMode('flow');
             setFabOpen(false);
@@ -1221,8 +1329,23 @@ const StudioWorkspace: React.FC = () => {
             setIsPlaying(false);
             setIsBeatPlaying(false);
 
-            const hasSections = p.sections && p.sections.length > 0;
-            setSections(p.sections || []);
+            const activeCat = p.activeCategory || 'Notes';
+            setActiveCategory(activeCat);
+
+            const initialCategorySections = p.categorySections || {};
+            CATEGORIES.forEach(cat => {
+                if (!initialCategorySections[cat]) {
+                    if (cat === 'Lyrics' && p.sections && p.sections.length > 0) {
+                        initialCategorySections[cat] = p.sections;
+                    } else {
+                        initialCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+                    }
+                }
+            });
+
+            setCategorySections(initialCategorySections);
+            setSections(initialCategorySections[activeCat]);
+
             setScraps(p.scraps || []);
             setSessions(p.sessions || []);
             setActiveSessionId(null);
@@ -1232,7 +1355,7 @@ const StudioWorkspace: React.FC = () => {
             setUploadedBeatName(p.beats?.[0]?.name || "");
             setActiveProjectId(p.id);
             setViewMode('studio');
-            setStudioMode(hasSections ? 'write' : 'flow');
+            setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
             setShowSearch(false);
         }
     };
@@ -1797,7 +1920,7 @@ const StudioWorkspace: React.FC = () => {
                                         isBeatLooping={isBeatLooping}
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}
-                                        lyrics={sections}
+                                        lyrics={categorySections['Lyrics'] || []}
                                         isAnalyzingVocal={isAnalyzingVocal}
                                         isAnalyzingBeat={isAnalyzingBeat}
 
@@ -1919,17 +2042,48 @@ const StudioWorkspace: React.FC = () => {
                                                             exit={{ opacity: 0 }}
                                                             className="space-y-12"
                                                         >
-                                                            {showSyllables && (
-                                                                <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] pb-3 border-b border-[var(--border-main)]/30 mb-6">
-                                                                    <div className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer select-none">
-                                                                        <span>Notes</span>
-                                                                        <ChevronDown size={12} className="opacity-70" />
-                                                                    </div>
-                                                                    <div className="tabular-nums font-bold">
-                                                                        {totalSyllables} syllables · {totalLines} lines
-                                                                    </div>
+                                                            <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] pb-3 border-b border-[var(--border-main)]/30 mb-6 relative">
+                                                                <div className="relative">
+                                                                    <button
+                                                                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                                                                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer select-none font-bold text-sm text-[var(--text-secondary)] py-1 bg-transparent border-none outline-none"
+                                                                    >
+                                                                        <span className="text-[var(--text-main)] font-semibold">{activeCategory}</span>
+                                                                        <ChevronDown size={14} className={cn("opacity-70 transition-transform duration-300", isCategoryDropdownOpen && "rotate-180")} />
+                                                                    </button>
+                                                                    
+                                                                    {isCategoryDropdownOpen && (
+                                                                        <>
+                                                                            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsCategoryDropdownOpen(false)} />
+                                                                            <div className="absolute left-0 mt-2 w-64 bg-[#141414]/95 backdrop-blur-md border border-[var(--border-main)] rounded-xl shadow-2xl z-50 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                                <div className="px-3 py-1 text-[10px] tracking-wider text-[var(--text-tertiary)] uppercase font-semibold border-b border-[var(--border-main)]/30 mb-1">
+                                                                                    Select Category
+                                                                                </div>
+                                                                                {CATEGORIES.map(category => (
+                                                                                    <button
+                                                                                        key={category}
+                                                                                        onClick={() => handleSelectCategory(category)}
+                                                                                        className={cn(
+                                                                                            "w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center justify-between cursor-pointer",
+                                                                                            activeCategory === category 
+                                                                                                ? "text-[var(--accent)] bg-[var(--accent)]/10 font-bold font-semibold" 
+                                                                                                : "text-[var(--text-secondary)] hover:text-white hover:bg-white/5"
+                                                                                        )}
+                                                                                    >
+                                                                                        <span>{category}</span>
+                                                                                        {activeCategory === category && (
+                                                                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+                                                                                        )}
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                        </>
+                                                                    )}
                                                                 </div>
-                                                            )}
+                                                                <div className="tabular-nums font-bold">
+                                                                    {showSyllables ? `${totalSyllables} syllables · ` : ''}{totalLines} lines
+                                                                </div>
+                                                            </div>
                                                             {sections.map((section, idx) => (
                                                                 <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                     <LyricCard
