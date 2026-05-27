@@ -1,31 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { FXSettings } from '@/components/studio/FXPanel';
-
-// Cached impulse response to avoid recreation
-const impulseCache = new Map<string, AudioBuffer>();
-
-function createReverbImpulse(context: AudioContext, duration: number, decay: number) {
-  const key = `${context.sampleRate}-${duration}-${decay}`;
-  if (impulseCache.has(key)) {
-    return impulseCache.get(key)!;
-  }
-
-  const sampleRate = context.sampleRate;
-  const length = sampleRate * duration;
-  const impulse = context.createBuffer(2, length, sampleRate);
-
-  const left = impulse.getChannelData(0);
-  const right = impulse.getChannelData(1);
-
-  for (let i = 0; i < length; i++) {
-    const val = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
-    left[i] = val;
-    right[i] = val;
-  }
-
-  impulseCache.set(key, impulse);
-  return impulse;
-}
+import { createReverbImpulse } from '@/lib/audio/reverb';
 
 export function useVocalFX(
   audioRef: React.RefObject<HTMLAudioElement | null>,
@@ -50,7 +25,7 @@ export function useVocalFX(
   const masterGainRef = useRef<GainNode | null>(null);
   const limiterRef = useRef<DynamicsCompressorNode | null>(null);
 
-  const isInitializedRef = useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const nodesRef = useRef<AudioNode[]>([]);
 
   // Cleanup function
@@ -87,12 +62,12 @@ export function useVocalFX(
     reverbWetRef.current = null;
     masterGainRef.current = null;
     limiterRef.current = null;
-    isInitializedRef.current = false;
+    setIsInitialized(false);
   }, []);
 
   // Initialization
   const initFX = useCallback(() => {
-    if (!audioRef.current || isInitializedRef.current) return;
+    if (!audioRef.current || isInitialized) return;
 
     try {
       // Check if audio element is ready
@@ -213,24 +188,24 @@ export function useVocalFX(
       masterGain.connect(limiter);
       limiter.connect(ctx.destination);
 
-      isInitializedRef.current = true;
+      setIsInitialized(true);
     } catch (err) {
       console.error('Error initializing FX:', err);
       cleanupFX();
     }
-  }, [audioRef, cleanupFX]);
+  }, [audioRef, cleanupFX, isInitialized]);
 
   // Handle active state
   useEffect(() => {
-    if (isActive && !isInitializedRef.current && audioRef.current) {
+    if (isActive && !isInitialized && audioRef.current) {
       initFX();
     }
-  }, [isActive, initFX, audioRef]);
+  }, [isActive, initFX, audioRef, isInitialized]);
 
   // Suspend/Resume based on isPlaying and isActive
   useEffect(() => {
     const ctx = contextRef.current;
-    if (!ctx) return;
+    if (!ctx || !isInitialized) return;
 
     if (isActive && isPlaying) {
       if (ctx.state === 'suspended') {
@@ -241,12 +216,12 @@ export function useVocalFX(
         ctx.suspend().catch(err => console.warn('Could not suspend AudioContext:', err));
       }
     }
-  }, [isActive, isPlaying]);
+  }, [isActive, isPlaying, isInitialized]);
 
   // Handle seeks/scrubbing by clearing delay/reverb buffers when a time jump occurs
   const lastTimeRef = useRef(currentTime);
   useEffect(() => {
-    if (!isInitializedRef.current || !isActive) {
+    if (!isInitialized || !isActive) {
       lastTimeRef.current = currentTime;
       return;
     }
@@ -294,11 +269,11 @@ export function useVocalFX(
     }
 
     lastTimeRef.current = currentTime;
-  }, [currentTime, isActive, settings]);
+  }, [currentTime, isActive, settings, isInitialized]);
 
   // Apply settings
   useEffect(() => {
-    if (!isInitializedRef.current) return;
+    if (!isInitialized) return;
 
     try {
       if (eqLowRef.current) eqLowRef.current.gain.value = settings.eqLow;
@@ -321,7 +296,7 @@ export function useVocalFX(
     } catch (err) {
       console.warn('Error applying FX settings:', err);
     }
-  }, [settings]);
+  }, [settings, isInitialized]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -330,5 +305,5 @@ export function useVocalFX(
     };
   }, [cleanupFX]);
 
-  return { isInitialized: isInitializedRef.current };
+  return { isInitialized };
 }
