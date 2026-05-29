@@ -161,7 +161,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
             {/* The Tooltip/Card */}
             <div
-                className="absolute flex flex-col p-8 rounded-3xl bg-[#121212] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
+                className="absolute flex flex-col p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
                 style={{
                     top: isWelcome
                         ? '50%'
@@ -178,7 +178,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
             >
                 <div className="mb-6">
                     <span className="text-xs mono uppercase tracking-wide text-[var(--accent)] mb-2 block">Step {currentStep + 1} of {STEPS.length}</span>
-                    <h3 className="text-xl font-bold text-white mb-3 tracking-tight">{params.title}</h3>
+                    <h3 className="text-xl font-bold text-[var(--text-main)] mb-3 tracking-tight">{params.title}</h3>
                     <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">{params.content}</p>
                 </div>
 
@@ -196,14 +196,14 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                         {currentStep > 0 && (
                             <button
                                 onClick={handleBack}
-                                className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-hover)] transition-all"
+                                className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition-all"
                             >
                                 <ChevronLeft size={18} strokeWidth={2.5} />
                             </button>
                         )}
                         <button
                             onClick={handleNext}
-                            className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wide hover:scale-105 active:scale-95 transition-all shadow-xl"
+                            className="flex items-center gap-2 bg-[var(--text-main)] text-[var(--bg-main)] px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wide hover:scale-105 active:scale-95 transition-all shadow-md"
                         >
                             {currentStep === STEPS.length - 1 ? 'Start' : 'Next'}
                             {currentStep === STEPS.length - 1 ? <Check size={14} strokeWidth={3} /> : <ChevronRight size={14} strokeWidth={3} />}

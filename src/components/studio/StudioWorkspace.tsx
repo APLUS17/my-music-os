@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2, Bookmark } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -1689,16 +1689,16 @@ const StudioWorkspace: React.FC = () => {
                             <div className="flex-1 flex flex-col overflow-hidden px-4">
                                 <div className="mb-4">
                                     {/* Segmented Control Switcher */}
-                                    <div className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/5 p-1 rounded-full flex gap-1 shadow-inner">
+                                    <div className="w-full bg-[var(--bg-secondary)] backdrop-blur-md border border-[var(--border-main)] p-1 rounded-full flex gap-1 shadow-inner">
                                         <button
                                             onClick={() => setLibraryTab('songs')}
-                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                                         >
                                             Songs
                                         </button>
                                         <button
                                             onClick={() => setLibraryTab('beats')}
-                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'beats' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'beats' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                                         >
                                             Beats
                                         </button>
@@ -1706,121 +1706,133 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {/* Display Saved Projects as cards when Songs tab is active */}
-                                        {libraryTab === 'songs' && savedProjects.map((p, index) => {
-                                            // Conic gradient colors based on project ID index to give variation
-                                            const gradients = [
-                                                'from-purple-900 to-indigo-950',
-                                                'from-emerald-900 to-teal-950',
-                                                'from-rose-900 to-amber-950',
-                                                'from-cyan-900 to-blue-950',
-                                                'from-fuchsia-900 to-purple-950'
-                                            ];
-                                            const gradientClass = gradients[index % gradients.length];
+                                    {libraryTab === 'songs' ? (
+                                        <div className="columns-2 gap-4 space-y-4 [column-fill:_balance] w-full">
+                                            {savedProjects.map((p, index) => {
+                                                const lyricPreview = p.sections
+                                                    ?.map(s => s.text)
+                                                    .filter(Boolean)
+                                                    .join('\n')
+                                                    .split('\n')
+                                                    .filter(line => line.trim())
+                                                    .slice(0, 3)
+                                                    .join('\n');
 
-                                            return (
-                                                <div key={p.id} className="flex flex-col gap-2 group relative">
+                                                return (
                                                     <div
+                                                        key={p.id}
                                                         onClick={() => loadProject(p)}
-                                                        className={`aspect-square w-full rounded-2xl bg-gradient-to-tr ${gradientClass} border border-white/5 relative overflow-hidden shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                        className="break-inside-avoid mb-4 w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:bg-[var(--bg-hover)] p-4 flex flex-col justify-between shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all relative group"
                                                     >
-                                                        {/* Sleek metallic cone/radial reflection mockup using gradient */}
-                                                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-black/40 mix-blend-overlay" />
+                                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                                            <h3 className="text-xs font-bold text-[var(--text-main)] tracking-tight line-clamp-2 pr-4">{p.name || "Untitled Project"}</h3>
+                                                            <Bookmark size={14} className="text-[var(--accent)] shrink-0 opacity-80" />
+                                                        </div>
                                                         
-                                                        {/* Play Button Overlay */}
-                                                        <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-90 transition-all hover:bg-white/25 active:scale-90">
-                                                            <Play size={12} fill="currentColor" className="ml-0.5" />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start justify-between px-1">
-                                                        <div className="min-w-0">
-                                                            <h3 className="text-xs font-semibold text-white truncate">{p.name || "Untitled Project"}</h3>
-                                                            <span className="text-[10px] text-zinc-500 font-medium tracking-wide">{p.lastModified}</span>
-                                                        </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (confirm(`Delete "${p.name || 'Untitled Project'}"?`)) {
-                                                                    deleteProject(p.id);
-                                                                }
-                                                            }}
-                                                            className="text-zinc-500 hover:text-white p-1"
-                                                        >
-                                                            <span className="text-sm font-bold leading-none">···</span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {/* Display Beats as cards when Beats tab is active */}
-                                        {libraryTab === 'beats' && beats.map((beat, index) => {
-                                            const gradients = [
-                                                'from-zinc-900 to-zinc-950',
-                                                'from-stone-900 to-zinc-950'
-                                            ];
-                                            const gradientClass = gradients[index % gradients.length];
-                                            const isPlaying = playingBeatId === beat.id;
+                                                        {lyricPreview ? (
+                                                            <p className="text-[10px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-3 whitespace-pre-wrap flex-1 mb-3">
+                                                                "{lyricPreview}"
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-[10px] text-[var(--text-tertiary)] italic leading-relaxed flex-1 mb-3">
+                                                                No lyrics written yet...
+                                                            </p>
+                                                        )}
 
-                                            return (
-                                                <div key={beat.id} className="flex flex-col gap-2 group relative">
-                                                    <div
-                                                        onClick={() => handleStartProjectFromBeat(beat)}
-                                                        className="aspect-square w-full relative group"
-                                                    >
-                                                        {/* Silvery Metallic Vinyl Record */}
-                                                        <motion.div
-                                                            animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
-                                                            transition={isPlaying ? { repeat: Infinity, duration: 4, ease: "linear" } : { duration: 0.5 }}
-                                                            className={`w-full h-full rounded-full bg-[conic-gradient(from_0deg,_#a1a1aa,_#e4e4e7,_#71717a,_#e4e4e7,_#a1a1aa)] border ${isPlaying ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-white/15'} relative overflow-hidden flex items-center justify-center shadow-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
-                                                        >
-                                                            {/* Grooves */}
-                                                            <div className="absolute inset-1.5 rounded-full border border-black/15" />
-                                                            <div className="absolute inset-4 rounded-full border border-black/15" />
-                                                            <div className="absolute inset-7 rounded-full border border-black/10" />
-                                                            <div className="absolute inset-10 rounded-full border border-black/10" />
-                                                            <div className="absolute inset-13 rounded-full border border-black/5" />
-                                                            <div className="absolute inset-16 rounded-full border border-black/5" />
-                                                            
-                                                            {/* Center Label (Colored vinyl label) */}
-                                                            <div className="w-1/3 h-1/3 rounded-full bg-zinc-800 border border-black/30 flex items-center justify-center relative shadow-inner">
-                                                                {/* Spindle hole */}
-                                                                <div className="w-3 h-3 rounded-full bg-black border border-zinc-700 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]" />
+                                                        <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5 mt-auto">
+                                                            <span className="text-[9px] text-[var(--text-tertiary)] font-medium tracking-wide">{p.lastModified}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (confirm(`Delete "${p.name || 'Untitled Project'}"?`)) {
+                                                                            deleteProject(p.id);
+                                                                        }
+                                                                    }}
+                                                                    className="text-[var(--text-tertiary)] hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-colors"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                                <div className="w-6 h-6 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow hover:scale-105 active:scale-95 transition-all">
+                                                                    <Play size={10} fill="currentColor" className="ml-0.5" />
+                                                                </div>
                                                             </div>
-                                                        </motion.div>
-                                                        
-                                                        {/* Play Button Overlay */}
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handlePlayBeat(beat.id);
-                                                            }}
-                                                            className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
-                                                        >
-                                                            {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-                                                        </button>
-                                                    </div>
-                                                    <div className="flex items-start justify-between px-1">
-                                                        <div className="min-w-0">
-                                                            <h3 className="text-xs font-semibold text-white truncate">{beat.name}</h3>
-                                                            <span className="text-[10px] text-zinc-500 font-medium tracking-wide">Beat · {beat.duration}</span>
                                                         </div>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                if (confirm(`Delete "${beat.name}"?`)) {
-                                                                    handleDeleteBeat(beat.id);
-                                                                }
-                                                            }}
-                                                            className="text-zinc-500 hover:text-white p-1"
-                                                        >
-                                                            <span className="text-sm font-bold leading-none">···</span>
-                                                        </button>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {beats.map((beat, index) => {
+                                                const gradients = [
+                                                    'from-zinc-900 to-zinc-950',
+                                                    'from-stone-900 to-zinc-950'
+                                                ];
+                                                const gradientClass = gradients[index % gradients.length];
+                                                const isPlaying = playingBeatId === beat.id;
+
+                                                return (
+                                                    <div key={beat.id} className="flex flex-col gap-2 group relative">
+                                                        <div
+                                                            onClick={() => handleStartProjectFromBeat(beat)}
+                                                            className="aspect-square w-full relative group"
+                                                        >
+                                                            {/* Silvery Metallic Vinyl Record */}
+                                                            <motion.div
+                                                                animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+                                                                transition={isPlaying ? { repeat: Infinity, duration: 4, ease: "linear" } : { duration: 0.5 }}
+                                                                className={`w-full h-full rounded-full bg-[conic-gradient(from_0deg,_#a1a1aa,_#e4e4e7,_#71717a,_#e4e4e7,_#a1a1aa)] border ${isPlaying ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-[var(--border-main)]'} relative overflow-hidden flex items-center justify-center shadow-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                            >
+                                                                {/* Grooves */}
+                                                                <div className="absolute inset-1.5 rounded-full border border-black/15" />
+                                                                <div className="absolute inset-4 rounded-full border border-black/15" />
+                                                                <div className="absolute inset-7 rounded-full border border-black/10" />
+                                                                <div className="absolute inset-10 rounded-full border border-black/10" />
+                                                                <div className="absolute inset-13 rounded-full border border-black/5" />
+                                                                <div className="absolute inset-16 rounded-full border border-black/5" />
+                                                                
+                                                                {/* Center Label (Colored vinyl label) */}
+                                                                <div className="w-1/3 h-1/3 rounded-full bg-zinc-800 border border-black/30 flex items-center justify-center relative shadow-inner">
+                                                                    {/* Spindle hole */}
+                                                                    <div className="w-3 h-3 rounded-full bg-black border border-zinc-700 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]" />
+                                                                </div>
+                                                            </motion.div>
+                                                            
+                                                            {/* Play Button Overlay */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handlePlayBeat(beat.id);
+                                                                }}
+                                                                className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-[var(--border-main)] flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
+                                                            >
+                                                                {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex items-start justify-between px-1">
+                                                            <div className="min-w-0">
+                                                                <h3 className="text-xs font-semibold text-[var(--text-main)] truncate">{beat.name}</h3>
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-medium tracking-wide">Beat · {beat.duration}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (confirm(`Delete "${beat.name}"?`)) {
+                                                                        handleDeleteBeat(beat.id);
+                                                                    }
+                                                                }}
+                                                                className="text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
+                                                            >
+                                                                <span className="text-sm font-bold leading-none">···</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Floating Action Menu Trigger */}
@@ -1955,7 +1967,7 @@ const StudioWorkspace: React.FC = () => {
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
+                        <div className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -1969,7 +1981,7 @@ const StudioWorkspace: React.FC = () => {
                                             />
                                             <button 
                                                 onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
-                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-white transition-colors"
+                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"
                                             >
                                                 <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
                                             </button>
@@ -1994,7 +2006,7 @@ const StudioWorkspace: React.FC = () => {
                                                                         }}
                                                                         className={cn(
                                                                             "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between group",
-                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-white"
+                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)]"
                                                                         )}
                                                                     >
                                                                         <span className="truncate">{p.name || "Untitled"}</span>
@@ -2086,10 +2098,10 @@ const StudioWorkspace: React.FC = () => {
                                 <button
                                     onClick={() => setShowSyllables(!showSyllables)}
                                     className={cn(
-                                        "w-8 h-8 rounded-full border flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
+                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
                                         showSyllables 
-                                            ? "bg-[var(--accent)] border-[var(--accent)] text-black font-bold shadow-[0_0_10px_var(--accent)]/30" 
-                                            : "bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)]"
+                                            ? "text-[var(--accent)] font-bold" 
+                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
                                     )}
                                     title="Toggle Syllables Editor"
                                 >
@@ -2154,130 +2166,88 @@ const StudioWorkspace: React.FC = () => {
                                         {activeTab === 'lyrics' ? (
                                             <>
                                                 <AnimatePresence mode="wait">
-                                                    {studioMode === 'flow' && sections.length === 0 ? (
-                                                        <motion.div 
-                                                            key="flow-canvas"
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-                                                            className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
-                                                        >
-                                                            {/* Abstract Background Shapes */}
-                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                            <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                            
-                                                            <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                                <div className="absolute inset-0 rounded-[40px] border border-white/5" />
-                                                                <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                                
-                                                                {/* Orbiting particles animation */}
-                                                                <motion.div 
-                                                                    animate={{ rotate: 360 }}
-                                                                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                    className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                                />
-                                                            </div>
-
-                                                            <motion.h2 
-                                                                initial={{ opacity: 0, y: 10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.2 }}
-                                                                className="text-4xl font-bold tracking-tight text-white mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60"
-                                                            >
-                                                                Capture the Flow
-                                                            </motion.h2>
-                                                            
-                                                            <motion.p 
-                                                                initial={{ opacity: 0, y: 10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.3 }}
-                                                                className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
-                                                            >
-                                                                Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
-                                                            </motion.p>
-
-                                                            <motion.button
-                                                                initial={{ opacity: 0, y: 20 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.4 }}
-                                                                onClick={addSection}
-                                                                className="px-10 h-14 bg-white text-black rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_50px_rgba(255,255,255,0.2)]"
-                                                            >
-                                                                <Plus size={20} strokeWidth={3} /> Start Writing
-                                                            </motion.button>
-                                                            
-                                                            {/* Optional quick start types */}
+                                                     {sections.length === 0 && showTour ? (
                                                             <motion.div 
-                                                                initial={{ opacity: 0 }}
-                                                                animate={{ opacity: 1 }}
-                                                                transition={{ delay: 0.6 }}
-                                                                className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                key="flow-canvas"
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                                className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                             >
-                                                                <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                                <div className="flex gap-4">
-                                                                    {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                        <button 
-                                                                            key={type}
-                                                                            onClick={addSection}
-                                                                            className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                        >
-                                                                            {type}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </motion.div>
-                                                        </motion.div>
-                                                    ) : (
-                                                        <motion.div 
-                                                            key="write-mode"
-                                                            initial={{ opacity: 0 }}
-                                                            animate={{ opacity: 1 }}
-                                                            exit={{ opacity: 0 }}
-                                                            className="space-y-12"
-                                                        >
-                                                            <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] pb-3 border-b border-[var(--border-main)]/30 mb-6 relative">
-                                                                <div className="relative">
-                                                                    <button
-                                                                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                                                                        className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer select-none font-bold text-sm text-[var(--text-secondary)] py-1 bg-transparent border-none outline-none"
-                                                                    >
-                                                                        <span className="text-[var(--text-main)] font-semibold">{activeCategory}</span>
-                                                                        <ChevronDown size={14} className={cn("opacity-70 transition-transform duration-300", isCategoryDropdownOpen && "rotate-180")} />
-                                                                    </button>
+                                                                {/* Abstract Background Shapes */}
+                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                                <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                                
+                                                                <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                                    <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
+                                                                    <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
                                                                     
-                                                                    {isCategoryDropdownOpen && (
-                                                                        <>
-                                                                            <div className="fixed inset-0 z-40 cursor-default" onClick={() => setIsCategoryDropdownOpen(false)} />
-                                                                            <div className="absolute left-0 mt-2 w-64 bg-[#141414]/95 backdrop-blur-md border border-[var(--border-main)] rounded-xl shadow-2xl z-50 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                                                <div className="px-3 py-1 text-[10px] tracking-wider text-[var(--text-tertiary)] uppercase font-semibold border-b border-[var(--border-main)]/30 mb-1">
-                                                                                    Select Category
-                                                                                </div>
-                                                                                {CATEGORIES.map(category => (
-                                                                                    <button
-                                                                                        key={category}
-                                                                                        onClick={() => handleSelectCategory(category)}
-                                                                                        className={cn(
-                                                                                            "w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center justify-between cursor-pointer",
-                                                                                            activeCategory === category 
-                                                                                                ? "text-[var(--accent)] bg-[var(--accent)]/10 font-bold font-semibold" 
-                                                                                                : "text-[var(--text-secondary)] hover:text-white hover:bg-white/5"
-                                                                                        )}
-                                                                                    >
-                                                                                        <span>{category}</span>
-                                                                                        {activeCategory === category && (
-                                                                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
-                                                                                        )}
-                                                                                    </button>
-                                                                                ))}
-                                                                            </div>
-                                                                        </>
-                                                                    )}
+                                                                    {/* Orbiting particles animation */}
+                                                                    <motion.div 
+                                                                        animate={{ rotate: 360 }}
+                                                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                        className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                    />
                                                                 </div>
-                                                                <div className="tabular-nums font-bold">
-                                                                    {showSyllables ? `${totalSyllables} syllables · ` : ''}{totalLines} lines
-                                                                </div>
-                                                            </div>
+
+                                                                <motion.h2 
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.2 }}
+                                                                    className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
+                                                                >
+                                                                    Capture the Flow
+                                                                </motion.h2>
+                                                                
+                                                                <motion.p 
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.3 }}
+                                                                    className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                >
+                                                                    Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                                </motion.p>
+
+                                                                <motion.button
+                                                                    initial={{ opacity: 0, y: 20 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.4 }}
+                                                                    onClick={addSection}
+                                                                    className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                                                >
+                                                                    <Plus size={20} strokeWidth={3} /> Start Writing
+                                                                </motion.button>
+                                                                
+                                                                {/* Optional quick start types */}
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    transition={{ delay: 0.6 }}
+                                                                    className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                >
+                                                                    <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                                    <div className="flex gap-4">
+                                                                        {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                            <button 
+                                                                                key={type}
+                                                                                onClick={addSection}
+                                                                                className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                            >
+                                                                                {type}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </motion.div>
+                                                            </motion.div>
+                                                     ) : (
+                                                         <motion.div 
+                                                             key="write-mode"
+                                                             initial={{ opacity: 0 }}
+                                                             animate={{ opacity: 1 }}
+                                                             exit={{ opacity: 0 }}
+                                                             className="space-y-12"
+                                                         >
                                                             {sections.map((section, idx) => (
                                                                 <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                     <LyricCard
@@ -2385,10 +2355,10 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 bg-black/60 backdrop-blur-xl border border-white/10 px-6 py-2.5 rounded-full flex items-center gap-8 shadow-[0_12px_40px_rgba(0,0,0,0.6)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2.5 flex items-center gap-8 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
                     <button
                         onClick={() => setViewMode('collection')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                         title="Library"
                     >
                         <Library className="h-6 w-6" />
@@ -2410,7 +2380,7 @@ const StudioWorkspace: React.FC = () => {
                     ) : (
                         <button
                             onClick={() => setViewMode('studio')}
-                            className="p-2 rounded-full transition-all active:scale-95 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                            className="p-2 rounded-full transition-all active:scale-95 text-[var(--text-secondary)] hover:text-[var(--text-main)] cursor-pointer"
                             title="Studio"
                         >
                             <Disc className="h-6 w-6" />
@@ -2418,7 +2388,7 @@ const StudioWorkspace: React.FC = () => {
                     )}
                     <button
                         onClick={() => setViewMode('vault')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                         title="Virtual Vault"
                     >
                         <History className="h-6 w-6" />
