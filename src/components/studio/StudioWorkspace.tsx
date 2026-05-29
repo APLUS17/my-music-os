@@ -1681,7 +1681,27 @@ const StudioWorkspace: React.FC = () => {
                             // Populated State (Packs Grid View)
                             <div className="flex-1 flex flex-col overflow-hidden px-6">
                                 <div className="mb-4">
-                                    <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Packs</h1>
+                                    <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Beats</h1>
+                                    <div className="flex border-b border-white/5 mb-4">
+                                        <button
+                                            onClick={() => setLibraryTab('songs')}
+                                            className={`pb-2 pr-6 text-sm font-semibold transition-all relative ${libraryTab === 'songs' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Songs
+                                            {libraryTab === 'songs' && (
+                                                <motion.div layoutId="lib-tab-indicator" className="absolute bottom-0 left-0 right-6 h-0.5 bg-[var(--accent)]" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setLibraryTab('beats')}
+                                            className={`pb-2 px-6 text-sm font-semibold transition-all relative ${libraryTab === 'beats' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        >
+                                            Beats
+                                            {libraryTab === 'beats' && (
+                                                <motion.div layoutId="lib-tab-indicator" className="absolute bottom-0 left-6 right-6 h-0.5 bg-[var(--accent)]" />
+                                            )}
+                                        </button>
+                                    </div>
                                     <div className="flex items-center justify-between text-xs text-zinc-500 uppercase tracking-wider font-semibold">
                                         <button className="flex items-center gap-1 hover:text-white transition-colors">
                                             <span>All</span>
@@ -1696,8 +1716,8 @@ const StudioWorkspace: React.FC = () => {
 
                                 <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
                                     <div className="grid grid-cols-2 gap-4">
-                                        {/* Display Saved Projects as cards */}
-                                        {savedProjects.map((p, index) => {
+                                        {/* Display Saved Projects as cards when Songs tab is active */}
+                                        {libraryTab === 'songs' && savedProjects.map((p, index) => {
                                             // Conic gradient colors based on project ID index to give variation
                                             const gradients = [
                                                 'from-purple-900 to-indigo-950',
@@ -1742,8 +1762,8 @@ const StudioWorkspace: React.FC = () => {
                                                 </div>
                                             );
                                         })}
-                                        {/* Display Beats as cards */}
-                                        {beats.map((beat, index) => {
+                                        {/* Display Beats as cards when Beats tab is active */}
+                                        {libraryTab === 'beats' && beats.map((beat, index) => {
                                             const gradients = [
                                                 'from-zinc-900 to-zinc-950',
                                                 'from-stone-900 to-zinc-950'
