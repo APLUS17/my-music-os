@@ -73,6 +73,11 @@ This framework ensures that every feature in My Music OS is Deterministic, Secur
   - [x] Kinetic Interactions (Inner glows, active state pulses)
   - [x] "Orbital" Layout Refinement (Modular asymmetry)
   - [x] Mobile Adaptive Layout (Tabbed Studio Interface)
+  - [x] Songs Masonry Notes Grid (stable, shift-free column cards with lyric snippets)
+  - [x] Beats Spinning Vinyl Cards (silvery metallic records with smooth spinning animation)
+  - [x] Sticky Header Layering z-index Fix (z-50 context stacking)
+  - [x] Light Mode Contrast & Theme Switcher (accessible colors, theme-aware uploader controls, sun/moon icon)
+  - [x] Workspace & Player UI cleanups (archived repeats selector, category dropdowns, and player buttons)
 - **Design Inspiration**: Modern DAWs (Ableton, Logic Pro), Baton.media, Untitled.
 - **Brand Guidelines**: Noir Tech & Quiet Luxury.
 

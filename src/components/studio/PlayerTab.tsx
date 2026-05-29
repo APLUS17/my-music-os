@@ -202,18 +202,18 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             {/* ── Integrated Header ───────────────────────────────────── */}
             <div className="flex items-center justify-between px-6 pt-6 pb-2 z-30">
                 <div className="flex flex-col">
-                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-white/40 mb-0.5">Now Playing</span>
-                    <h2 className="text-sm font-bold text-white tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
+                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-0.5">Now Playing</span>
+                    <h2 className="text-sm font-bold text-[var(--text-main)] tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
                 </div>
 
                 {sessions && sessions.length > 0 && (
                     <div className="relative">
                         <button 
                             onClick={() => setShowTakeList(!showTakeList)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-all active:scale-95"
                         >
                             <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessions.length - sessionIdx}</span>
-                            <ChevronDown size={14} className={cn("text-white/40 transition-transform duration-300", showTakeList && "rotate-180")} />
+                            <ChevronDown size={14} className={cn("text-[var(--text-secondary)] transition-transform duration-300", showTakeList && "rotate-180")} />
                         </button>
 
                         <AnimatePresence>
@@ -224,7 +224,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="absolute right-0 mt-2 w-40 bg-[#1A1A1A] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+                                        className="absolute right-0 mt-2 w-40 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
                                     >
                                         {sessions.map((s, i) => (
                                             <button
@@ -235,7 +235,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                                 }}
                                                 className={cn(
                                                     "w-full text-left px-4 py-3 text-xs font-semibold transition-colors flex items-center justify-between",
-                                                    activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-white/60 hover:bg-white/5"
+                                                    activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                                                 )}
                                             >
                                                 <span>Take {sessions.length - i}</span>
@@ -281,13 +281,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                 <motion.div
                                     key={`line-${i}`}
                                     ref={el => { lyricRefs.current[i] = el; }}
-                                    className={cn("text-left cursor-pointer", isActive ? "text-white" : "text-white/80")}
+                                    className={cn("text-left cursor-pointer", isActive ? "text-[var(--text-main)]" : "text-[var(--text-secondary)]")}
                                     initial={false}
                                     animate={{ opacity, scale, filter: `blur(${blur}px)` }}
                                     transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
                                     onClick={() => onSeek(line.startTime)}
                                 >
-                                    <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" : "")}>
+                                    <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_var(--accent-dim)]" : "")}>
                                         {line.text}
                                     </p>
                                 </motion.div>
@@ -302,7 +302,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                     // Beat sections loading — skeleton pills
                     <div className="flex gap-3 px-6 pb-2 pt-4 overflow-hidden">
                         {[80, 64, 96, 72, 88].map((w, i) => (
-                            <div key={i} className="shrink-0 h-8 rounded-xl bg-white/10 animate-pulse" style={{ width: w }} />
+                            <div key={i} className="shrink-0 h-8 rounded-xl bg-[var(--border-subtle)] animate-pulse" style={{ width: w }} />
                         ))}
                     </div>
                 ) : beatSections.length > 0 ? (
@@ -336,7 +336,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                             'w-full px-4 py-2 rounded-xl border text-xs font-semibold transition-all whitespace-nowrap',
                                             isActive
                                                 ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
-                                                : 'border-white/20 text-white/70 bg-white/[0.07]'
+                                                : 'border-[var(--border-main)] text-[var(--text-secondary)] bg-[var(--bg-secondary)] hover:border-[var(--text-tertiary)]'
                                         )}
                                     >
                                         {sec.label || sec.type}
@@ -351,16 +351,16 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             {/* ── Scrubber ───────────────────────────────────────────── */}
             <div className="px-6 pt-3 pb-1">
                 <div
-                    className="relative w-full h-[2px] bg-white/20 rounded-full cursor-pointer"
+                    className="relative w-full h-[2px] bg-[var(--border-strong)] rounded-full cursor-pointer"
                     onClick={e => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         onSeek(((e.clientX - rect.left) / rect.width) * duration);
                     }}
                 >
-                    <motion.div className="absolute left-0 top-0 h-full bg-white rounded-full" animate={{ width: `${progress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
-                    <motion.div className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-white rounded-full shadow" animate={{ left: `calc(${progress}% - 7px)` }} transition={{ duration: 0.1, ease: 'linear' }} />
+                    <motion.div className="absolute left-0 top-0 h-full bg-[var(--text-main)] rounded-full" animate={{ width: `${progress}%` }} transition={{ duration: 0.1, ease: 'linear' }} />
+                    <motion.div className="absolute top-1/2 -translate-y-1/2 w-[14px] h-[14px] bg-[var(--text-main)] rounded-full shadow" animate={{ left: `calc(${progress}% - 7px)` }} transition={{ duration: 0.1, ease: 'linear' }} />
                 </div>
-                <div className="flex justify-between text-xs text-white/50 mt-2 font-medium">
+                <div className="flex justify-between text-xs text-[var(--text-secondary)] mt-2 font-medium">
                     <span>{formatTime(currentTime)}</span>
                     <span>-{formatTime(Math.max(0, duration - currentTime))}</span>
                 </div>
@@ -368,18 +368,18 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Controls ──────────────────────────────────────────── */}
             <div className="flex items-center justify-center gap-10 py-5">
-                <button onClick={onOpenFX} className="text-white/40 active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
-                <button onClick={() => skip(-10)} className="text-white active:opacity-60 transition-opacity"><Rewind size={34} fill="white" /></button>
-                <button onClick={togglePlay} className="w-20 h-20 bg-white rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
-                    {isPlaying ? <Pause size={40} className="text-black" fill="black" /> : <Play size={40} className="text-black ml-1" fill="black" />}
+                <button onClick={onOpenFX} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
+                <button onClick={() => skip(-10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><Rewind size={34} fill="currentColor" /></button>
+                <button onClick={togglePlay} className="w-20 h-20 bg-[var(--text-main)] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
+                    {isPlaying ? <Pause size={40} className="text-[var(--bg-main)]" fill="currentColor" /> : <Play size={40} className="text-[var(--bg-main)] ml-1" fill="currentColor" />}
                 </button>
-                <button onClick={() => skip(10)} className="text-white active:opacity-60 transition-opacity"><FastForward size={34} fill="white" /></button>
+                <button onClick={() => skip(10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><FastForward size={34} fill="currentColor" /></button>
                 <button
                     onClick={() => {
                         if (isBeatLooping) onClearLoop?.();
                         else { const sec = activeSectionIdx >= 0 ? beatSections[activeSectionIdx] : null; if (sec) onSetLoopRegion?.(sec.startTime, sec.endTime); }
                     }}
-                    className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-white/40')}
+                    className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]')}
                 >
                     <Repeat2 size={28} />
                 </button>
@@ -387,24 +387,20 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Volume ─────── */}
             <div className="flex items-center gap-3 px-8 pt-1 pb-2">
-                <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
+                <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
                 <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
-                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer accent-white
+                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer slider-v
                     [&::-webkit-slider-runnable-track]:h-full [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent
-                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
                     [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
-                    [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-                    style={{ touchAction: 'none', background: `linear-gradient(to right, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.8) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) ${(beatMuted ? 0 : beatVolume) * 100}%, rgba(255,255,255,0.1) 100%)` }}
+                    [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--text-main)] [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+                    style={{ touchAction: 'none', background: `linear-gradient(to right, var(--text-main) 0%, var(--text-main) ${(beatMuted ? 0 : beatVolume) * 100}%, var(--border-strong) ${(beatMuted ? 0 : beatVolume) * 100}%, var(--border-strong) 100%)` }}
                 />
-                <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-white/40 shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
+                <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
             </div>
 
-            {/* ── Bottom action bar ────── */}
-            <div className="flex items-center justify-evenly pb-8 pt-3">
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><MessageSquare size={20} className="text-white/60" /></button>
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><Languages size={20} className="text-white/60" /></button>
-                <button className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"><List size={20} className="text-white/60" /></button>
-            </div>
+            {/* Spacer to prevent overlap with floating navigation bar */}
+            <div className="h-20" />
         </div>
     );
 });

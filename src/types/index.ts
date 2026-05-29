@@ -95,6 +95,8 @@ export interface SavedProject {
     scraps: LyricScrap[];
     sessions: RecordingSession[];
     beats: Beat[];
+    categorySections?: Record<string, LyricSection[]>;
+    activeCategory?: string;
 }
 
 // Removed 'tag' and 'idea' from this list so they don't appear in the LyricCard dropdown

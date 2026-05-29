@@ -52,3 +52,16 @@ We have implemented the core backend for the **Studio Facilitator** in `src/app/
 *   **Share Button**: Currently removed from the header. Needs link-generation logic.
 *   **BPM & Key Display**: Needs connection to real project metadata.
 *   **Supabase Types**: Backend is connected but requires manual type casting (`as any`) until full schema generation is integrated.
+
+---
+
+## 🗄️ Archived & Hidden UI Elements
+The following elements have been archived or hidden to simplify layout clutter, clean up vertical space, or prevent navigation overlaps:
+*   **Repeats Indicator & Buttons (`x2 | + -`)**: Removed from the header of each `LyricCard.tsx` to clean up structured writing card space.
+*   **Category Selector Dropdown & Line/Syllable Summary Bar**: Removed from above the lyric card list in `StudioWorkspace.tsx` to maximize vertical space for mobile writing.
+*   **Empty State Centered Button**: Removed the centered "Add Lyric Section" button that appeared when the workspace had zero lyric cards. The app now directly displays the write-mode editor canvas and relies on the standard `+ Add Section` button at the bottom of the list.
+*   **Player Tab Action Buttons**: Removed the chat (`MessageSquare`), language translation (`Languages`), and menu list (`List`) icons from the bottom action bar of `PlayerTab.tsx` as they were overlapping with the centered floating bottom navigation pill. Replace with a `<div className="h-20" />` spacer.
+*   **Global Search Icon**: Replaced with the theme toggle in the main Studio header.
+*   **Borderless Syllable Toggle Button ("T")**: Removed the circle border ring, active background color, and active glow shadow from the syllable toggle button. It now remains completely transparent, toggling only the text color of the letter "T" itself to the active accent color.
+*   **"Capture the Flow" greeting, illustrator & quick start tags**: Hidden from normal blank states and moved exclusively inside the active onboarding tour sequence (`showTour === true`).
+

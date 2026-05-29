@@ -181,42 +181,42 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-4 py-3 rounded-xl border transition-all duration-300 border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]",
       isFocused && "bg-[var(--bg-secondary)] border-[var(--shark-blue-dim)] shadow-md"
     )}>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] transition-colors font-medium"
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all font-medium active:scale-95 cursor-pointer"
           >
             {section.type}
             <ChevronDown size={10} className="opacity-70" />
           </button>
 
-          <div className="flex items-center gap-1">
-            <span className="text-xs mono text-[var(--text-tertiary)] tabular-nums opacity-50 font-bold">x{section.repeats}</span>
-            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-              <button 
-                onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: section.repeats + 1 }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-              >
-                <Plus size={10} />
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onUpdate(section.id, { repeats: Math.max(1, section.repeats - 1) }); }} 
-                className="p-0.5 text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-              >
-                <Minus size={10} />
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center mr-1 opacity-50 group-hover:opacity-100 transition-opacity duration-300">
-            <button onClick={() => onMove(section.id, 'up')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronUp size={14} /></button>
-            <button onClick={() => onMove(section.id, 'down')} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90"><ChevronDown size={14} /></button>
+          <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-md px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <button 
+              onClick={() => onMove(section.id, 'up')} 
+              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90 cursor-pointer"
+              title="Move up"
+            >
+              <ChevronUp size={12} />
+            </button>
+            <span className="w-[1px] h-3 bg-[var(--border-main)] mx-0.5" />
+            <button 
+              onClick={() => onMove(section.id, 'down')} 
+              className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90 cursor-pointer"
+              title="Move down"
+            >
+              <ChevronDown size={12} />
+            </button>
           </div>
-          <button onClick={() => onDelete(section.id)} className="text-[var(--text-tertiary)] hover:text-red-500 transition-all duration-300 ml-1 opacity-10 group-hover:opacity-100 hover:scale-110 active:scale-90">
-            <X size={14} />
+          <button 
+            onClick={() => onDelete(section.id)} 
+            className="p-1 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
+            title="Delete section"
+          >
+            <X size={12} />
           </button>
         </div>
       </div>
@@ -225,11 +225,12 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       <div className="space-y-1.5 relative transition-all">
         {lines.map((lineText, idx) => (
           <div key={`${section.id}-row-${idx}`} className="flex items-start w-full gap-1">
-            {showSyllables && (
-              <div className="w-10 text-right pr-3.5 text-xs font-mono text-[var(--text-tertiary)] opacity-60 pt-1.5 select-none tabular-nums flex-shrink-0">
-                {countSyllables(lineText) || '\u00A0'}
-              </div>
-            )}
+            <div className={cn(
+              "w-6 text-right pr-1.5 text-xs font-mono text-[var(--text-tertiary)] pt-1.5 select-none tabular-nums flex-shrink-0 transition-opacity duration-200",
+              showSyllables ? "opacity-60" : "opacity-0 pointer-events-none"
+            )}>
+              {countSyllables(lineText) || '\u00A0'}
+            </div>
             <div className="flex-1 min-w-0">
               <AutoResizeRowTextarea
                 id={`input-${section.id}-${idx}`}

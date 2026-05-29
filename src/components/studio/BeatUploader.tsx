@@ -245,7 +245,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
-            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-white active:scale-90 transition-all rounded-none"
+            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-main)] active:scale-90 transition-all rounded-none"
           >
             {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
           </Button>
@@ -256,8 +256,8 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
             <button
               className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-[var(--bg-soft)] transition-colors text-left"
             >
-              <span className="text-xs mono uppercase font-bold tracking-wide text-white/80 max-w-[100px] truncate">{beatName || 'Beat'}</span>
-              <Badge variant="outline" className="h-4 px-1 text-[8px] border-[var(--border-subtle)] text-white/40">BEAT</Badge>
+              <span className="text-xs mono uppercase font-bold tracking-wide text-[var(--text-main)] max-w-[100px] truncate">{beatName || 'Beat'}</span>
+              <Badge variant="outline" className="h-4 px-1 text-[8px] border-[var(--border-subtle)] text-[var(--text-secondary)]">BEAT</Badge>
             </button>
           </PopoverTrigger>
         </div>
@@ -266,10 +266,10 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col gap-0.5">
-              <span className="text-xs mono uppercase tracking-wide text-white/30">Backing Track</span>
-              <span className="text-sm font-bold text-white truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
+              <span className="text-xs mono uppercase tracking-wide text-[var(--text-tertiary)]">Backing Track</span>
+              <span className="text-sm font-bold text-[var(--text-main)] truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClear} className="text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
               <Trash2 size={14} />
             </Button>
           </div>
@@ -293,7 +293,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               )}
               {/* Progress fill */}
               <div
-                className="absolute top-0 bottom-0 bg-white opacity-20 pointer-events-none"
+                className="absolute top-0 bottom-0 bg-[var(--text-main)] opacity-20 pointer-events-none"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -306,7 +306,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('start'); }}
               >
-                <div className="w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-3 h-3 rounded-full bg-[var(--accent)] shadow-lg border border-[var(--border-strong)] z-10 group-hover:scale-125 transition-transform" />
                 <div className="w-[1.5px] flex-1 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
               </div>
             )}
@@ -317,21 +317,21 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onMouseDown={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
                 onTouchStart={(e) => { e.stopPropagation(); setDraggingMarker('end'); }}
               >
-                <div className="w-3 h-3 rounded-full bg-white shadow-lg border border-black z-10 group-hover:scale-125 transition-transform" />
-                <div className="w-[1.5px] flex-1 bg-white opacity-60" />
+                <div className="w-3 h-3 rounded-full bg-[var(--text-main)] shadow-lg border border-[var(--border-strong)] z-10 group-hover:scale-125 transition-transform" />
+                <div className="w-[1.5px] flex-1 bg-[var(--text-main)] opacity-60" />
               </div>
             )}
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-xs mono tabular-nums text-white/40">
+            <span className="text-xs mono tabular-nums text-[var(--text-secondary)]">
               {formatTime(currentTime)} <span className="opacity-30">/</span> {formatTime(duration)}
             </span>
 
             <div className="flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="h-8 w-8 text-white/40 hover:text-white hover:bg-[var(--bg-soft)]">
+                  <Button variant="ghost" size="icon" onClick={() => audioRef.current!.currentTime = loopStart ?? 0} className="h-8 w-8 text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-soft)]">
                     <RotateCcw size={14} />
                   </Button>
                 </TooltipTrigger>
@@ -344,7 +344,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
                 onClick={() => setIsLooping(!isLooping)}
                 className={cn(
                   "h-7 rounded-lg text-xs mono uppercase tracking-wide gap-2",
-                  isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-[var(--border-subtle)] text-white/40"
+                  isLooping ? "bg-[var(--accent)] text-black font-bold" : "border-[var(--border-subtle)] text-[var(--text-secondary)]"
                 )}
               >
                 <Repeat size={10} /> {isLooping ? 'Looping' : 'Loop'}
@@ -361,7 +361,7 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
 
           {/* Volume */}
           <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center gap-4">
-            <Volume2 size={14} className="text-white/20" />
+            <Volume2 size={14} className="text-[var(--text-tertiary)]" />
             <Slider
               min={0}
               max={1}

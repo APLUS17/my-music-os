@@ -10,7 +10,6 @@ import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
-import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
@@ -37,11 +36,15 @@ import {
     MessageSquare,
     House,
     ListMusic,
-    Library
+    Library,
+    Disc,
+    History,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, CheckCircle2, Bookmark } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -337,21 +340,30 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
     );
 };
 
-const MISSION_PROJECT: SavedProject = {
-    id: 'mission-001',
-    name: 'Mission: Flow to Write',
-    lastModified: new Date().toLocaleDateString(),
-    sections: [
-        { id: 'mission-v1', type: 'verse', repeats: 1, text: "" }
-    ],
-    scraps: [],
-    sessions: [],
-    beats: []
-};
+
+const CATEGORIES = [
+    'Notes',
+    'Song Titles',
+    'Song Ideas + Concepts',
+    'Arrangement',
+    'Sample This',
+    'Moods',
+    'BPM',
+    'Genre/Style',
+    'Epiphanies',
+    'Chord Progressions',
+    'Lyrics'
+];
 
 const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
     const [theme, setTheme] = useState<Theme>('dark');
+    const cycleTheme = () => {
+        const themes: Theme[] = ['dark', 'light', 'midnight', 'matrix', 'sonar'];
+        const currentIndex = themes.indexOf(theme);
+        const nextIndex = (currentIndex + 1) % themes.length;
+        setTheme(themes[nextIndex]);
+    };
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
     const [ritualStats, setRitualStats] = useState<RitualStat[]>([]);
     const handleCompleteRitual = (stat: RitualStat) => {
@@ -365,7 +377,6 @@ const StudioWorkspace: React.FC = () => {
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
-    const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
     const [showFXPanel, setShowFXPanel] = useState(false);
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
@@ -382,6 +393,7 @@ const StudioWorkspace: React.FC = () => {
     const beatAudioCtxRef = useRef<AudioContext | null>(null);
     const beatGainRef = useRef<GainNode | null>(null);
 
+    const [showPillOptions, setShowPillOptions] = useState(false);
     const [projectTitle, setProjectTitle] = useState("");
     const [projectBpm, setProjectBpm] = useState("120");
     const [projectKey, setProjectKey] = useState("C Min");
@@ -390,6 +402,10 @@ const StudioWorkspace: React.FC = () => {
         { id: 'init-verse', type: 'verse', repeats: 1, text: '' }
     ]);
     const [scraps, setScraps] = useState<LyricScrap[]>([]);
+
+    const [activeCategory, setActiveCategory] = useState<string>('Notes');
+    const [categorySections, setCategorySections] = useState<Record<string, LyricSection[]>>({});
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
 
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
@@ -408,6 +424,29 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('lyriq_show_syllables', String(showSyllables));
     }, [showSyllables]);
+
+    // Sync sections edits to categorySections
+    useEffect(() => {
+        setCategorySections(prev => ({
+            ...prev,
+            [activeCategory]: sections
+        }));
+    }, [sections, activeCategory]);
+
+    const handleSelectCategory = (newCategory: string) => {
+        if (newCategory === activeCategory) {
+            setIsCategoryDropdownOpen(false);
+            return;
+        }
+
+        const newSections = categorySections[newCategory] && categorySections[newCategory].length > 0
+            ? categorySections[newCategory]
+            : [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+
+        setSections(newSections);
+        setActiveCategory(newCategory);
+        setIsCategoryDropdownOpen(false);
+    };
 
     const totalSyllables = useMemo(() => {
         return sections.reduce((sum, s) => sum + countSyllables(s.text), 0);
@@ -696,6 +735,26 @@ const StudioWorkspace: React.FC = () => {
                 try {
                     const parsed = JSON.parse(savedData);
 
+                    const activeCat = parsed.activeCategory || 'Notes';
+                    setActiveCategory(activeCat);
+
+                    let activeCatSections = parsed.sections || [];
+                    if (parsed.categorySections) {
+                        setCategorySections(parsed.categorySections);
+                        activeCatSections = parsed.categorySections[activeCat] || [];
+                    } else {
+                        const newCategorySections: Record<string, LyricSection[]> = {};
+                        CATEGORIES.forEach(cat => {
+                            if (cat === 'Lyrics') {
+                                newCategorySections[cat] = parsed.sections || [];
+                            } else {
+                                 newCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+                            }
+                        });
+                        setCategorySections(newCategorySections);
+                        activeCatSections = newCategorySections[activeCat] || [];
+                    }
+
                     // Migration: clear old mock text from mission project
                     if (parsed.sections && parsed.sections.some((s: LyricSection) =>
                         s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
@@ -703,26 +762,21 @@ const StudioWorkspace: React.FC = () => {
                         // Old mock text detected, reset to empty
                         setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
                         setProjectTitle('');
+                        setActiveCategory('Notes');
+                        setCategorySections({});
                     } else if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
-                        setSections(parsed.sections);
+                        setSections(activeCatSections);
                         if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     } else {
                         // Default to empty project
-                        setSections(MISSION_PROJECT.sections);
+                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
                         setProjectTitle('');
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
-                    // Also clean mission project from saved list if it has old mock text
-                    loadedProjects = loadedProjects.filter((p: SavedProject) =>
-                        !(p.id === 'mission-001' && p.sections?.some(s =>
-                            s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
-                        ))
-                    );
-                    if (!loadedProjects.find((p: SavedProject) => p.id === MISSION_PROJECT.id)) {
-                        loadedProjects = [MISSION_PROJECT, ...loadedProjects];
-                    }
+                    // Remove mission project if it exists
+                    loadedProjects = loadedProjects.filter((p: SavedProject) => p.id !== 'mission-001');
                     setSavedProjects(loadedProjects);
 
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
@@ -786,11 +840,19 @@ const StudioWorkspace: React.FC = () => {
             setSaveIndicator('saving');
             const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
             const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
+            
+            const currentCategorySections = {
+                ...categorySections,
+                [activeCategory]: sections
+            };
+
             const dataToSave = {
                 sections, scraps, savedProjects,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
-                activeProjectId, uploadedBeatId
+                activeProjectId, uploadedBeatId,
+                categorySections: currentCategorySections,
+                activeCategory
             };
             try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
             catch (e) { console.error("Storage full or error", e); }
@@ -802,7 +864,7 @@ const StudioWorkspace: React.FC = () => {
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats, categorySections, activeCategory]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -823,7 +885,8 @@ const StudioWorkspace: React.FC = () => {
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 
-        const lyricsContextString = sections.map(s => `[${s.type}]: ${s.text}`).join('\n');
+        const lyricsSections = categorySections['Lyrics'] || sections;
+        const lyricsContextString = lyricsSections.map(s => `[${s.type}]: ${s.text}`).join('\n');
         const structurePromise = analyzeAudioStructure(base64, lyricsContextString);
 
         await saveAudioData(id, base64);
@@ -1126,13 +1189,38 @@ const StudioWorkspace: React.FC = () => {
     const archiveCurrentProject = () => {
         if (sections.length === 0 && scraps.length === 0) return;
         const projectSessions = sessions.filter(s => !s.projectId || s.projectId === activeProjectId);
+
+        // Keep categorySections up to date with the latest active sections before archiving
+        const updatedCategorySections = {
+            ...categorySections,
+            [activeCategory]: sections
+        };
+
+        // Always save the 'Lyrics' sections in the root sections property for compatibility
+        const primarySections = updatedCategorySections['Lyrics'] || [];
+
         const newProject: SavedProject = {
-            id: randomId(),
+            id: activeProjectId || randomId(),
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
-            sections, scraps, sessions: projectSessions, beats: []
+            sections: primarySections,
+            scraps,
+            sessions: projectSessions,
+            beats: [],
+            categorySections: updatedCategorySections,
+            activeCategory: activeCategory
         };
-        setSavedProjects(prev => [newProject, ...prev]);
+
+        setSavedProjects(prev => {
+            const index = prev.findIndex(p => p.id === newProject.id);
+            if (index !== -1) {
+                const updated = [...prev];
+                updated[index] = newProject;
+                return updated;
+            } else {
+                return [newProject, ...prev];
+            }
+        });
     };
 
     const handleStartFromScrap = (text: string, type: SectionType) => {
@@ -1178,7 +1266,7 @@ const StudioWorkspace: React.FC = () => {
             setIsPlaying(false);
             setIsBeatPlaying(false);
 
-            setSections([{ id: randomId(), type: 'verse', repeats: 1, text: "" }]);
+            setSections([{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }]);
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
@@ -1186,6 +1274,10 @@ const StudioWorkspace: React.FC = () => {
             setProjectTitle("");
             setUploadedBeat(null);
             setActiveProjectId(null);
+
+            setActiveCategory('Notes');
+            setCategorySections({});
+            setIsCategoryDropdownOpen(false);
         }
     };
 
@@ -1198,6 +1290,8 @@ const StudioWorkspace: React.FC = () => {
             setIsBeatPlaying(false);
 
             archiveCurrentProject();
+            
+            // Reset workspace
             setSections([]); // Empty for Flow mode
             setScraps([]);
             setSessions([]);
@@ -1207,6 +1301,11 @@ const StudioWorkspace: React.FC = () => {
             setUploadedBeat(null);
             setUploadedBeatName("");
             setActiveProjectId(null);
+            
+            setActiveCategory('Notes');
+            setCategorySections({});
+            setIsCategoryDropdownOpen(false);
+
             setViewMode('studio');
             setStudioMode('flow');
             setFabOpen(false);
@@ -1221,8 +1320,23 @@ const StudioWorkspace: React.FC = () => {
             setIsPlaying(false);
             setIsBeatPlaying(false);
 
-            const hasSections = p.sections && p.sections.length > 0;
-            setSections(p.sections || []);
+            const activeCat = p.activeCategory || 'Notes';
+            setActiveCategory(activeCat);
+
+            const initialCategorySections = p.categorySections || {};
+            CATEGORIES.forEach(cat => {
+                if (!initialCategorySections[cat]) {
+                    if (cat === 'Lyrics' && p.sections && p.sections.length > 0) {
+                        initialCategorySections[cat] = p.sections;
+                    } else {
+                        initialCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
+                    }
+                }
+            });
+
+            setCategorySections(initialCategorySections);
+            setSections(initialCategorySections[activeCat]);
+
             setScraps(p.scraps || []);
             setSessions(p.sessions || []);
             setActiveSessionId(null);
@@ -1232,7 +1346,7 @@ const StudioWorkspace: React.FC = () => {
             setUploadedBeatName(p.beats?.[0]?.name || "");
             setActiveProjectId(p.id);
             setViewMode('studio');
-            setStudioMode(hasSections ? 'write' : 'flow');
+            setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
             setShowSearch(false);
         }
     };
@@ -1502,69 +1616,284 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'collection':
+            case 'collection': {
+                const isEmpty = savedProjects.length === 0 && beats.length === 0;
+
                 return (
-                    <div className="h-full flex flex-col pt-12">
-                        <div className="px-6 mb-8 flex items-center justify-between">
-                            <div>
-                                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
-                                <div className="flex border-b border-[var(--border-main)]">
-                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
-                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--accent)] bg-[var(--bg-secondary)] border border-[var(--border-main)] transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></button>
-                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
-                            {libraryTab === 'beats' && (
-                                <div className="space-y-4">
-                                    {beats.map(beat => (
-                                        <SwipeableBeatCard
-                                            key={beat.id}
-                                            beat={beat}
-                                            isPlaying={playingBeatId === beat.id}
-                                            onPlay={() => handlePlayBeat(beat.id)}
-                                            onWrite={() => handleStartProjectFromBeat(beat)}
-                                            onDelete={() => handleDeleteBeat(beat.id)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            {libraryTab === 'songs' && (
-                                <div className="space-y-4">
-                                    {savedProjects.map(p => (
-                                        <SwipeableProjectCard key={p.id} project={p} onClick={() => loadProject(p)} onDelete={() => deleteProject(p.id)} />
-                                    ))}
-                                </div>
-                            )}
+                    <div className="h-full flex flex-col pt-6 relative text-[var(--text-main)] bg-[var(--bg-main)] select-none">
+                        {/* Top Bar Header */}
+                        <div className="px-6 py-4 flex items-center justify-between z-30">
+                            <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
+                            <button
+                                onClick={cycleTheme}
+                                className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
+                                title="Cycle Theme"
+                            >
+                                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                            </button>
                         </div>
 
-                        <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
-                            <div className="pointer-events-auto flex flex-col items-end gap-3">
-                                <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-out origin-bottom-right ${fabOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}>
-                                    <button onClick={handleNewProject} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
-                                    </button>
-                                    <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
-                                        <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={() => setFabOpen(!fabOpen)}
-                                    className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
-                                >
-                                    {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
-                                </button>
+                        {isEmpty ? (
+                            // Blank Start / Option States
+                            <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
+                                <AnimatePresence mode="wait">
+                                    {!showPillOptions ? (
+                                        <motion.div
+                                            key="start-state"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="flex flex-col items-center gap-4 cursor-pointer"
+                                            onClick={() => setShowPillOptions(true)}
+                                        >
+                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                                                <Plus size={36} className="text-white" />
+                                            </div>
+                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="option-state"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 10 }}
+                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
+                                        >
+                                            <button
+                                                onClick={() => {
+                                                    fabInputRef.current?.click();
+                                                    setShowPillOptions(false);
+                                                }}
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
+                                            >
+                                                <Music size={16} />
+                                                <span>Import</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    handleNewProject();
+                                                    setShowPillOptions(false);
+                                                }}
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                            >
+                                                <FilePlus size={16} />
+                                                <span>Create</span>
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
                             </div>
-                        </div>
+                        ) : (
+                            // Populated State (Packs Grid View)
+                            <div className="flex-1 flex flex-col overflow-hidden px-4">
+                                <div className="mb-4">
+                                    {/* Segmented Control Switcher */}
+                                    <div className="w-full bg-[var(--bg-secondary)] backdrop-blur-md border border-[var(--border-main)] p-1 rounded-full flex gap-1 shadow-inner">
+                                        <button
+                                            onClick={() => setLibraryTab('songs')}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                                        >
+                                            Songs
+                                        </button>
+                                        <button
+                                            onClick={() => setLibraryTab('beats')}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'beats' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                                        >
+                                            Beats
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
+                                    {libraryTab === 'songs' ? (
+                                        <div className="columns-2 gap-4 space-y-4 [column-fill:_balance] w-full">
+                                            {savedProjects.map((p, index) => {
+                                                const lyricPreview = p.sections
+                                                    ?.map(s => s.text)
+                                                    .filter(Boolean)
+                                                    .join('\n')
+                                                    .split('\n')
+                                                    .filter(line => line.trim())
+                                                    .slice(0, 3)
+                                                    .join('\n');
+
+                                                return (
+                                                    <div
+                                                        key={p.id}
+                                                        onClick={() => loadProject(p)}
+                                                        className="break-inside-avoid mb-4 w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:bg-[var(--bg-hover)] p-4 flex flex-col justify-between shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all relative group"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                                            <h3 className="text-xs font-bold text-[var(--text-main)] tracking-tight line-clamp-2 pr-4">{p.name || "Untitled Project"}</h3>
+                                                            <Bookmark size={14} className="text-[var(--accent)] shrink-0 opacity-80" />
+                                                        </div>
+                                                        
+                                                        {lyricPreview ? (
+                                                            <p className="text-[10px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-3 whitespace-pre-wrap flex-1 mb-3">
+                                                                "{lyricPreview}"
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-[10px] text-[var(--text-tertiary)] italic leading-relaxed flex-1 mb-3">
+                                                                No lyrics written yet...
+                                                            </p>
+                                                        )}
+
+                                                        <div className="flex items-center justify-between border-t border-[var(--border-subtle)] pt-2.5 mt-auto">
+                                                            <span className="text-[9px] text-[var(--text-tertiary)] font-medium tracking-wide">{p.lastModified}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (confirm(`Delete "${p.name || 'Untitled Project'}"?`)) {
+                                                                            deleteProject(p.id);
+                                                                        }
+                                                                    }}
+                                                                    className="text-[var(--text-tertiary)] hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-colors"
+                                                                    title="Delete"
+                                                                >
+                                                                    <Trash2 size={12} />
+                                                                </button>
+                                                                <div className="w-6 h-6 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow hover:scale-105 active:scale-95 transition-all">
+                                                                    <Play size={10} fill="currentColor" className="ml-0.5" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {beats.map((beat, index) => {
+                                                const gradients = [
+                                                    'from-zinc-900 to-zinc-950',
+                                                    'from-stone-900 to-zinc-950'
+                                                ];
+                                                const gradientClass = gradients[index % gradients.length];
+                                                const isPlaying = playingBeatId === beat.id;
+
+                                                return (
+                                                    <div key={beat.id} className="flex flex-col gap-2 group relative">
+                                                        <div
+                                                            onClick={() => handleStartProjectFromBeat(beat)}
+                                                            className="aspect-square w-full relative group"
+                                                        >
+                                                            {/* Silvery Metallic Vinyl Record */}
+                                                            <motion.div
+                                                                animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+                                                                transition={isPlaying ? { repeat: Infinity, duration: 4, ease: "linear" } : { duration: 0.5 }}
+                                                                className={`w-full h-full rounded-full bg-[conic-gradient(from_0deg,_#a1a1aa,_#e4e4e7,_#71717a,_#e4e4e7,_#a1a1aa)] border ${isPlaying ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-[var(--border-main)]'} relative overflow-hidden flex items-center justify-center shadow-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                            >
+                                                                {/* Grooves */}
+                                                                <div className="absolute inset-1.5 rounded-full border border-black/15" />
+                                                                <div className="absolute inset-4 rounded-full border border-black/15" />
+                                                                <div className="absolute inset-7 rounded-full border border-black/10" />
+                                                                <div className="absolute inset-10 rounded-full border border-black/10" />
+                                                                <div className="absolute inset-13 rounded-full border border-black/5" />
+                                                                <div className="absolute inset-16 rounded-full border border-black/5" />
+                                                                
+                                                                {/* Center Label (Colored vinyl label) */}
+                                                                <div className="w-1/3 h-1/3 rounded-full bg-zinc-800 border border-black/30 flex items-center justify-center relative shadow-inner">
+                                                                    {/* Spindle hole */}
+                                                                    <div className="w-3 h-3 rounded-full bg-black border border-zinc-700 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]" />
+                                                                </div>
+                                                            </motion.div>
+                                                            
+                                                            {/* Play Button Overlay */}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handlePlayBeat(beat.id);
+                                                                }}
+                                                                className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-[var(--border-main)] flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
+                                                            >
+                                                                {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                                            </button>
+                                                        </div>
+                                                        <div className="flex items-start justify-between px-1">
+                                                            <div className="min-w-0">
+                                                                <h3 className="text-xs font-semibold text-[var(--text-main)] truncate">{beat.name}</h3>
+                                                                <span className="text-[10px] text-[var(--text-secondary)] font-medium tracking-wide">Beat · {beat.duration}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (confirm(`Delete "${beat.name}"?`)) {
+                                                                        handleDeleteBeat(beat.id);
+                                                                    }
+                                                                }}
+                                                                className="text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
+                                                            >
+                                                                <span className="text-sm font-bold leading-none">···</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Floating Action Menu Trigger */}
+                                <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+                                    <div className="pointer-events-auto flex flex-col items-end gap-3">
+                                        <AnimatePresence>
+                                            {fabOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                                                    className="bg-[#e4ece9] text-black border border-white/20 rounded-2xl p-2 flex flex-col gap-1 shadow-2xl min-w-[160px]"
+                                                >
+                                                    <button
+                                                        onClick={() => {
+                                                            fabInputRef.current?.click();
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <Music size={16} />
+                                                        <span>Upload files</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleNewProject();
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <FilePlus size={16} />
+                                                        <span>Create pack</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setViewMode('studio');
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <Disc size={16} />
+                                                        <span>Open studio</span>
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        <button
+                                            onClick={() => setFabOpen(!fabOpen)}
+                                            className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                                        >
+                                            {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
+                            </div>
+                        )}
                     </div>
                 );
+            }
             case 'rituals':
                 return (
                     <div className="h-full relative">
@@ -1638,7 +1967,7 @@ const StudioWorkspace: React.FC = () => {
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div className="glass z-20 sticky top-0 border-b border-[var(--border-main)]">
+                        <div className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -1652,7 +1981,7 @@ const StudioWorkspace: React.FC = () => {
                                             />
                                             <button 
                                                 onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
-                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-white transition-colors"
+                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"
                                             >
                                                 <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
                                             </button>
@@ -1677,7 +2006,7 @@ const StudioWorkspace: React.FC = () => {
                                                                         }}
                                                                         className={cn(
                                                                             "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between group",
-                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-white"
+                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)]"
                                                                         )}
                                                                     >
                                                                         <span className="truncate">{p.name || "Untitled"}</span>
@@ -1769,10 +2098,10 @@ const StudioWorkspace: React.FC = () => {
                                 <button
                                     onClick={() => setShowSyllables(!showSyllables)}
                                     className={cn(
-                                        "w-8 h-8 rounded-full border flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
+                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
                                         showSyllables 
-                                            ? "bg-[var(--accent)] border-[var(--accent)] text-black font-bold shadow-[0_0_10px_var(--accent)]/30" 
-                                            : "bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:border-[var(--text-tertiary)]"
+                                            ? "text-[var(--accent)] font-bold" 
+                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
                                     )}
                                     title="Toggle Syllables Editor"
                                 >
@@ -1797,7 +2126,7 @@ const StudioWorkspace: React.FC = () => {
                                         isBeatLooping={isBeatLooping}
                                         beatLoopStart={beatLoopStart}
                                         beatLoopEnd={beatLoopEnd}
-                                        lyrics={sections}
+                                        lyrics={categorySections['Lyrics'] || []}
                                         isAnalyzingVocal={isAnalyzingVocal}
                                         isAnalyzingBeat={isAnalyzingBeat}
 
@@ -1837,99 +2166,88 @@ const StudioWorkspace: React.FC = () => {
                                         {activeTab === 'lyrics' ? (
                                             <>
                                                 <AnimatePresence mode="wait">
-                                                    {studioMode === 'flow' && sections.length === 0 ? (
-                                                        <motion.div 
-                                                            key="flow-canvas"
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-                                                            className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
-                                                        >
-                                                            {/* Abstract Background Shapes */}
-                                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                            <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                            
-                                                            <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                                <div className="absolute inset-0 rounded-[40px] border border-white/5" />
-                                                                <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                                
-                                                                {/* Orbiting particles animation */}
-                                                                <motion.div 
-                                                                    animate={{ rotate: 360 }}
-                                                                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                    className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                                />
-                                                            </div>
-
-                                                            <motion.h2 
-                                                                initial={{ opacity: 0, y: 10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.2 }}
-                                                                className="text-4xl font-bold tracking-tight text-white mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60"
-                                                            >
-                                                                Capture the Flow
-                                                            </motion.h2>
-                                                            
-                                                            <motion.p 
-                                                                initial={{ opacity: 0, y: 10 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.3 }}
-                                                                className="text-base text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
-                                                            >
-                                                                Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
-                                                            </motion.p>
-
-                                                            <motion.button
-                                                                initial={{ opacity: 0, y: 20 }}
-                                                                animate={{ opacity: 1, y: 0 }}
-                                                                transition={{ delay: 0.4 }}
-                                                                onClick={addSection}
-                                                                className="px-10 h-14 bg-white text-black rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_50px_rgba(255,255,255,0.2)]"
-                                                            >
-                                                                <Plus size={20} strokeWidth={3} /> Start Writing
-                                                            </motion.button>
-                                                            
-                                                            {/* Optional quick start types */}
+                                                     {sections.length === 0 && showTour ? (
                                                             <motion.div 
-                                                                initial={{ opacity: 0 }}
-                                                                animate={{ opacity: 1 }}
-                                                                transition={{ delay: 0.6 }}
-                                                                className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                key="flow-canvas"
+                                                                initial={{ opacity: 0, scale: 0.95 }}
+                                                                animate={{ opacity: 1, scale: 1 }}
+                                                                exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                                className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                             >
-                                                                <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                                <div className="flex gap-4">
-                                                                    {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                        <button 
-                                                                            key={type}
-                                                                            onClick={addSection}
-                                                                            className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                        >
-                                                                            {type}
-                                                                        </button>
-                                                                    ))}
+                                                                {/* Abstract Background Shapes */}
+                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                                <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                                
+                                                                <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                                    <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
+                                                                    <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                                    
+                                                                    {/* Orbiting particles animation */}
+                                                                    <motion.div 
+                                                                        animate={{ rotate: 360 }}
+                                                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                        className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                    />
                                                                 </div>
+
+                                                                <motion.h2 
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.2 }}
+                                                                    className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
+                                                                >
+                                                                    Capture the Flow
+                                                                </motion.h2>
+                                                                
+                                                                <motion.p 
+                                                                    initial={{ opacity: 0, y: 10 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.3 }}
+                                                                    className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                >
+                                                                    Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                                </motion.p>
+
+                                                                <motion.button
+                                                                    initial={{ opacity: 0, y: 20 }}
+                                                                    animate={{ opacity: 1, y: 0 }}
+                                                                    transition={{ delay: 0.4 }}
+                                                                    onClick={addSection}
+                                                                    className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                                                >
+                                                                    <Plus size={20} strokeWidth={3} /> Start Writing
+                                                                </motion.button>
+                                                                
+                                                                {/* Optional quick start types */}
+                                                                <motion.div 
+                                                                    initial={{ opacity: 0 }}
+                                                                    animate={{ opacity: 1 }}
+                                                                    transition={{ delay: 0.6 }}
+                                                                    className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                >
+                                                                    <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                                    <div className="flex gap-4">
+                                                                        {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                            <button 
+                                                                                key={type}
+                                                                                onClick={addSection}
+                                                                                className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                            >
+                                                                                {type}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </motion.div>
                                                             </motion.div>
-                                                        </motion.div>
-                                                    ) : (
-                                                        <motion.div 
-                                                            key="write-mode"
-                                                            initial={{ opacity: 0 }}
-                                                            animate={{ opacity: 1 }}
-                                                            exit={{ opacity: 0 }}
-                                                            className="space-y-12"
-                                                        >
-                                                            {showSyllables && (
-                                                                <div className="flex items-center justify-between text-xs mono text-[var(--text-tertiary)] pb-3 border-b border-[var(--border-main)]/30 mb-6">
-                                                                    <div className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer select-none">
-                                                                        <span>Notes</span>
-                                                                        <ChevronDown size={12} className="opacity-70" />
-                                                                    </div>
-                                                                    <div className="tabular-nums font-bold">
-                                                                        {totalSyllables} syllables · {totalLines} lines
-                                                                    </div>
-                                                                </div>
-                                                            )}
+                                                     ) : (
+                                                         <motion.div 
+                                                             key="write-mode"
+                                                             initial={{ opacity: 0 }}
+                                                             animate={{ opacity: 1 }}
+                                                             exit={{ opacity: 0 }}
+                                                             className="space-y-12"
+                                                         >
                                                             {sections.map((section, idx) => (
                                                                 <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                     <LyricCard
@@ -2037,31 +2355,44 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
-                <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
-                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
-                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
-                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
-                        <div className="flex justify-center relative">
-                            <div className="absolute bottom-1 flex flex-col items-center">
-                                <button
-                                    id="tour-nav-record"
-                                    onClick={() => {
-                                        setShowRecorder(true);
-                                        setRecorderMinimized(true);
-                                        setRecorderAutoStart(isBeatPlaying);
-                                    }}
-                                    className="relative flex items-center justify-center w-[72px] h-[72px] sm:w-[82px] sm:h-[82px] rounded-full transition-all duration-300 select-none border-[6px] sm:border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 active:scale-95 shadow-[0_4px_20px_rgba(239,68,68,0.4)]"
-                                    style={{ touchAction: 'none' }}
-                                >
-                                    <Plus className="h-5 w-5 text-white" />
-                                </button>
+                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2.5 flex items-center gap-8 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                    <button
+                        onClick={() => setViewMode('collection')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                        title="Library"
+                    >
+                        <Library className="h-6 w-6" />
+                    </button>
+                    {viewMode === 'studio' ? (
+                        <button
+                            onClick={() => {
+                                setShowRecorder(true);
+                                setRecorderMinimized(true);
+                                setRecorderAutoStart(isBeatPlaying);
+                            }}
+                            className="p-2 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                            title="Record"
+                        >
+                            <div className="w-6 h-6 rounded-full border-2 border-red-500 flex items-center justify-center">
+                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
                             </div>
-                        </div>
-                        <NavBtn id="tour-nav-rituals" active={viewMode === 'rituals'} onClick={() => setViewMode('rituals')} icon={<Clock className="h-5 w-5" />} label="Rituals" />
-                        <NavBtn active={viewMode === 'vault'} onClick={() => setViewMode('vault')} icon={<Library className="h-5 w-5" />} label="Vault" />
-                    </div>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setViewMode('studio')}
+                            className="p-2 rounded-full transition-all active:scale-95 text-[var(--text-secondary)] hover:text-[var(--text-main)] cursor-pointer"
+                            title="Studio"
+                        >
+                            <Disc className="h-6 w-6" />
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setViewMode('vault')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                        title="Virtual Vault"
+                    >
+                        <History className="h-6 w-6" />
+                    </button>
                 </nav>
             </main>
 
@@ -2085,8 +2416,6 @@ const StudioWorkspace: React.FC = () => {
                     parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
                 />
             )}
-
-            {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
             {/* Music Player Modal */}
             <AnimatePresence>
