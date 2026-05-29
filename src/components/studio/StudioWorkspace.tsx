@@ -1615,12 +1615,7 @@ const StudioWorkspace: React.FC = () => {
                     <div className="h-full flex flex-col pt-6 relative text-white bg-black select-none">
                         {/* Top Bar Header */}
                         <div className="px-6 py-4 flex items-center justify-between z-30">
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-300 hover:text-white transition-all active:scale-95">
-                                    <div className="w-6 h-6 rounded bg-zinc-750 flex items-center justify-center text-[10px] font-bold text-white uppercase">U</div>
-                                </button>
-                                <span className="text-xl font-black tracking-tight uppercase text-white">PLUS+</span>
-                            </div>
+                            <span className="text-xl font-black tracking-tight uppercase text-white">LYRIQ</span>
                             <button onClick={() => setShowSearch(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all">
                                 <Search size={20} />
                             </button>
@@ -1700,16 +1695,6 @@ const StudioWorkspace: React.FC = () => {
                                             {libraryTab === 'beats' && (
                                                 <motion.div layoutId="lib-tab-indicator" className="absolute bottom-0 left-6 right-6 h-0.5 bg-[var(--accent)]" />
                                             )}
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center justify-between text-xs text-zinc-500 uppercase tracking-wider font-semibold">
-                                        <button className="flex items-center gap-1 hover:text-white transition-colors">
-                                            <span>All</span>
-                                            <ChevronDown size={14} />
-                                        </button>
-                                        <button className="flex items-center gap-1 hover:text-white transition-colors">
-                                            <span>Recent</span>
-                                            <ChevronDown size={14} className="rotate-180" />
                                         </button>
                                     </div>
                                 </div>
