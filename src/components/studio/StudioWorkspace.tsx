@@ -10,7 +10,6 @@ import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
-import { FeedbackModal } from './FeedbackModal';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
@@ -37,7 +36,9 @@ import {
     MessageSquare,
     House,
     ListMusic,
-    Library
+    Library,
+    Disc,
+    History
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -337,17 +338,6 @@ const SwipeableBeatCard = ({ beat, isPlaying, onPlay, onWrite, onDelete }: Swipe
     );
 };
 
-const MISSION_PROJECT: SavedProject = {
-    id: 'mission-001',
-    name: 'Mission: Flow to Write',
-    lastModified: new Date().toLocaleDateString(),
-    sections: [
-        { id: 'mission-v1', type: 'verse', repeats: 1, text: "" }
-    ],
-    scraps: [],
-    sessions: [],
-    beats: []
-};
 
 const CATEGORIES = [
     'Notes',
@@ -379,7 +369,6 @@ const StudioWorkspace: React.FC = () => {
     const [recorderAutoStart, setRecorderAutoStart] = useState(false);
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
-    const [showFeedback, setShowFeedback] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
     const [showFXPanel, setShowFXPanel] = useState(false);
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
@@ -396,6 +385,7 @@ const StudioWorkspace: React.FC = () => {
     const beatAudioCtxRef = useRef<AudioContext | null>(null);
     const beatGainRef = useRef<GainNode | null>(null);
 
+    const [showPillOptions, setShowPillOptions] = useState(false);
     const [projectTitle, setProjectTitle] = useState("");
     const [projectBpm, setProjectBpm] = useState("120");
     const [projectKey, setProjectKey] = useState("C Min");
@@ -771,21 +761,14 @@ const StudioWorkspace: React.FC = () => {
                         if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
                     } else {
                         // Default to empty project
-                        setSections(MISSION_PROJECT.sections);
+                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
                         setProjectTitle('');
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
-                    // Also clean mission project from saved list if it has old mock text
-                    loadedProjects = loadedProjects.filter((p: SavedProject) =>
-                        !(p.id === 'mission-001' && p.sections?.some(s =>
-                            s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
-                        ))
-                    );
-                    if (!loadedProjects.find((p: SavedProject) => p.id === MISSION_PROJECT.id)) {
-                        loadedProjects = [MISSION_PROJECT, ...loadedProjects];
-                    }
+                    // Remove mission project if it exists
+                    loadedProjects = loadedProjects.filter((p: SavedProject) => p.id !== 'mission-001');
                     setSavedProjects(loadedProjects);
 
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
@@ -1625,69 +1608,250 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'collection':
+            case 'collection': {
+                const isEmpty = savedProjects.length === 0 && beats.length === 0;
+
                 return (
-                    <div className="h-full flex flex-col pt-12">
-                        <div className="px-6 mb-8 flex items-center justify-between">
-                            <div>
-                                <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)] mb-6">Library</h1>
-                                <div className="flex border-b border-[var(--border-main)]">
-                                    <button onClick={() => setLibraryTab('songs')} className={`pb-3 pr-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'songs' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Projects</button>
-                                    <button onClick={() => setLibraryTab('beats')} className={`pb-3 px-6 text-xs mono uppercase tracking-wider transition-all ${libraryTab === 'beats' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Beats</button>
-                                </div>
+                    <div className="h-full flex flex-col pt-6 relative text-white bg-black select-none">
+                        {/* Top Bar Header */}
+                        <div className="px-6 py-4 flex items-center justify-between z-30">
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-center text-zinc-300 hover:text-white transition-all active:scale-95">
+                                    <div className="w-6 h-6 rounded bg-zinc-750 flex items-center justify-center text-[10px] font-bold text-white uppercase">U</div>
+                                </button>
+                                <span className="text-xl font-black tracking-tight uppercase text-white">PLUS+</span>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowFeedback(true)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--accent)] bg-[var(--bg-secondary)] border border-[var(--border-main)] transition-all shadow-sm active:scale-95"><MessageSquare size={16} fill="currentColor" /></button>
-                                <button onClick={() => setViewMode('settings')} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"><Settings size={18} /></button>
-                            </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto px-6 space-y-2 pb-32 scrollbar-hide">
-                            {libraryTab === 'beats' && (
-                                <div className="space-y-4">
-                                    {beats.map(beat => (
-                                        <SwipeableBeatCard
-                                            key={beat.id}
-                                            beat={beat}
-                                            isPlaying={playingBeatId === beat.id}
-                                            onPlay={() => handlePlayBeat(beat.id)}
-                                            onWrite={() => handleStartProjectFromBeat(beat)}
-                                            onDelete={() => handleDeleteBeat(beat.id)}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                            {libraryTab === 'songs' && (
-                                <div className="space-y-4">
-                                    {savedProjects.map(p => (
-                                        <SwipeableProjectCard key={p.id} project={p} onClick={() => loadProject(p)} onDelete={() => deleteProject(p.id)} />
-                                    ))}
-                                </div>
-                            )}
+                            <button onClick={() => setShowSearch(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all">
+                                <Search size={20} />
+                            </button>
                         </div>
 
-                        <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
-                            <div className="pointer-events-auto flex flex-col items-end gap-3">
-                                <div className={`flex flex-col items-end gap-3 transition-all duration-300 ease-out origin-bottom-right ${fabOpen ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto' : 'opacity-0 translate-y-8 scale-95 pointer-events-none'}`}>
-                                    <button onClick={handleNewProject} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-100' : 'translate-x-4 opacity-0'}`}>New Project</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><FilePlus size={16} /></div>
-                                    </button>
-                                    <button onClick={() => fabInputRef.current?.click()} className="flex items-center gap-3 group">
-                                        <span className={`bg-[var(--bg-card)] border border-[var(--border-main)] px-2 py-1.5 rounded text-xs mono uppercase tracking-wider text-[var(--text-main)] shadow-lg transition-transform duration-300 ${fabOpen ? 'translate-x-0 opacity-100 delay-75' : 'translate-x-4 opacity-0'}`}>Import Beat</span>
-                                        <div className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center shadow-lg border border-[var(--border-main)] group-hover:bg-[var(--bg-hover)] group-active:scale-95 transition-all"><Music size={16} /></div>
-                                        <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={() => setFabOpen(!fabOpen)}
-                                    className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
-                                >
-                                    {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
-                                </button>
+                        {isEmpty ? (
+                            // Blank Start / Option States
+                            <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
+                                <AnimatePresence mode="wait">
+                                    {!showPillOptions ? (
+                                        <motion.div
+                                            key="start-state"
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="flex flex-col items-center gap-4 cursor-pointer"
+                                            onClick={() => setShowPillOptions(true)}
+                                        >
+                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                                                <Plus size={36} className="text-white" />
+                                            </div>
+                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="option-state"
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 10 }}
+                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
+                                        >
+                                            <button
+                                                onClick={() => {
+                                                    fabInputRef.current?.click();
+                                                    setShowPillOptions(false);
+                                                }}
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
+                                            >
+                                                <Music size={16} />
+                                                <span>Import</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    handleNewProject();
+                                                    setShowPillOptions(false);
+                                                }}
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                            >
+                                                <FilePlus size={16} />
+                                                <span>Create</span>
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
                             </div>
-                        </div>
+                        ) : (
+                            // Populated State (Packs Grid View)
+                            <div className="flex-1 flex flex-col overflow-hidden px-6">
+                                <div className="mb-4">
+                                    <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Packs</h1>
+                                    <div className="flex items-center justify-between text-xs text-zinc-500 uppercase tracking-wider font-semibold">
+                                        <button className="flex items-center gap-1 hover:text-white transition-colors">
+                                            <span>All</span>
+                                            <ChevronDown size={14} />
+                                        </button>
+                                        <button className="flex items-center gap-1 hover:text-white transition-colors">
+                                            <span>Recent</span>
+                                            <ChevronDown size={14} className="rotate-180" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {/* Display Saved Projects as cards */}
+                                        {savedProjects.map((p, index) => {
+                                            // Conic gradient colors based on project ID index to give variation
+                                            const gradients = [
+                                                'from-purple-900 to-indigo-950',
+                                                'from-emerald-900 to-teal-950',
+                                                'from-rose-900 to-amber-950',
+                                                'from-cyan-900 to-blue-950',
+                                                'from-fuchsia-900 to-purple-950'
+                                            ];
+                                            const gradientClass = gradients[index % gradients.length];
+
+                                            return (
+                                                <div key={p.id} className="flex flex-col gap-2 group relative">
+                                                    <div
+                                                        onClick={() => loadProject(p)}
+                                                        className={`aspect-square w-full rounded-2xl bg-gradient-to-tr ${gradientClass} border border-white/5 relative overflow-hidden shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                    >
+                                                        {/* Sleek metallic cone/radial reflection mockup using gradient */}
+                                                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-black/40 mix-blend-overlay" />
+                                                        
+                                                        {/* Play Button Overlay */}
+                                                        <div className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-90 transition-all hover:bg-white/25 active:scale-90">
+                                                            <Play size={12} fill="currentColor" className="ml-0.5" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-start justify-between px-1">
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-xs font-semibold text-white truncate">{p.name || "Untitled Project"}</h3>
+                                                            <span className="text-[10px] text-zinc-500 font-medium tracking-wide">{p.lastModified}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (confirm(`Delete "${p.name || 'Untitled Project'}"?`)) {
+                                                                    deleteProject(p.id);
+                                                                }
+                                                            }}
+                                                            className="text-zinc-500 hover:text-white p-1"
+                                                        >
+                                                            <span className="text-sm font-bold leading-none">···</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                        {/* Display Beats as cards */}
+                                        {beats.map((beat, index) => {
+                                            const gradients = [
+                                                'from-zinc-900 to-zinc-950',
+                                                'from-stone-900 to-zinc-950'
+                                            ];
+                                            const gradientClass = gradients[index % gradients.length];
+                                            const isPlaying = playingBeatId === beat.id;
+
+                                            return (
+                                                <div key={beat.id} className="flex flex-col gap-2 group relative">
+                                                    <div
+                                                        onClick={() => handleStartProjectFromBeat(beat)}
+                                                        className={`aspect-square w-full rounded-2xl bg-gradient-to-tr ${gradientClass} border ${isPlaying ? 'border-[var(--accent)]' : 'border-white/5'} relative overflow-hidden shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                    >
+                                                        <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent opacity-50" />
+                                                        
+                                                        {/* Play Button Overlay */}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handlePlayBeat(beat.id);
+                                                            }}
+                                                            className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-90 transition-all hover:bg-white/25 active:scale-90"
+                                                        >
+                                                            {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex items-start justify-between px-1">
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-xs font-semibold text-white truncate">{beat.name}</h3>
+                                                            <span className="text-[10px] text-zinc-500 font-medium tracking-wide">Beat · {beat.duration}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (confirm(`Delete "${beat.name}"?`)) {
+                                                                    handleDeleteBeat(beat.id);
+                                                                }
+                                                            }}
+                                                            className="text-zinc-500 hover:text-white p-1"
+                                                        >
+                                                            <span className="text-sm font-bold leading-none">···</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Floating Action Menu Trigger */}
+                                <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+                                    <div className="pointer-events-auto flex flex-col items-end gap-3">
+                                        <AnimatePresence>
+                                            {fabOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                                                    className="bg-[#e4ece9] text-black border border-white/20 rounded-2xl p-2 flex flex-col gap-1 shadow-2xl min-w-[160px]"
+                                                >
+                                                    <button
+                                                        onClick={() => {
+                                                            fabInputRef.current?.click();
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <Music size={16} />
+                                                        <span>Upload files</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            handleNewProject();
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <FilePlus size={16} />
+                                                        <span>Create pack</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setViewMode('studio');
+                                                            setFabOpen(false);
+                                                        }}
+                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                    >
+                                                        <Disc size={16} />
+                                                        <span>Open studio</span>
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        <button
+                                            onClick={() => setFabOpen(!fabOpen)}
+                                            className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                                        >
+                                            {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
+                            </div>
+                        )}
                     </div>
                 );
+            }
             case 'rituals':
                 return (
                     <div className="h-full relative">
@@ -2191,31 +2355,28 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-
-                <nav className={`z-[110] transition-all duration-500 bg-[var(--bg-card)] backdrop-blur-3xl border-t border-[var(--border-main)] pb-[env(safe-area-inset-bottom)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
-                    <div className="relative mx-auto max-w-lg grid grid-cols-5 items-end pt-2">
-                        <NavBtn id="tour-nav-library" active={viewMode === 'collection'} onClick={() => setViewMode('collection')} icon={<House className="h-5 w-5" />} label="Library" />
-                        <NavBtn id="tour-nav-studio" active={viewMode === 'studio'} onClick={() => setViewMode('studio')} icon={<ListMusic className="h-5 w-5" />} label="Studio" />
-                        <div className="flex justify-center relative">
-                            <div className="absolute bottom-1 flex flex-col items-center">
-                                <button
-                                    id="tour-nav-record"
-                                    onClick={() => {
-                                        setShowRecorder(true);
-                                        setRecorderMinimized(true);
-                                        setRecorderAutoStart(isBeatPlaying);
-                                    }}
-                                    className="relative flex items-center justify-center w-[72px] h-[72px] sm:w-[82px] sm:h-[82px] rounded-full transition-all duration-300 select-none border-[6px] sm:border-[7px] border-[var(--bg-card)] bg-red-500 hover:scale-105 active:scale-95 shadow-[0_4px_20px_rgba(239,68,68,0.4)]"
-                                    style={{ touchAction: 'none' }}
-                                >
-                                    <Plus className="h-5 w-5 text-white" />
-                                </button>
-                            </div>
-                        </div>
-                        <NavBtn id="tour-nav-rituals" active={viewMode === 'rituals'} onClick={() => setViewMode('rituals')} icon={<Clock className="h-5 w-5" />} label="Rituals" />
-                        <NavBtn active={viewMode === 'vault'} onClick={() => setViewMode('vault')} icon={<Library className="h-5 w-5" />} label="Vault" />
-                    </div>
+                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 bg-black/60 backdrop-blur-xl border border-white/10 px-6 py-2.5 rounded-full flex items-center gap-8 shadow-[0_12px_40px_rgba(0,0,0,0.6)] ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                    <button
+                        onClick={() => setViewMode('collection')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        title="Library"
+                    >
+                        <Library className="h-6 w-6" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('studio')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'studio' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        title="Studio"
+                    >
+                        <Disc className="h-6 w-6" />
+                    </button>
+                    <button
+                        onClick={() => setViewMode('vault')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        title="Virtual Vault"
+                    >
+                        <History className="h-6 w-6" />
+                    </button>
                 </nav>
             </main>
 
@@ -2239,8 +2400,6 @@ const StudioWorkspace: React.FC = () => {
                     parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
                 />
             )}
-
-            {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
             {/* Music Player Modal */}
             <AnimatePresence>
