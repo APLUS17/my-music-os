@@ -38,7 +38,9 @@ import {
     ListMusic,
     Library,
     Disc,
-    History
+    History,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -356,6 +358,12 @@ const CATEGORIES = [
 const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
     const [theme, setTheme] = useState<Theme>('dark');
+    const cycleTheme = () => {
+        const themes: Theme[] = ['dark', 'light', 'midnight', 'matrix', 'sonar'];
+        const currentIndex = themes.indexOf(theme);
+        const nextIndex = (currentIndex + 1) % themes.length;
+        setTheme(themes[nextIndex]);
+    };
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
     const [ritualStats, setRitualStats] = useState<RitualStat[]>([]);
     const handleCompleteRitual = (stat: RitualStat) => {
@@ -1616,8 +1624,12 @@ const StudioWorkspace: React.FC = () => {
                         {/* Top Bar Header */}
                         <div className="px-6 py-4 flex items-center justify-between z-30">
                             <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
-                            <button onClick={() => setShowSearch(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all">
-                                <Search size={20} />
+                            <button
+                                onClick={cycleTheme}
+                                className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
+                                title="Cycle Theme"
+                            >
+                                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                             </button>
                         </div>
 
