@@ -1754,9 +1754,28 @@ const StudioWorkspace: React.FC = () => {
                                                 <div key={beat.id} className="flex flex-col gap-2 group relative">
                                                     <div
                                                         onClick={() => handleStartProjectFromBeat(beat)}
-                                                        className={`aspect-square w-full rounded-2xl bg-gradient-to-tr ${gradientClass} border ${isPlaying ? 'border-[var(--accent)]' : 'border-white/5'} relative overflow-hidden shadow-lg cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                        className="aspect-square w-full relative group"
                                                     >
-                                                        <div className="absolute inset-0 bg-radial-gradient from-white/5 to-transparent opacity-50" />
+                                                        {/* Silvery Metallic Vinyl Record */}
+                                                        <motion.div
+                                                            animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
+                                                            transition={isPlaying ? { repeat: Infinity, duration: 4, ease: "linear" } : { duration: 0.5 }}
+                                                            className={`w-full h-full rounded-full bg-[conic-gradient(from_0deg,_#a1a1aa,_#e4e4e7,_#71717a,_#e4e4e7,_#a1a1aa)] border ${isPlaying ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-white/15'} relative overflow-hidden flex items-center justify-center shadow-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                        >
+                                                            {/* Grooves */}
+                                                            <div className="absolute inset-1.5 rounded-full border border-black/15" />
+                                                            <div className="absolute inset-4 rounded-full border border-black/15" />
+                                                            <div className="absolute inset-7 rounded-full border border-black/10" />
+                                                            <div className="absolute inset-10 rounded-full border border-black/10" />
+                                                            <div className="absolute inset-13 rounded-full border border-black/5" />
+                                                            <div className="absolute inset-16 rounded-full border border-black/5" />
+                                                            
+                                                            {/* Center Label (Colored vinyl label) */}
+                                                            <div className="w-1/3 h-1/3 rounded-full bg-zinc-800 border border-black/30 flex items-center justify-center relative shadow-inner">
+                                                                {/* Spindle hole */}
+                                                                <div className="w-3 h-3 rounded-full bg-black border border-zinc-700 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]" />
+                                                            </div>
+                                                        </motion.div>
                                                         
                                                         {/* Play Button Overlay */}
                                                         <button
@@ -1764,9 +1783,9 @@ const StudioWorkspace: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 handlePlayBeat(beat.id);
                                                             }}
-                                                            className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-90 transition-all hover:bg-white/25 active:scale-90"
+                                                            className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
                                                         >
-                                                            {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
+                                                            {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                                                         </button>
                                                     </div>
                                                     <div className="flex items-start justify-between px-1">
@@ -2362,13 +2381,29 @@ const StudioWorkspace: React.FC = () => {
                     >
                         <Library className="h-6 w-6" />
                     </button>
-                    <button
-                        onClick={() => setViewMode('studio')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'studio' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
-                        title="Studio"
-                    >
-                        <Disc className="h-6 w-6" />
-                    </button>
+                    {viewMode === 'studio' ? (
+                        <button
+                            onClick={() => {
+                                setShowRecorder(true);
+                                setRecorderMinimized(true);
+                                setRecorderAutoStart(isBeatPlaying);
+                            }}
+                            className="p-2 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                            title="Record"
+                        >
+                            <div className="w-6 h-6 rounded-full border-2 border-red-500 flex items-center justify-center">
+                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
+                            </div>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setViewMode('studio')}
+                            className="p-2 rounded-full transition-all active:scale-95 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                            title="Studio"
+                        >
+                            <Disc className="h-6 w-6" />
+                        </button>
+                    )}
                     <button
                         onClick={() => setViewMode('vault')}
                         className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-zinc-500 hover:text-zinc-300'}`}
