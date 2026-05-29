@@ -1674,27 +1674,21 @@ const StudioWorkspace: React.FC = () => {
                             </div>
                         ) : (
                             // Populated State (Packs Grid View)
-                            <div className="flex-1 flex flex-col overflow-hidden px-6">
+                            <div className="flex-1 flex flex-col overflow-hidden px-4">
                                 <div className="mb-4">
-                                    <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Beats</h1>
-                                    <div className="flex border-b border-white/5 mb-4">
+                                    {/* Segmented Control Switcher */}
+                                    <div className="w-full bg-zinc-900/60 backdrop-blur-md border border-white/5 p-1 rounded-full flex gap-1 shadow-inner">
                                         <button
                                             onClick={() => setLibraryTab('songs')}
-                                            className={`pb-2 pr-6 text-sm font-semibold transition-all relative ${libraryTab === 'songs' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                                         >
                                             Songs
-                                            {libraryTab === 'songs' && (
-                                                <motion.div layoutId="lib-tab-indicator" className="absolute bottom-0 left-0 right-6 h-0.5 bg-[var(--accent)]" />
-                                            )}
                                         </button>
                                         <button
                                             onClick={() => setLibraryTab('beats')}
-                                            className={`pb-2 px-6 text-sm font-semibold transition-all relative ${libraryTab === 'beats' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'beats' ? 'bg-white/10 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                                         >
                                             Beats
-                                            {libraryTab === 'beats' && (
-                                                <motion.div layoutId="lib-tab-indicator" className="absolute bottom-0 left-6 right-6 h-0.5 bg-[var(--accent)]" />
-                                            )}
                                         </button>
                                     </div>
                                 </div>
