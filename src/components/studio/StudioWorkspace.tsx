@@ -1612,10 +1612,10 @@ const StudioWorkspace: React.FC = () => {
                 const isEmpty = savedProjects.length === 0 && beats.length === 0;
 
                 return (
-                    <div className="h-full flex flex-col pt-6 relative text-white bg-black select-none">
+                    <div className="h-full flex flex-col pt-6 relative text-[var(--text-main)] bg-[var(--bg-main)] select-none">
                         {/* Top Bar Header */}
                         <div className="px-6 py-4 flex items-center justify-between z-30">
-                            <span className="text-xl font-black tracking-tight uppercase text-white">LYRIQ</span>
+                            <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
                             <button onClick={() => setShowSearch(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all">
                                 <Search size={20} />
                             </button>
