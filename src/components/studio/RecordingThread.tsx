@@ -136,13 +136,14 @@ const ThreadItemComponent = memo<{
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="relative"
         >
-            <div className="relative pl-6 border-l border-white/10">
+            <div className="relative pl-6 border-l border-white/8">
                 {/* Timeline dot */}
-                <div className="absolute -left-[7px] top-5 w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/30" />
+                <div className="absolute -left-[7px] top-5 w-3 h-3 rounded-full bg-white/40" />
 
                 {/* Main item card */}
                 <div
@@ -150,8 +151,8 @@ const ThreadItemComponent = memo<{
                     className={cn(
                         "p-4 rounded-xl cursor-pointer transition-all border",
                         isPlaying_this
-                            ? "bg-emerald-500/10 border-emerald-500/30"
-                            : "bg-slate-900/50 hover:bg-slate-800/50 border-white/5"
+                            ? "bg-emerald-500/5 border-emerald-500/40"
+                            : "bg-slate-900/40 hover:bg-slate-900/60 border-white/8 hover:border-white/12"
                     )}
                 >
                     {/* Header row */}
@@ -187,7 +188,7 @@ const ThreadItemComponent = memo<{
                         <span className="font-medium text-sm truncate">{item.label}</span>
                         <button
                             onClick={(e) => onPlaySection(item.section, e)}
-                            className="bg-white/5 p-2 rounded-full hover:bg-white/10 transition-transform active:scale-95"
+                            className="bg-white/8 p-2 rounded-full hover:bg-white/12 transition-all active:scale-95"
                         >
                             {isPlaying_this ? (
                                 <Pause size={16} className="text-white" />
@@ -210,27 +211,29 @@ const ThreadItemComponent = memo<{
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeInOut" }}
                             className="pl-6 pt-2 overflow-hidden space-y-2"
                         >
                             {item.children.map((child) => (
                                 <motion.div
                                     key={child.id}
-                                    initial={{ x: -10 }}
-                                    animate={{ x: 0 }}
+                                    initial={{ x: -10, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ duration: 0.25, ease: "easeOut" }}
                                     className="relative"
                                 >
                                     {/* Variant dot */}
-                                    <div className="absolute -left-[7px] top-3 w-2 h-2 rounded-full bg-slate-500" />
+                                    <div className="absolute -left-[7px] top-3 w-2 h-2 rounded-full bg-white/25" />
 
                                     <div
                                         onClick={() => onSelectSession(item.sessionId)}
-                                        className="p-3 rounded-lg border border-white/5 bg-slate-900/30 hover:bg-slate-900/50 transition-colors cursor-pointer"
+                                        className="p-3 rounded-lg border border-white/6 bg-slate-900/20 hover:bg-slate-900/40 transition-all cursor-pointer"
                                     >
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs text-white/60">{child.label}</span>
                                             <button
                                                 onClick={(e) => onPlaySection(child.section, e)}
-                                                className="bg-white/5 p-1.5 rounded-full hover:bg-white/10 transition-transform"
+                                                className="bg-white/6 p-1.5 rounded-full hover:bg-white/10 transition-all active:scale-95"
                                             >
                                                 <Play size={12} className="text-white ml-0.5" />
                                             </button>
@@ -309,7 +312,7 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     }, [sessions, activeSessionId, onPlaySession, onSelectSession, onSeek, onTogglePlay]);
 
     return (
-        <div className="flex flex-col gap-6 p-4 pb-32 max-w-3xl mx-auto w-full">
+        <div className="flex flex-col gap-6 p-4 pb-8 max-w-3xl mx-auto w-full">
             <AnimatePresence mode="popLayout">
                 {threadItems.map((item) => (
                     <ThreadItemComponent
@@ -329,20 +332,12 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
             </AnimatePresence>
 
             {threadItems.length === 0 && (
-                <div className="flex flex-col items-center justify-center p-12 text-white/50 border border-dashed border-white/10 rounded-2xl bg-white/[0.02]">
-                    <Mic size={32} className="mb-4 opacity-40" />
+                <div className="flex flex-col items-center justify-center p-12 text-white/40 border border-dashed border-white/8 rounded-2xl bg-slate-900/20">
+                    <Mic size={32} className="mb-4 opacity-30" />
                     <p className="text-center font-medium text-sm">No recordings yet</p>
-                    <p className="text-center text-xs opacity-60 mt-1">Tap the record button to start capturing</p>
+                    <p className="text-center text-xs opacity-50 mt-1">Tap the record button to start capturing</p>
                 </div>
             )}
-
-            {/* FAB - preserved from original */}
-            <motion.button
-                whileTap={{ scale: 0.9 }}
-                className="fixed bottom-6 right-6 bg-emerald-500 p-4 rounded-full shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-colors"
-            >
-                <Mic size={24} className="text-black" />
-            </motion.button>
         </div>
     );
 };
