@@ -186,7 +186,7 @@ function LoginForm() {
         </button>
 
         <p className="text-center text-xs text-[var(--text-secondary)] mt-8">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/signup" className="text-white hover:text-[var(--accent)] font-semibold transition-colors">
             Sign up
           </Link>
