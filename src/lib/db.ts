@@ -9,6 +9,7 @@ export type Database = {
           title: string
           status: string
           description: string | null
+          user_id: string
           created_at: string
           updated_at: string
         }
@@ -17,6 +18,7 @@ export type Database = {
           title: string
           status?: string
           description?: string | null
+          user_id: string
           created_at?: string
           updated_at?: string
         }
@@ -25,6 +27,7 @@ export type Database = {
           title?: string
           status?: string
           description?: string | null
+          user_id?: string
           created_at?: string
           updated_at?: string
         }

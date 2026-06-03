@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import { X, Play, Pause, Volume2, SkipBack, SkipForward } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession } from '@/types';
@@ -103,14 +104,16 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       vocalAudioCtxRef.current?.resume();
       
       if (vocal.paused && hasVocals) {
-        vocal.play().catch(() => setIsPlaying(false));
+        vocal.play().catch((err) => {
+          setIsPlaying(false);
+          if (err?.name !== 'AbortError') toast.error('Vocal playback failed.');
+        });
         
         if (beat.paused && hasBeat) {
           // Sync beat to vocal start position + offset
           beat.currentTime = vocal.currentTime + beatOffset;
-          beat.play().catch(() => {
-            // If beat fails, we might still want to play vocal, but let's be safe
-            console.error("Beat playback failed");
+          beat.play().catch((err) => {
+            if (err?.name !== 'AbortError') toast.error('Beat playback failed.');
           });
         }
       }

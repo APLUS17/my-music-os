@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   Play,
   Pause,
@@ -146,7 +147,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } else if (!isMinimized) {
       // Traditional browser recording pattern: prompt for microphone
       // permissions and initialize as soon as the drawer opens
-      initializeMic().catch(console.error);
+      initializeMic().catch((err) => {
+        if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission denied')) {
+          toast.error('Microphone access denied. Check your browser settings.');
+        } else {
+          toast.error('Could not access microphone. Please check your device.');
+        }
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, isMinimized]);
@@ -321,7 +328,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
     if (isPlaying) {
       if (audio.paused) {
-        audio.play().catch(() => setIsPlaying(false));
+        audio.play().catch((err) => {
+          setIsPlaying(false);
+          if (err?.name !== 'AbortError') toast.error('Playback failed. Try again.');
+        });
       }
 
       if (backingAudio && backingTrackSrc && backingAudio.paused) {
@@ -331,7 +341,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         // Duck beat during vocal review so the take is audible over the beat
         backingAudio.volume = 0.55;
         onResumeBeatAudio?.();
-        backingAudio.play().catch(console.error);
+        backingAudio.play().catch((err) => {
+          if (err?.name !== 'AbortError') console.warn('Backing audio playback issue:', err);
+        });
       }
     } else {
       if (!audio.paused) audio.pause();
@@ -385,7 +397,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     // Play parent audio (main take)
     if (parentAudioRef.current && parentAudioUrl) {
       parentAudioRef.current.currentTime = 0;
-      parentAudioRef.current.play().catch(console.error);
+      parentAudioRef.current.play().catch((err) => {
+        if (err?.name !== 'AbortError') console.warn('Parent audio playback issue:', err);
+      });
     }
 
     // Play all unmuted existing layers
@@ -394,7 +408,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (audio && !layer.isMuted && audio.paused) {
         audio.currentTime = 0;
         audio.volume = layer.gain ?? 1;
-        audio.play().catch(console.error);
+        audio.play().catch((err) => {
+          if (err?.name !== 'AbortError') toast.error('Playback failed. Try again.');
+        });
       }
     });
   };
@@ -498,7 +514,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         recordingStartOffsetRef.current = backingAudio.currentTime;
         loopPassCountRef.current = 0;
         onResumeBeatAudio?.();
-        backingAudio.play().catch(console.error);
+        backingAudio.play().catch((err) => {
+          if (err?.name !== 'AbortError') console.warn('Backing audio playback issue:', err);
+        });
       } else {
         recordingStartOffsetRef.current = 0;
         loopPassCountRef.current = 0;

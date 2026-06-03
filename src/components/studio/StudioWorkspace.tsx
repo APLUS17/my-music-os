@@ -1,11 +1,15 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase/client';
+import { copyLyricsToClipboard } from '@/lib/export';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
+import { ErrorBoundary } from '../ErrorBoundary';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
@@ -36,9 +40,9 @@ import {
     MessageSquare,
     House,
     ListMusic,
-    Library
+    Library,
+    Copy
 } from 'lucide-react';
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChevronDown, CheckCircle2 } from 'lucide-react';
 
@@ -375,6 +379,31 @@ const StudioWorkspace: React.FC = () => {
     const [uploadedBeatId, setUploadedBeatId] = useState<string | null>(null);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                setUserEmail(user.email ?? null);
+            }
+        };
+        fetchUser();
+    }, []);
+
+    const handleLogout = async () => {
+        if (!confirm("Are you sure you want to sign out?")) return;
+        try {
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            toast.success("Signed out successfully!");
+            window.location.reload();
+        } catch (error) {
+            toast.error("Failed to sign out");
+        }
+    };
+
     const [fabOpen, setFabOpen] = useState(false);
     const fabInputRef = useRef<HTMLInputElement>(null);
     const beatAudioRef = useRef<HTMLAudioElement>(null);
@@ -487,7 +516,9 @@ const StudioWorkspace: React.FC = () => {
             // 1. Play Vocal if available
             const hasVocals = sessions.length > 0 && vocalAudioRef.current;
             if (hasVocals) {
-                vocalAudioRef.current?.play().catch(console.error);
+                vocalAudioRef.current?.play().catch((err) => {
+                    if (err?.name !== 'AbortError') toast.error("Vocal playback failed.");
+                });
             }
 
             // 2. Play Beat if available
@@ -498,7 +529,9 @@ const StudioWorkspace: React.FC = () => {
                     const beat = beatAudioRef.current;
                     if (beat.readyState >= 1) beat.currentTime = vocalAudioRef.current.currentTime + offset;
                 }
-                beatAudioRef.current.play().catch(console.error);
+                beatAudioRef.current.play().catch((err) => {
+                    if (err?.name !== 'AbortError') toast.error("Beat playback failed.");
+                });
                 setIsBeatPlaying(true);
             }
             
@@ -984,11 +1017,15 @@ const StudioWorkspace: React.FC = () => {
                 beatAudioRef.current.currentTime = session.beatOffset;
                 if (beatGainRef.current) beatGainRef.current.gain.value = beatVolume;
                 beatAudioCtxRef.current?.resume();
-                beatAudioRef.current.play().catch(console.error);
+                beatAudioRef.current.play().catch((err) => {
+                    if (err?.name !== 'AbortError') toast.error("Beat playback failed.");
+                });
                 setIsBeatPlaying(true);
             }
             
-            audio.play().catch(console.error);
+            audio.play().catch((err) => {
+                if (err?.name !== 'AbortError') toast.error("Vocal playback failed.");
+            });
             globalAudioRef.current = audio;
             setPlayingSessionId(sessionId);
         }
@@ -1024,7 +1061,9 @@ const StudioWorkspace: React.FC = () => {
             if (globalAudioRef.current) globalAudioRef.current.pause();
             const audio = new Audio(beat.audioUrl || beat.base64);
             audio.onended = () => setPlayingBeatId(null);
-            audio.play().catch(console.error);
+            audio.play().catch((err) => {
+                if (err?.name !== 'AbortError') toast.error("Beat playback failed.");
+            });
             globalAudioRef.current = audio;
             setPlayingBeatId(beatId);
         }
@@ -1067,7 +1106,9 @@ const StudioWorkspace: React.FC = () => {
             if (isBeatLooping) {
                 audio.currentTime = beatLoopStart ?? 0;
                 beatAudioCtxRef.current?.resume();
-                audio.play().catch(console.error);
+                audio.play().catch((err) => {
+                    if (err?.name !== 'AbortError') console.warn("Failed to loop beat:", err);
+                });
             } else {
                 setIsBeatPlaying(false);
             }
@@ -1086,7 +1127,10 @@ const StudioWorkspace: React.FC = () => {
         if (isBeatPlaying) {
             if (audio.paused && audio.src) {
                 beatAudioCtxRef.current?.resume();
-                audio.play().catch(() => setIsBeatPlaying(false));
+                audio.play().catch((err) => {
+                    setIsBeatPlaying(false);
+                    if (err?.name !== 'AbortError') toast.error("Beat playback failed.");
+                });
             }
         } else {
             if (!audio.paused) {
@@ -1461,6 +1505,24 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             </section>
                             <section className="pt-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Account</h2>
+                                <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Logged In As</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] truncate max-w-[240px]">{userEmail || 'Loading...'}</p>
+                                        </div>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors uppercase tracking-wider cursor-pointer"
+                                        >
+                                            Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section className="pt-4">
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Help</h2>
                                 <div className="grid grid-cols-1 gap-3">
                                     <button
@@ -1730,6 +1792,22 @@ const StudioWorkspace: React.FC = () => {
                                             }}
                                             onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
                                         />
+
+                                        <button
+                                            onClick={async () => {
+                                                const success = await copyLyricsToClipboard(sections, projectTitle);
+                                                if (success) {
+                                                    toast.success("Lyrics copied to clipboard!");
+                                                } else {
+                                                    toast.error("No lyrics to copy.");
+                                                }
+                                            }}
+                                            className="h-9 px-3 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 text-xs mono uppercase font-medium cursor-pointer"
+                                            title="Copy lyrics to clipboard"
+                                        >
+                                            <Copy size={12} />
+                                            <span>Copy Lyrics</span>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1746,50 +1824,52 @@ const StudioWorkspace: React.FC = () => {
                             {/* Player Tab — full height, no scroll padding */}
                             {activeTab === 'player' && (
                                 <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
-                                    <PlayerTab
-                                        projectTitle={projectTitle || "Untitled Project"}
-                                        session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
-                                        onOpenFX={() => setShowFXPanel(true)}
-                                        sessions={sessions}
-                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
-                                        beatSrc={uploadedBeat}
-                                        beatVolume={beatVolume}
-                                        beatMuted={beatMuted}
-                                        onVolumeChange={setBeatVolume}
-                                        onMuteChange={setBeatMuted}
-                                        isBeatLooping={isBeatLooping}
-                                        beatLoopStart={beatLoopStart}
-                                        beatLoopEnd={beatLoopEnd}
-                                        lyrics={sections}
-                                        isAnalyzingVocal={isAnalyzingVocal}
-                                        isAnalyzingBeat={isAnalyzingBeat}
+                                    <ErrorBoundary featureName="Player" compact>
+                                        <PlayerTab
+                                            projectTitle={projectTitle || "Untitled Project"}
+                                            session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                            onOpenFX={() => setShowFXPanel(true)}
+                                            sessions={sessions}
+                                            beat={beats.find(b => b.id === uploadedBeatId) ?? null}
+                                            beatSrc={uploadedBeat}
+                                            beatVolume={beatVolume}
+                                            beatMuted={beatMuted}
+                                            onVolumeChange={setBeatVolume}
+                                            onMuteChange={setBeatMuted}
+                                            isBeatLooping={isBeatLooping}
+                                            beatLoopStart={beatLoopStart}
+                                            beatLoopEnd={beatLoopEnd}
+                                            lyrics={sections}
+                                            isAnalyzingVocal={isAnalyzingVocal}
+                                            isAnalyzingBeat={isAnalyzingBeat}
 
-                                        // Shared Audio State
-                                        isPlaying={isPlaying}
-                                        currentTime={currentTime}
-                                        duration={duration}
-                                        onTogglePlay={togglePlayback}
-                                        onSeek={seekTo}
-                                        onSelectSession={setActiveSessionId}
+                                            // Shared Audio State
+                                            isPlaying={isPlaying}
+                                            currentTime={currentTime}
+                                            duration={duration}
+                                            onTogglePlay={togglePlayback}
+                                            onSeek={seekTo}
+                                            onSelectSession={setActiveSessionId}
 
-                                        onBeatPlaybackChange={(isP) => {
-                                            if (isP && isBeatPlaying && beatAudioRef.current) {
-                                                beatAudioRef.current.pause();
-                                                beatAudioCtxRef.current?.suspend();
-                                                setIsBeatPlaying(false);
-                                            }
-                                        }}
-                                        onSetLoopRegion={(startTime, endTime) => {
-                                            setBeatLoopStart(startTime);
-                                            setBeatLoopEnd(endTime);
-                                            setIsBeatLooping(true);
-                                        }}
-                                        onClearLoop={() => {
-                                            setIsBeatLooping(false);
-                                            setBeatLoopStart(null);
-                                            setBeatLoopEnd(null);
-                                        }}
-                                    />
+                                            onBeatPlaybackChange={(isP) => {
+                                                if (isP && isBeatPlaying && beatAudioRef.current) {
+                                                    beatAudioRef.current.pause();
+                                                    beatAudioCtxRef.current?.suspend();
+                                                    setIsBeatPlaying(false);
+                                                }
+                                            }}
+                                            onSetLoopRegion={(startTime, endTime) => {
+                                                setBeatLoopStart(startTime);
+                                                setBeatLoopEnd(endTime);
+                                                setIsBeatLooping(true);
+                                            }}
+                                            onClearLoop={() => {
+                                                setIsBeatLooping(false);
+                                                setBeatLoopStart(null);
+                                                setBeatLoopEnd(null);
+                                            }}
+                                        />
+                                    </ErrorBoundary>
                                 </div>
                             )}
 
@@ -2017,24 +2097,26 @@ const StudioWorkspace: React.FC = () => {
             </main>
 
             {showRecorder && (
-                <RecorderDrawer
-                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); setLayerModeSessionId(null); }}
-                    onSave={handleSaveRecordingSession}
-                    isMinimized={recorderMinimized}
-                    onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
-                    backingTrackSrc={uploadedBeat}
-                    backingAudioRef={beatAudioRef}
-                    onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}
-                    autoStart={recorderAutoStart}
-                    latencyCompensation={latencyCompensation}
-                    beatVolume={beatVolume}
-                    loopStart={beatLoopStart}
-                    loopEnd={beatLoopEnd}
-                    isLooping={isBeatLooping}
-                    layerMode={!!layerModeSessionId}
-                    existingLayers={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.layers || [] : []}
-                    parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
-                />
+                <ErrorBoundary featureName="Recorder" compact>
+                    <RecorderDrawer
+                        onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); setLayerModeSessionId(null); }}
+                        onSave={handleSaveRecordingSession}
+                        isMinimized={recorderMinimized}
+                        onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
+                        backingTrackSrc={uploadedBeat}
+                        backingAudioRef={beatAudioRef}
+                        onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}
+                        autoStart={recorderAutoStart}
+                        latencyCompensation={latencyCompensation}
+                        beatVolume={beatVolume}
+                        loopStart={beatLoopStart}
+                        loopEnd={beatLoopEnd}
+                        isLooping={isBeatLooping}
+                        layerMode={!!layerModeSessionId}
+                        existingLayers={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.layers || [] : []}
+                        parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
+                    />
+                </ErrorBoundary>
             )}
 
             {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
@@ -2042,12 +2124,14 @@ const StudioWorkspace: React.FC = () => {
             {/* Music Player Modal */}
             <AnimatePresence>
                 {showMusicPlayer && (
-                    <MusicPlayer
-                        onClose={() => setShowMusicPlayer(false)}
-                        beatSrc={uploadedBeat}
-                        vocalSessions={sessions}
-                        projectTitle={projectTitle || "Untitled"}
-                    />
+                    <ErrorBoundary featureName="Music Player">
+                        <MusicPlayer
+                            onClose={() => setShowMusicPlayer(false)}
+                            beatSrc={uploadedBeat}
+                            vocalSessions={sessions}
+                            projectTitle={projectTitle || "Untitled"}
+                        />
+                    </ErrorBoundary>
                 )}
             </AnimatePresence>
 

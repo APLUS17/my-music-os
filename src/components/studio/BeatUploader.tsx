@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Play, Pause, X, RotateCcw, Repeat, Trash2, Music, Volume2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -196,6 +197,18 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const MAX_FILE_SIZE_MB = 100;
+      const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/ogg', 'audio/webm', 'audio/flac'];
+
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`File too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+        return;
+      }
+      if (!file.type.startsWith('audio/') && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
+        toast.error('Please upload an audio file (MP3, WAV, M4A, etc.)');
+        return;
+      }
+
       setLoopStart(null);
       setLoopEnd(null);
       onUpload(file);

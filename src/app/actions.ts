@@ -1,16 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/db";
+import { createClient } from "@/lib/supabase/server";
 import { GoogleGenAI } from "@google/genai";
 
-// --- Database Actions (Supabase) ---
+// --- Database Actions (Supabase with Auth) ---
 
 export async function createProject(title: string) {
     try {
-        const { data, error } = await (supabase
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) throw new Error("Unauthenticated");
+
+        const { data, error } = await (supabaseServer
             .from("projects") as any)
-            .insert([{ title, status: "draft" }])
+            .insert([{ title, status: "draft", user_id: user.id }])
             .select()
             .single();
 
@@ -26,9 +30,14 @@ export async function createProject(title: string) {
 
 export async function getProjects() {
     try {
-        const { data, error } = await supabase
-            .from("projects")
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return [];
+
+        const { data, error } = await (supabaseServer
+            .from("projects") as any)
             .select("*")
+            .eq("user_id", user.id)
             .order("updated_at", { ascending: false });
 
         if (error) throw error;
@@ -41,10 +50,15 @@ export async function getProjects() {
 
 export async function getProject(id: string) {
     try {
-        const { data, error } = await supabase
-            .from("projects")
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) return null;
+
+        const { data, error } = await (supabaseServer
+            .from("projects") as any)
             .select("*")
             .eq("id", id)
+            .eq("user_id", user.id)
             .single();
 
         if (error) throw error;
@@ -57,10 +71,15 @@ export async function getProject(id: string) {
 
 export async function deleteProject(id: string) {
     try {
-        const { error } = await supabase
-            .from("projects")
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) throw new Error("Unauthenticated");
+
+        const { error } = await (supabaseServer
+            .from("projects") as any)
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .eq("user_id", user.id);
 
         if (error) throw error;
 
@@ -74,10 +93,15 @@ export async function deleteProject(id: string) {
 
 export async function updateProjectStudio(id: string, content: string) {
     try {
-        const { error } = await supabase
-            .from("projects")
+        const supabaseServer = await createClient();
+        const { data: { user } } = await supabaseServer.auth.getUser();
+        if (!user) throw new Error("Unauthenticated");
+
+        const { error } = await (supabaseServer
+            .from("projects") as any)
             .update({ description: content, updated_at: new Date().toISOString() })
-            .eq("id", id);
+            .eq("id", id)
+            .eq("user_id", user.id);
 
         if (error) throw error;
         return { success: true };
