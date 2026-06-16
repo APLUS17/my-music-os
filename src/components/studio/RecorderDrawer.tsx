@@ -592,7 +592,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
             initial={{ y: 100, opacity: 0, x: '-50%' }}
             animate={{ y: 0, opacity: 1, x: '-50%' }}
             exit={{ y: 100, opacity: 0, x: '-50%' }}
-            className="fixed bottom-28 left-1/2 z-[70] w-full max-w-[90%] sm:max-w-md"
+            className="fixed bottom-24 left-1/2 z-[120] w-full max-w-[95%] sm:max-w-md"
           >
             <div className="w-full glass rounded-full p-2 pl-3 shadow-2xl flex items-center justify-between gap-3 border border-white/10">
               <div className="flex items-center gap-3 flex-1 min-w-0">

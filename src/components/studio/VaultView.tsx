@@ -3,7 +3,7 @@
 import React, { useMemo, memo, useContext, useEffect, useRef, useState, createContext } from 'react';
 import {
     Library, Music, FileText, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat,
-    LayoutGrid, Maximize2, List
+    LayoutGrid, Maximize2, List as ListIcon, ChevronRight, MessageSquare
 } from 'lucide-react';
 import { Button } from "../ui/button";
 import { LyricScrap, RecordingSession, Beat, RitualStat } from '../../types';
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 // --- Types & Context ---
 type GridVariant = "default" | "masonry" | "premium";
-type LayoutMode = "infinite" | "grid";
+type LayoutMode = "infinite" | "grid" | "list";
 const GridVariantContext = createContext<GridVariant | undefined>(undefined);
 
 const formatTime = (seconds: number = 0) => {
@@ -174,8 +174,11 @@ const VaultAudioCard = ({
     );
 };
 
-const VaultStickyNote = ({ scrap }: { scrap: LyricScrap }) => (
-    <div className="h-full bg-yellow-200/90 p-5 shadow-xl rotate-[-1deg] flex flex-col justify-between rounded-sm border-t-2 border-yellow-300">
+const VaultStickyNote = ({ scrap, compact = false }: { scrap: LyricScrap, compact?: boolean }) => (
+    <div className={cn(
+        "h-full bg-yellow-200/90 shadow-xl rotate-[-1deg] flex flex-col justify-between rounded-sm border-t-2 border-yellow-300",
+        compact ? "p-3" : "p-5"
+    )}>
         <p className="text-sm text-yellow-900 font-medium leading-relaxed italic">
             "{scrap.text}"
         </p>
@@ -333,6 +336,101 @@ const GridBody = memo(({ children, className }: { children: React.ReactNode; cla
 
 GridBody.displayName = "GridBody";
 
+// --- List View Component ---
+
+const VaultListView = ({
+    items,
+    playingSessionId,
+    playingBeatId,
+    onPlaySession,
+    onPlayBeat,
+    currentTime,
+    duration
+}: {
+    items: { type: 'session' | 'scrap' | 'beat', data: any }[],
+    playingSessionId: string | null,
+    playingBeatId: string | null,
+    onPlaySession: (id: string) => void,
+    onPlayBeat: (id: string) => void,
+    currentTime: number,
+    duration: number
+}) => {
+    return (
+        <div className="flex flex-col w-full divide-y divide-[var(--border-main)]">
+            {items.map((item, idx) => {
+                const isPlaying = (item.type === 'session' && playingSessionId === item.data.id) ||
+                                  (item.type === 'beat' && playingBeatId === item.data.id);
+
+                const title = item.type === 'session' ? (item.data.name || 'Untitled Recording') :
+                              item.type === 'beat' ? item.data.name :
+                              item.data.text ? (item.data.text.length > 50 ? item.data.text.substring(0, 50) + '...' : item.data.text) : 'Note';
+
+                const date = item.type === 'session' ? new Date(item.data.timestamp).toLocaleDateString() :
+                             item.type === 'beat' ? item.data.date :
+                             'Just now';
+
+                const durationStr = item.type === 'session' ? formatTime(item.data.duration) :
+                                   item.type === 'beat' ? item.data.duration :
+                                   '';
+
+                return (
+                    <motion.div
+                        key={`${item.type}-${item.data.id}-${idx}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.03 }}
+                        onClick={() => item.type === 'session' ? onPlaySession(item.data.id) : item.type === 'beat' ? onPlayBeat(item.data.id) : null}
+                        className={cn(
+                            "group flex items-center justify-between py-4 px-2 hover:bg-[var(--bg-secondary)] transition-all cursor-pointer",
+                            isPlaying && "bg-[var(--accent)]/5"
+                        )}
+                    >
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <div className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all",
+                                isPlaying ? "bg-[var(--accent)] text-black" : "bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
+                            )}>
+                                {isPlaying ? (
+                                    <Pause size={16} fill="currentColor" />
+                                ) : item.type === 'session' ? (
+                                    <FileText size={18} />
+                                ) : item.type === 'beat' ? (
+                                    <Music size={18} />
+                                ) : (
+                                    <MessageSquare size={18} />
+                                )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <h4 className={cn(
+                                    "text-sm font-semibold truncate transition-colors",
+                                    isPlaying ? "text-[var(--accent)]" : "text-[var(--text-main)]"
+                                )}>
+                                    {title}
+                                </h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] mono text-[var(--text-tertiary)] uppercase">{date}</span>
+                                    {item.type === 'session' && item.data.transcription && (
+                                        <div className="w-1 h-1 rounded-full bg-[var(--text-tertiary)]" />
+                                    )}
+                                    {item.type === 'session' && item.data.transcription && (
+                                        <MessageSquare size={10} className="text-[var(--text-tertiary)]" />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 pl-4">
+                            {durationStr && <span className="text-xs mono text-[var(--text-secondary)]">{durationStr}</span>}
+                            <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    </motion.div>
+                );
+            })}
+        </div>
+    );
+};
+
 // --- Main Component ---
 
 interface VaultViewProps {
@@ -407,6 +505,15 @@ export const VaultView: React.FC<VaultViewProps> = ({
                         >
                             <LayoutGrid size={16} />
                         </button>
+                        <button
+                            onClick={() => setLayoutMode('list')}
+                            className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                                layoutMode === 'list' ? "bg-[var(--text-main)] text-[var(--bg-main)] shadow-md font-bold" : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                            )}
+                        >
+                            <ListIcon size={16} />
+                        </button>
                     </div>
                     <span className="text-[10px] mono text-[var(--text-secondary)] uppercase tracking-widest">{items.length} Elements</span>
                 </div>
@@ -465,7 +572,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                             </GridBody>
                         </DraggableContainer>
                     </motion.div>
-                ) : (
+                ) : layoutMode === 'grid' ? (
                     <motion.div 
                         key="grid"
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -488,7 +595,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                                     )}
                                     {item.type === 'scrap' && (
                                         <div className="h-[200px]">
-                                            <VaultStickyNote scrap={item.data as LyricScrap} />
+                                            <VaultStickyNote scrap={item.data as LyricScrap} compact={true} />
                                         </div>
                                     )}
                                     {item.type === 'beat' && (
@@ -507,12 +614,28 @@ export const VaultView: React.FC<VaultViewProps> = ({
                             ))}
                         </div>
                     </motion.div>
+                ) : (
+                    <motion.div
+                        key="list"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="flex-1 overflow-y-auto px-6 pt-32 pb-32 scrollbar-hide bg-[var(--bg-main)]"
+                    >
+                        <VaultListView
+                            items={items}
+                            playingSessionId={playingSessionId}
+                            playingBeatId={playingBeatId}
+                            onPlaySession={onPlaySession}
+                            onPlayBeat={onPlayBeat}
+                            currentTime={currentTime}
+                            duration={duration}
+                        />
+                    </motion.div>
                 )}
             </AnimatePresence>
 
             {/* Instruction Overlay */}
             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-[var(--bg-card)] backdrop-blur-sm rounded-full border border-[var(--border-main)] text-[9px] mono uppercase tracking-[0.2em] text-[var(--text-secondary)] pointer-events-none z-50 shadow-2xl">
-                {layoutMode === 'infinite' ? 'Infinite Canvas Grid' : 'Standard Grid View'}
+                {layoutMode === 'infinite' ? 'Infinite Canvas Grid' : layoutMode === 'grid' ? 'Standard Grid View' : 'Apple List View'}
             </div>
         </div>
     );
