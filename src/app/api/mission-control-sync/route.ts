@@ -50,38 +50,36 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // 1. Fetch Workstreams from Notion
-    const wsResponse = await fetch(`https://api.notion.com/v1/databases/${dbWorkstreamsId}/query`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${notionApiKey}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json"
-      },
-      next: { revalidate: 30 } // Cache database query results for 30 seconds
-    });
-
-    // 2. Fetch Roadmap from Notion
-    const rmResponse = await fetch(`https://api.notion.com/v1/databases/${dbRoadmapId}/query`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${notionApiKey}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json"
-      },
-      next: { revalidate: 30 }
-    });
-
-    // 3. Fetch Changelog from Notion
-    const logResponse = await fetch(`https://api.notion.com/v1/databases/${dbChangelogId}/query`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${notionApiKey}`,
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json"
-      },
-      next: { revalidate: 30 }
-    });
+    // Fetch Workstreams, Roadmap, and Changelog from Notion concurrently
+    const [wsResponse, rmResponse, logResponse] = await Promise.all([
+      fetch(`https://api.notion.com/v1/databases/${dbWorkstreamsId}/query`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${notionApiKey}`,
+          "Notion-Version": "2022-06-28",
+          "Content-Type": "application/json"
+        },
+        next: { revalidate: 30 } // Cache database query results for 30 seconds
+      }),
+      fetch(`https://api.notion.com/v1/databases/${dbRoadmapId}/query`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${notionApiKey}`,
+          "Notion-Version": "2022-06-28",
+          "Content-Type": "application/json"
+        },
+        next: { revalidate: 30 }
+      }),
+      fetch(`https://api.notion.com/v1/databases/${dbChangelogId}/query`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${notionApiKey}`,
+          "Notion-Version": "2022-06-28",
+          "Content-Type": "application/json"
+        },
+        next: { revalidate: 30 }
+      })
+    ]);
 
     if (!wsResponse.ok || !rmResponse.ok || !logResponse.ok) {
       console.warn("One or more Notion API queries failed. Falling back to seeds.");
@@ -94,9 +92,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const wsData = await wsResponse.json();
-    const rmData = await rmResponse.json();
-    const logData = await logResponse.json();
+    // Parse JSON responses concurrently
+    const [wsData, rmData, logData] = await Promise.all([
+      wsResponse.json(),
+      rmResponse.json(),
+      logResponse.json()
+    ]);
 
     // Map Notion Workstreams database rows
     const parsedWorkstreams = wsData.results.map((page: any) => {
