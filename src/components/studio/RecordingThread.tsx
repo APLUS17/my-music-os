@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Play, Pause, Scissors, Trash2, Mic, Wand2, Heart, GitMerge, ChevronDown, Layers, Plus, Volume2, VolumeX } from 'lucide-react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { RecordingSession, AutoSection, RecordingLayer } from '@/types';
@@ -49,7 +49,9 @@ export const RecordingThread: React.FC<RecordingThreadProps> = ({
     onTogglePlay,
     onSeek,
 }) => {
-    const sortedSessions = [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const sortedSessions = useMemo(() => {
+        return [...sessions].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }, [sessions]);
 
     return (
         <div className="flex flex-col gap-6 p-4 pb-32 max-w-3xl mx-auto w-full">
