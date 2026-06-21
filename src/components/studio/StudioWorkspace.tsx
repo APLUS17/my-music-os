@@ -409,6 +409,16 @@ const StudioWorkspace: React.FC = () => {
 
 
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
+    const [recordingCounter, setRecordingCounter] = useState<number>(() => {
+        if (typeof window !== 'undefined') {
+            return parseInt(localStorage.getItem('lyriq_recording_counter') || '1');
+        }
+        return 1;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lyriq_recording_counter', recordingCounter.toString());
+    }, [recordingCounter]);
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
@@ -864,7 +874,7 @@ const StudioWorkspace: React.FC = () => {
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, ritualStats, categorySections, activeCategory]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, uploadedBeatId, ritualStats, categorySections, activeCategory]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -878,6 +888,11 @@ const StudioWorkspace: React.FC = () => {
         const id = randomId().substring(0, 6).toUpperCase();
 
         const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
+
+        // Increment global recording counter for named takes
+        if (!isLayer) {
+            setRecordingCounter(prev => prev + 1);
+        }
 
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
@@ -967,14 +982,22 @@ const StudioWorkspace: React.FC = () => {
             });
         } else {
             // Create new session (original behavior)
+        const isStandalone = viewMode === 'collection' || viewMode === 'vault';
             const newSession: RecordingSession = {
-                id, name: `Recording ${sessions.length + 1}`, timestamp, duration, audioUrl: url, base64: base64, beatOffset: compensatedOffset,
+            id,
+            name: isStandalone ? `New Recording ${recordingCounter}` : `Recording ${sessions.length + 1}`,
+            timestamp,
+            duration,
+            audioUrl: url,
+            base64: base64,
+            beatOffset: compensatedOffset,
                 isLoopSession: !!uploadedBeat && isBeatLooping,
                 sections: initialSections,
                 loopStart: beatLoopStart || undefined,
                 loopEnd: beatLoopEnd || undefined,
-                projectId: activeProjectId || undefined
+            projectId: isStandalone ? undefined : (activeProjectId || undefined)
             };
+
             setSessions(prev => [newSession, ...prev]);
             setActiveSessionId(id); // Auto-select the latest take
 
@@ -982,7 +1005,25 @@ const StudioWorkspace: React.FC = () => {
                 setRecordingTargetLineId(null);
             }
 
-            toast.success('Recording saved');
+            if (isStandalone) {
+                toast.success(`Saved to Vault as ${newSession.name}`, {
+                    action: {
+                        label: 'Add to Project',
+                        onClick: () => {
+                            // Logic to open a project selector or assign to current
+                            if (activeProjectId) {
+                                setSessions(prev => prev.map(s => s.id === id ? { ...s, projectId: activeProjectId } : s));
+                                toast.success('Added to current project');
+                            } else {
+                                setViewMode('collection');
+                                toast('Select a project to add this recording to');
+                            }
+                        }
+                    }
+                });
+            } else {
+                toast.success('Recording saved');
+            }
             const recordingToastId = toast.loading('Processing audio intelligence...');
 
             // Wait for both Gemini structure and Groq transcription
@@ -1187,8 +1228,21 @@ const StudioWorkspace: React.FC = () => {
     }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd]);
 
     const archiveCurrentProject = () => {
-        if (sections.length === 0 && scraps.length === 0) return;
-        const projectSessions = sessions.filter(s => !s.projectId || s.projectId === activeProjectId);
+        // Only archive if there's actual content or a title
+        if (sections.length === 0 && scraps.length === 0 && !projectTitle) return;
+
+        const projectId = activeProjectId || randomId();
+
+        // If we just generated an ID, we need to update sessions that were recorded while project was ID-less
+        let updatedSessions = sessions;
+        if (!activeProjectId) {
+            setActiveProjectId(projectId);
+            updatedSessions = sessions.map(s => !s.projectId ? { ...s, projectId } : s);
+            setSessions(updatedSessions);
+        }
+
+        // Sessions that belong to this project
+        const projectSessions = updatedSessions.filter(s => s.projectId === projectId);
 
         // Keep categorySections up to date with the latest active sections before archiving
         const updatedCategorySections = {
@@ -1200,13 +1254,13 @@ const StudioWorkspace: React.FC = () => {
         const primarySections = updatedCategorySections['Lyrics'] || [];
 
         const newProject: SavedProject = {
-            id: activeProjectId || randomId(),
+            id: projectId,
             name: projectTitle || "Untitled Project",
             lastModified: new Date().toLocaleDateString(),
             sections: primarySections,
             scraps,
             sessions: projectSessions,
-            beats: [],
+            beats: uploadedBeatId ? beats.filter(b => b.id === uploadedBeatId) : [],
             categorySections: updatedCategorySections,
             activeCategory: activeCategory
         };
@@ -1314,6 +1368,9 @@ const StudioWorkspace: React.FC = () => {
 
     const loadProject = (p: SavedProject) => {
         if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
+            // Auto-archive current work before switching
+            archiveCurrentProject();
+
             // Stop all audio playback before loading new project
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
@@ -1338,7 +1395,14 @@ const StudioWorkspace: React.FC = () => {
             setSections(initialCategorySections[activeCat]);
 
             setScraps(p.scraps || []);
-            setSessions(p.sessions || []);
+            // Merge project sessions into global sessions if they aren't already there
+            if (p.sessions && p.sessions.length > 0) {
+                setSessions(prev => {
+                    const existingIds = new Set(prev.map(s => s.id));
+                    const newOnes = p.sessions.filter(s => !existingIds.has(s.id));
+                    return [...newOnes, ...prev];
+                });
+            }
             setActiveSessionId(null);
             setPlayingSessionId(null);
             setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
@@ -2355,43 +2419,65 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2.5 flex items-center gap-8 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+                <AnimatePresence>
+                    {!showRecorder && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, x: '-50%' }}
+                            animate={{ opacity: 1, y: 0, x: '-50%' }}
+                            exit={{ opacity: 0, y: 10, x: '-50%' }}
+                            className="fixed bottom-[84px] left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
+                        >
+                            Tap • Hold to record
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2 flex items-center gap-6 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0 shadow-2xl border border-white/10'}`}>
                     <button
                         onClick={() => setViewMode('collection')}
                         className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                         title="Library"
                     >
-                        <Library className="h-6 w-6" />
+                        <House className="h-6 w-6" />
                     </button>
-                    {viewMode === 'studio' ? (
-                        <button
-                            onClick={() => {
-                                setShowRecorder(true);
-                                setRecorderMinimized(true);
-                                setRecorderAutoStart(isBeatPlaying);
-                            }}
-                            className="p-2 rounded-full transition-all active:scale-95 flex items-center justify-center cursor-pointer"
-                            title="Record"
-                        >
-                            <div className="w-6 h-6 rounded-full border-2 border-red-500 flex items-center justify-center">
-                                <div className="w-3 h-3 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-pulse" />
-                            </div>
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => setViewMode('studio')}
-                            className="p-2 rounded-full transition-all active:scale-95 text-[var(--text-secondary)] hover:text-[var(--text-main)] cursor-pointer"
-                            title="Studio"
-                        >
-                            <Disc className="h-6 w-6" />
-                        </button>
-                    )}
+
+                    <button
+                        onClick={() => setViewMode('rituals')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'rituals' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                        title="Rituals"
+                    >
+                        <Sun className="h-6 w-6" />
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            setShowRecorder(true);
+                            setRecorderMinimized(true);
+                            setRecorderAutoStart(true);
+                        }}
+                        className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-lg group"
+                        title="Record"
+                    >
+                        <div className="absolute inset-0 rounded-full bg-red-500/20 group-hover:bg-red-500/30 transition-all scale-110" />
+                        <div className="w-11 h-11 rounded-full bg-red-600 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)] border-2 border-white/20">
+                            <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+                        </div>
+                    </button>
+
                     <button
                         onClick={() => setViewMode('vault')}
                         className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Virtual Vault"
+                        title="Vault"
                     >
                         <History className="h-6 w-6" />
+                    </button>
+
+                    <button
+                        onClick={() => setViewMode('studio')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'studio' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                        title="Studio"
+                    >
+                        <Disc className="h-6 w-6" />
                     </button>
                 </nav>
             </main>
