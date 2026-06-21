@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from "../ui/button";
 import { LyricScrap, RecordingSession, Beat, RitualStat } from '../../types';
+import { formatTime } from '@/lib/utils/time';
 import {
   animate,
   cubicBezier,
@@ -22,12 +23,6 @@ import { cn } from "@/lib/utils";
 type GridVariant = "default" | "masonry" | "premium";
 type LayoutMode = "infinite" | "grid";
 const GridVariantContext = createContext<GridVariant | undefined>(undefined);
-
-const formatTime = (seconds: number = 0) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-};
 
 // --- Sub-Components (Gallery Cards) ---
 

@@ -16,6 +16,11 @@ describe('time utils', () => {
       expect(formatTime(3665)).toBe('61:05');
     });
 
+    it('should handle extremely large values', () => {
+      expect(formatTime(360000)).toBe('6000:00');
+      expect(formatTime(86400)).toBe('1440:00'); // 24 hours
+    });
+
     it('should handle null, undefined, and NaN', () => {
       expect(formatTime(null)).toBe('00:00');
       expect(formatTime(undefined)).toBe('00:00');
@@ -34,6 +39,8 @@ describe('time utils', () => {
     it('should floor decimal seconds', () => {
       expect(formatTime(65.7)).toBe('01:05');
       expect(formatTime(0.9)).toBe('00:00');
+      expect(formatTime(59.999)).toBe('00:59');
+      expect(formatTime(0.001)).toBe('00:00');
     });
   });
 });
