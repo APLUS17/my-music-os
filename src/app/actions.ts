@@ -304,17 +304,46 @@ When a user is stuck or starting cold, suggest ONE prompt from a relevant catego
 - **IMPORTANT — Output Length:** DO NOT explain theory at length. Give ONE method, ONE formula, and ONE immediate action step. Maximum 2-3 lyric examples if requested. Elite coaches give less, not more.`;
 
         // Format the context for the model
+        let sectionsStr = '(none — user is starting cold)';
+        if (context.sections.length > 0) {
+            sectionsStr = '';
+            for (let i = 0; i < context.sections.length; i++) {
+                const s = context.sections[i];
+                sectionsStr += `[${s.type}]: ${s.text || '(empty)'}`;
+                if (i < context.sections.length - 1) sectionsStr += '\n';
+            }
+        }
+
+        let scrapsStr = '(none)';
+        if (context.scraps.length > 0) {
+            scrapsStr = '';
+            for (let i = 0; i < context.scraps.length; i++) {
+                scrapsStr += `- ${context.scraps[i].text}`;
+                if (i < context.scraps.length - 1) scrapsStr += '\n';
+            }
+        }
+
+        let sessionsStr = '(none)';
+        if (context.recentSessions.length > 0) {
+            sessionsStr = '';
+            for (let i = 0; i < context.recentSessions.length; i++) {
+                const s = context.recentSessions[i];
+                sessionsStr += `- ${s.name || 'Untitled'}, duration: ${Math.round(s.duration)}s, time: ${s.timestamp}`;
+                if (i < context.recentSessions.length - 1) sessionsStr += '\n';
+            }
+        }
+
         const contextString = `
 Current Song Title: ${context.projectTitle || 'Untitled'}
 Active View: ${context.activeView ?? 'unknown'}
 Active Section: ${context.activeSection ?? 'none'}
 Session Phase: ${context.sessionPhase ?? 'unknown'}${context.ritualContext ? `\nRitual Context: ${context.ritualContext}` : ''}
 Lyrics Sections:
-${context.sections.length > 0 ? context.sections.map(s => `[${s.type}]: ${s.text || '(empty)'}`).join('\n') : '(none — user is starting cold)'}
+${sectionsStr}
 Lyric Scraps:
-${context.scraps.length > 0 ? context.scraps.map(s => `- ${s.text}`).join('\n') : '(none)'}
+${scrapsStr}
 Recent Recording Sessions:
-${context.recentSessions.length > 0 ? context.recentSessions.map(s => `- ${s.name || 'Untitled'}, duration: ${Math.round(s.duration)}s, time: ${s.timestamp}`).join('\n') : '(none)'}
+${sessionsStr}
 `;
 
         const prompt = `Context:\n${contextString}\n\nUser: ${userPrompt}`;
