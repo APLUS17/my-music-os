@@ -721,7 +721,50 @@ const StudioWorkspace: React.FC = () => {
         setViewMode('studio');
         setSections([]); // Blank canvas for new users
         setProjectTitle('');
-        setStudioMode('flow');
+    };
+
+    const handleResetStudio = async () => {
+        if (!confirm("Are you sure you want to delete all projects, recordings, and beats? This action cannot be undone.")) return;
+        
+        try {
+            // Clear localStorage keys
+            localStorage.removeItem('studio-pro-data-v2');
+            localStorage.removeItem('lyriq_ritual_stats');
+            localStorage.removeItem('lyriq_recording_counter');
+            
+            // Clear IndexedDB audio assets
+            if (typeof window !== 'undefined') {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onsuccess = (event) => {
+                    const db = (event.target as IDBOpenDBRequest).result;
+                    const tx = db.transaction(STORE_NAME, 'readwrite');
+                    const store = tx.objectStore(STORE_NAME);
+                    const clearReq = store.clear();
+                    clearReq.onsuccess = () => {
+                        console.log("IndexedDB audio store cleared.");
+                    };
+                };
+            }
+
+            // Reset states
+            setSavedProjects([]);
+            setSessions([]);
+            setBeats([]);
+            setScraps([]);
+            setSections([{ id: 'fresh-start', type: 'verse' as SectionType, repeats: 1, text: '' }]);
+            setProjectTitle('');
+            setRitualStats([]);
+            setActiveProjectId(null);
+            setUploadedBeat(null);
+            setUploadedBeatName('');
+            setUploadedBeatId(null);
+            
+            toast.success("Studio database reset successfully. Everything is cleared.");
+            setViewMode('collection');
+        } catch (e) {
+            console.error("Failed to reset database", e);
+            toast.error("Failed to reset database.");
+        }
     };
 
     // Persistence Load
@@ -1678,6 +1721,21 @@ const StudioWorkspace: React.FC = () => {
                                     </button>
                                 </div>
                             </section>
+                            <section className="pt-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-red-500 mb-4">Danger Zone</h2>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <button
+                                        onClick={handleResetStudio}
+                                        className="p-4 rounded-lg border bg-[var(--bg-card)] border-red-500/30 hover:border-red-500 text-red-400 flex items-center justify-between transition-all cursor-pointer"
+                                    >
+                                        <div className="text-left">
+                                            <span className="text-sm font-semibold block">Reset Studio Database</span>
+                                            <span className="text-xs text-[var(--text-tertiary)] block mt-0.5">Delete all local projects, recording takes, and imported beats.</span>
+                                        </div>
+                                        <Trash2 size={16} className="text-red-500" />
+                                    </button>
+                                </div>
+                            </section>
                         </div>
                     </div>
                 );
@@ -1689,13 +1747,22 @@ const StudioWorkspace: React.FC = () => {
                         {/* Top Bar Header */}
                         <div className="px-6 py-4 flex items-center justify-between z-30">
                             <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
-                            <button
-                                onClick={cycleTheme}
-                                className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
-                                title="Cycle Theme"
-                            >
-                                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setViewMode('settings')}
+                                    className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
+                                    title="Settings"
+                                >
+                                    <Settings size={20} />
+                                </button>
+                                <button
+                                    onClick={cycleTheme}
+                                    className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
+                                    title="Cycle Theme"
+                                >
+                                    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+                                </button>
+                            </div>
                         </div>
 
                         {isEmpty ? (
@@ -2436,47 +2503,36 @@ const StudioWorkspace: React.FC = () => {
                 </div>
 
                 <AnimatePresence>
-                    {!showRecorder && (
-                        viewMode === 'studio' ? (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, x: '-50%' }}
-                                animate={{ opacity: 1, y: 0, x: '-50%' }}
-                                exit={{ opacity: 0, y: 10, x: '-50%' }}
-                                className="fixed bottom-28 left-1/2 z-[100] px-3.5 py-2 bg-[rgba(30,30,30,0.75)] backdrop-blur-md rounded-full flex items-center gap-2 shadow-2xl border border-white/10"
-                            >
-                                <button
-                                    onClick={() => setActiveTab('lyrics')}
-                                    className={cn(
-                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
-                                        activeTab === 'lyrics' 
-                                            ? "w-5 bg-[var(--accent)]" 
-                                            : "w-2 bg-white/30 hover:bg-white/50"
-                                    )}
-                                    aria-label="Lyrics view"
-                                    title="Lyrics view"
-                                />
-                                <button
-                                    onClick={() => setActiveTab('player')}
-                                    className={cn(
-                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
-                                        activeTab === 'player' 
-                                            ? "w-5 bg-[var(--accent)]" 
-                                            : "w-2 bg-white/30 hover:bg-white/50"
-                                    )}
-                                    aria-label="Player view"
-                                    title="Player view"
-                                />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, x: '-50%' }}
-                                animate={{ opacity: 1, y: 0, x: '-50%' }}
-                                exit={{ opacity: 0, y: 10, x: '-50%' }}
-                                className="fixed bottom-28 left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
-                            >
-                                Tap • Hold to record
-                            </motion.div>
-                        )
+                    {!showRecorder && viewMode === 'studio' && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10, x: '-50%' }}
+                            animate={{ opacity: 1, y: 0, x: '-50%' }}
+                            exit={{ opacity: 0, y: 10, x: '-50%' }}
+                            className="fixed bottom-28 left-1/2 z-[100] px-3.5 py-2 bg-[rgba(30,30,30,0.75)] backdrop-blur-md rounded-full flex items-center gap-2 shadow-2xl border border-white/10"
+                        >
+                            <button
+                                onClick={() => setActiveTab('lyrics')}
+                                className={cn(
+                                    "h-2 rounded-full transition-all duration-300 cursor-pointer",
+                                    activeTab === 'lyrics' 
+                                        ? "w-5 bg-[var(--accent)]" 
+                                        : "w-2 bg-white/30 hover:bg-white/50"
+                                )}
+                                aria-label="Lyrics view"
+                                title="Lyrics view"
+                            />
+                            <button
+                                onClick={() => setActiveTab('player')}
+                                className={cn(
+                                    "h-2 rounded-full transition-all duration-300 cursor-pointer",
+                                    activeTab === 'player' 
+                                        ? "w-5 bg-[var(--accent)]" 
+                                        : "w-2 bg-white/30 hover:bg-white/50"
+                                )}
+                                aria-label="Player view"
+                                title="Player view"
+                            />
+                        </motion.div>
                     )}
                 </AnimatePresence>
 
@@ -2487,14 +2543,6 @@ const StudioWorkspace: React.FC = () => {
                         title="Library"
                     >
                         <House className="h-6 w-6" />
-                    </button>
-
-                    <button
-                        onClick={() => setViewMode('rituals')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'rituals' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Rituals"
-                    >
-                        <Sun className="h-6 w-6" />
                     </button>
 
                     <button
@@ -2510,14 +2558,6 @@ const StudioWorkspace: React.FC = () => {
                         <div className="w-11 h-11 rounded-full bg-red-600 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)] border-2 border-white/20">
                             <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                         </div>
-                    </button>
-
-                    <button
-                        onClick={() => setViewMode('vault')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Vault"
-                    >
-                        <History className="h-6 w-6" />
                     </button>
 
                     <button
