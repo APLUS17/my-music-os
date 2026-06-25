@@ -214,12 +214,13 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
         />
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => fileInputRef.current?.click()}
-          className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
+          className="h-8 w-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all flex items-center justify-center relative active:scale-95"
+          title="Load Beat"
         >
-          <Music size={12} />
-          <span>Load Beat</span>
+          <Music size={14} />
+          <span className="absolute -top-1 -right-1 text-[9px] font-bold text-[var(--accent)] bg-[var(--bg-secondary)] rounded-full px-0.5 leading-none">↑</span>
         </Button>
       </>
     );

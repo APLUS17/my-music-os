@@ -2421,14 +2421,57 @@ const StudioWorkspace: React.FC = () => {
 
                 <AnimatePresence>
                     {!showRecorder && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10, x: '-50%' }}
-                            animate={{ opacity: 1, y: 0, x: '-50%' }}
-                            exit={{ opacity: 0, y: 10, x: '-50%' }}
-                            className="fixed bottom-[84px] left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
-                        >
-                            Tap • Hold to record
-                        </motion.div>
+                        viewMode === 'studio' ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, x: '-50%' }}
+                                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                                exit={{ opacity: 0, y: 10, x: '-50%' }}
+                                className="fixed bottom-[84px] left-1/2 z-[100] px-3.5 py-2 bg-[rgba(30,30,30,0.75)] backdrop-blur-md rounded-full flex items-center gap-2 shadow-2xl border border-white/10"
+                            >
+                                <button
+                                    onClick={() => setActiveTab('lyrics')}
+                                    className={cn(
+                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
+                                        activeTab === 'lyrics' 
+                                            ? "w-5 bg-[var(--accent)]" 
+                                            : "w-2 bg-white/30 hover:bg-white/50"
+                                    )}
+                                    aria-label="Lyrics view"
+                                    title="Lyrics view"
+                                />
+                                <button
+                                    onClick={() => setActiveTab('takes')}
+                                    className={cn(
+                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
+                                        activeTab === 'takes' 
+                                            ? "w-5 bg-[var(--accent)]" 
+                                            : "w-2 bg-white/30 hover:bg-white/50"
+                                    )}
+                                    aria-label="Takes view"
+                                    title="Takes view"
+                                />
+                                <button
+                                    onClick={() => setActiveTab('player')}
+                                    className={cn(
+                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
+                                        activeTab === 'player' 
+                                            ? "w-5 bg-[var(--accent)]" 
+                                            : "w-2 bg-white/30 hover:bg-white/50"
+                                    )}
+                                    aria-label="Player view"
+                                    title="Player view"
+                                />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, x: '-50%' }}
+                                animate={{ opacity: 1, y: 0, x: '-50%' }}
+                                exit={{ opacity: 0, y: 10, x: '-50%' }}
+                                className="fixed bottom-[84px] left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
+                            >
+                                Tap • Hold to record
+                            </motion.div>
+                        )
                     )}
                 </AnimatePresence>
 
