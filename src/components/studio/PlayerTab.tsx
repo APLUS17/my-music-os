@@ -200,7 +200,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
             {/* ── Integrated Header ───────────────────────────────────── */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-2 z-30">
+            <div className="flex items-center justify-between px-6 pt-6 pb-2 z-30 shrink-0">
                 <div className="flex flex-col">
                     <span className="text-[10px] mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-0.5">Now Playing</span>
                     <h2 className="text-sm font-bold text-[var(--text-main)] tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
@@ -251,7 +251,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
+            <div ref={lyricContainerRef} className="flex-1 min-h-0 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
                 <motion.div
                         ref={lyricListRef}
                         className="flex flex-col gap-8 py-[50vh] shrink-0"
@@ -300,13 +300,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             {beat && (
                 isAnalyzingBeat ? (
                     // Beat sections loading — skeleton pills
-                    <div className="flex gap-3 px-6 pb-2 pt-4 overflow-hidden">
+                    <div className="flex gap-3 px-6 pb-2 pt-4 overflow-hidden shrink-0">
                         {[80, 64, 96, 72, 88].map((w, i) => (
                             <div key={i} className="shrink-0 h-8 rounded-xl bg-[var(--border-subtle)] animate-pulse" style={{ width: w }} />
                         ))}
                     </div>
                 ) : beatSections.length > 0 ? (
-                    <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide">
+                    <div className="flex gap-3 overflow-x-auto px-6 pb-2 pt-4 scrollbar-hide shrink-0">
                         {beatSections.map((sec, i) => {
                             const isActive = i === activeSectionIdx;
                             return (
@@ -349,7 +349,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             )}
 
             {/* ── Scrubber ───────────────────────────────────────────── */}
-            <div className="px-6 pt-3 pb-1">
+            <div className="px-6 pt-2 pb-1 shrink-0">
                 <div
                     className="relative w-full h-[2px] bg-[var(--border-strong)] rounded-full cursor-pointer"
                     onClick={e => {
@@ -367,13 +367,13 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             </div>
 
             {/* ── Controls ──────────────────────────────────────────── */}
-            <div className="flex items-center justify-center gap-10 py-5">
-                <button onClick={onOpenFX} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>
-                <button onClick={() => skip(-10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><Rewind size={34} fill="currentColor" /></button>
-                <button onClick={togglePlay} className="w-20 h-20 bg-[var(--text-main)] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
-                    {isPlaying ? <Pause size={40} className="text-[var(--bg-main)]" fill="currentColor" /> : <Play size={40} className="text-[var(--bg-main)] ml-1" fill="currentColor" />}
+            <div className="flex items-center justify-center gap-8 py-3 shrink-0">
+                <button onClick={onOpenFX} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] active:opacity-60 transition-opacity"><SlidersHorizontal size={22} /></button>
+                <button onClick={() => skip(-10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><Rewind size={28} fill="currentColor" /></button>
+                <button onClick={togglePlay} className="w-16 h-16 bg-[var(--text-main)] rounded-full flex items-center justify-center active:scale-[0.97] hover:scale-[1.02] transition-all shadow-xl">
+                    {isPlaying ? <Pause size={32} className="text-[var(--bg-main)]" fill="currentColor" /> : <Play size={32} className="text-[var(--bg-main)] ml-1" fill="currentColor" />}
                 </button>
-                <button onClick={() => skip(10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><FastForward size={34} fill="currentColor" /></button>
+                <button onClick={() => skip(10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><FastForward size={28} fill="currentColor" /></button>
                 <button
                     onClick={() => {
                         if (isBeatLooping) onClearLoop?.();
@@ -381,12 +381,12 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                     }}
                     className={cn('active:opacity-60 transition-opacity', isBeatLooping ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]')}
                 >
-                    <Repeat2 size={28} />
+                    <Repeat2 size={22} />
                 </button>
             </div>
 
             {/* ── Volume ─────── */}
-            <div className="flex items-center gap-3 px-8 pt-1 pb-2">
+            <div className="flex items-center gap-3 px-8 py-2 shrink-0">
                 <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
                 <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
                     className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer slider-v
@@ -400,7 +400,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
             </div>
 
             {/* Spacer to prevent overlap with floating navigation bar */}
-            <div className="h-20" />
+            <div className="h-40 shrink-0" />
         </div>
     );
 });

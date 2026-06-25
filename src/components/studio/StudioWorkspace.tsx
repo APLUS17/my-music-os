@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2, Bookmark } from 'lucide-react';
+import { ChevronDown, CheckCircle2, Bookmark, Wand2, Rocket, LayoutGrid, Sparkles, Type } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -422,8 +422,9 @@ const StudioWorkspace: React.FC = () => {
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'player'>('lyrics');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'lyrics' | 'takes' | 'player'>('lyrics');
+    const [isSparkExpanded, setIsSparkExpanded] = useState(false);
     const [showSyllables, setShowSyllables] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('lyriq_show_syllables') === 'true';
@@ -1900,7 +1901,7 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
 
                                 {/* Floating Action Menu Trigger */}
-                                <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+                                <div className="absolute bottom-28 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
                                     <div className="pointer-events-auto flex flex-col items-end gap-3">
                                         <AnimatePresence>
                                             {fabOpen && (
@@ -2036,18 +2037,25 @@ const StudioWorkspace: React.FC = () => {
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <div className="group relative flex items-center">
-                                            <input
-                                                value={projectTitle}
-                                                onChange={(e) => setProjectTitle(e.target.value)}
-                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate pr-8"
-                                                placeholder="Untitled Project"
-                                            />
+                                        <div className="flex items-center gap-1.5 min-w-0 max-w-[240px] sm:max-w-md relative">
+                                            <div className="relative inline-grid items-center min-w-0 flex-1">
+                                                {/* Mirror element to size the input container */}
+                                                <span className="invisible col-start-1 row-start-1 whitespace-pre text-xl font-bold px-1 select-none pointer-events-none truncate">
+                                                    {projectTitle || "Untitled Project"}
+                                                </span>
+                                                <input
+                                                    value={projectTitle}
+                                                    onChange={(e) => setProjectTitle(e.target.value)}
+                                                    className="col-start-1 row-start-1 bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] px-1"
+                                                    placeholder="Untitled Project"
+                                                />
+                                            </div>
                                             <button 
                                                 onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
-                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"
+                                                className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] rounded-lg transition-all flex-shrink-0 flex items-center justify-center min-h-[32px] min-w-[32px]"
+                                                aria-label="Select Project"
                                             >
-                                                <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
+                                                <ChevronDown size={18} className={cn("transition-transform duration-200", isProjectSelectorOpen && "rotate-180")} />
                                             </button>
 
                                             <AnimatePresence>
@@ -2152,30 +2160,9 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Toggle For Tabs */}
-                            <div className="flex items-center justify-between border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
-                                <div className="flex items-center">
-                                    <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                    <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
-                                    <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
-                                </div>
-                                <button
-                                    onClick={() => setShowSyllables(!showSyllables)}
-                                    className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
-                                        showSyllables 
-                                            ? "text-[var(--accent)] font-bold" 
-                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                    )}
-                                    title="Toggle Syllables Editor"
-                                >
-                                    T
-                                </button>
-                            </div>
-
                             {/* Player Tab — full height, no scroll padding */}
                             {activeTab === 'player' && (
-                                <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
+                                <div className="absolute inset-0 mt-0 flex flex-col overflow-hidden bg-[var(--bg-main)]">
                                     <PlayerTab
                                         projectTitle={projectTitle || "Untitled Project"}
                                         session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
@@ -2223,9 +2210,9 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Lyrics & Takes tabs — scrollable content */}
+                            {/* Lyrics tab — scrollable content */}
                             {activeTab !== 'player' && (
-                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div className="absolute inset-0 mt-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
                                         {activeTab === 'lyrics' ? (
                                             <>
@@ -2335,36 +2322,6 @@ const StudioWorkspace: React.FC = () => {
                                                     )}
                                                 </AnimatePresence>
                                             </>
-                                        ) : activeTab === 'takes' ? (
-                                            <RecordingThread
-                                                sessions={displaySessions}
-                                                activeSessionId={activeSessionId}
-                                                onSelectSession={handleSelectSession}
-                                                onPlaySession={handleSelectSessionAndPlay}
-                                                onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
-                                                onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
-                                                onOpenSplitEditor={(id) => {
-                                                    setRecordingToSplit(id);
-                                                    setSplitEditorOpen(true);
-                                                }}
-
-                                                onDeleteSession={handleDeleteSession}
-                                                beatSrc={uploadedBeat}
-                                                beatVolume={beatVolume}
-                                                onBeatPlaybackChange={(isP) => {
-                                                    if (isP && isBeatPlaying && beatAudioRef.current) {
-                                                        beatAudioRef.current.pause();
-                                                        beatAudioCtxRef.current?.suspend();
-                                                        setIsBeatPlaying(false);
-                                                    }
-                                                }}
-
-                                                // Shared Audio State
-                                                isPlaying={isPlaying}
-                                                currentTime={currentTime}
-                                                onTogglePlay={togglePlayback}
-                                                onSeek={seekTo}
-                                            />
                                         ) : null}
                                     </div>
                                 </div>
@@ -2415,8 +2372,67 @@ const StudioWorkspace: React.FC = () => {
                     className="hidden"
                 />
 
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden relative">
                     {getActiveView()}
+
+                    {/* Floating Spark Menu */}
+                    {viewMode === 'studio' && activeTab === 'lyrics' && !showRecorder && (
+                        <div className="absolute bottom-28 right-4 z-[120] flex flex-col items-center gap-3">
+                            <AnimatePresence>
+                                {isSparkExpanded && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 15, scale: 0.9 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 15, scale: 0.9 }}
+                                        className="flex flex-col items-center gap-2 bg-[rgba(30,30,30,0.85)] backdrop-blur-lg rounded-2xl p-2 border border-white/10 shadow-2xl"
+                                    >
+                                        <button 
+                                            onClick={() => setShowSyllables(!showSyllables)}
+                                            className={cn(
+                                                "w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90",
+                                                showSyllables 
+                                                    ? "bg-[var(--accent)] text-black" 
+                                                    : "bg-white/5 hover:bg-white/15 text-[var(--accent)]"
+                                            )}
+                                            title="Toggle Syllables Editor"
+                                        >
+                                            <Type size={18} />
+                                        </button>
+                                        <button 
+                                            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-[var(--accent)] flex items-center justify-center transition-all active:scale-90"
+                                            title="Magic Wand (Rhymes & Metaphors)"
+                                        >
+                                            <Wand2 size={18} />
+                                        </button>
+                                        <button 
+                                            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-[var(--accent)] flex items-center justify-center transition-all active:scale-90"
+                                            title="Rocket (AI Generator)"
+                                        >
+                                            <Rocket size={18} />
+                                        </button>
+                                        <button 
+                                            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-[var(--accent)] flex items-center justify-center transition-all active:scale-90"
+                                            title="Cards (Structure / Sections)"
+                                        >
+                                            <LayoutGrid size={18} />
+                                        </button>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                            <button
+                                onClick={() => setIsSparkExpanded(!isSparkExpanded)}
+                                className={cn(
+                                    "w-12 h-12 rounded-full flex items-center justify-center shadow-2xl border transition-all active:scale-90 cursor-pointer",
+                                    isSparkExpanded
+                                        ? "bg-[var(--accent)] text-black border-[var(--accent)] rotate-45"
+                                        : "bg-[var(--bg-card)] text-[var(--accent)] border-[var(--accent)]/30 hover:border-[var(--accent)] hover:bg-[var(--bg-hover)]"
+                                )}
+                                title="Spark Studio Tools"
+                            >
+                                <Sparkles size={20} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <AnimatePresence>
@@ -2426,7 +2442,7 @@ const StudioWorkspace: React.FC = () => {
                                 initial={{ opacity: 0, y: 10, x: '-50%' }}
                                 animate={{ opacity: 1, y: 0, x: '-50%' }}
                                 exit={{ opacity: 0, y: 10, x: '-50%' }}
-                                className="fixed bottom-[84px] left-1/2 z-[100] px-3.5 py-2 bg-[rgba(30,30,30,0.75)] backdrop-blur-md rounded-full flex items-center gap-2 shadow-2xl border border-white/10"
+                                className="fixed bottom-28 left-1/2 z-[100] px-3.5 py-2 bg-[rgba(30,30,30,0.75)] backdrop-blur-md rounded-full flex items-center gap-2 shadow-2xl border border-white/10"
                             >
                                 <button
                                     onClick={() => setActiveTab('lyrics')}
@@ -2438,17 +2454,6 @@ const StudioWorkspace: React.FC = () => {
                                     )}
                                     aria-label="Lyrics view"
                                     title="Lyrics view"
-                                />
-                                <button
-                                    onClick={() => setActiveTab('takes')}
-                                    className={cn(
-                                        "h-2 rounded-full transition-all duration-300 cursor-pointer",
-                                        activeTab === 'takes' 
-                                            ? "w-5 bg-[var(--accent)]" 
-                                            : "w-2 bg-white/30 hover:bg-white/50"
-                                    )}
-                                    aria-label="Takes view"
-                                    title="Takes view"
                                 />
                                 <button
                                     onClick={() => setActiveTab('player')}
@@ -2467,7 +2472,7 @@ const StudioWorkspace: React.FC = () => {
                                 initial={{ opacity: 0, y: 10, x: '-50%' }}
                                 animate={{ opacity: 1, y: 0, x: '-50%' }}
                                 exit={{ opacity: 0, y: 10, x: '-50%' }}
-                                className="fixed bottom-[84px] left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
+                                className="fixed bottom-28 left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
                             >
                                 Tap • Hold to record
                             </motion.div>
