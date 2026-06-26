@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
+import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat, Note } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { countSyllables } from '@/lib/utils/syllable';
@@ -9,6 +9,7 @@ import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
 import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
+import { NotesView } from "./NotesView";
 import { BeatUploader } from './BeatUploader';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
@@ -40,7 +41,8 @@ import {
     Disc,
     History,
     Sun,
-    Moon
+    Moon,
+    BookText
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -102,7 +104,7 @@ const deleteAudioData = async (id: string) => {
     });
 };
 
-type ViewMode = 'collection' | 'studio' | 'rituals' | 'vault' | 'settings';
+type ViewMode = 'collection' | 'studio' | 'rituals' | 'vault' | 'settings' | 'notes';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -402,6 +404,7 @@ const StudioWorkspace: React.FC = () => {
         { id: 'init-verse', type: 'verse', repeats: 1, text: '' }
     ]);
     const [scraps, setScraps] = useState<LyricScrap[]>([]);
+    const [notes, setNotes] = useState<Note[]>([]);
 
     const [activeCategory, setActiveCategory] = useState<string>('Notes');
     const [categorySections, setCategorySections] = useState<Record<string, LyricSection[]>>({});
@@ -783,6 +786,7 @@ const StudioWorkspace: React.FC = () => {
                         setProjectTitle('');
                     }
                     if (parsed.scraps) setScraps(parsed.scraps);
+                    if (parsed.notes) setNotes(parsed.notes);
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
                     // Remove mission project if it exists
@@ -857,7 +861,7 @@ const StudioWorkspace: React.FC = () => {
             };
 
             const dataToSave = {
-                sections, scraps, savedProjects,
+                sections, scraps, notes, savedProjects,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
                 activeProjectId, uploadedBeatId,
@@ -874,7 +878,7 @@ const StudioWorkspace: React.FC = () => {
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, uploadedBeatId, ritualStats, categorySections, activeCategory]);
+    }, [sections, scraps, notes, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, uploadedBeatId, ritualStats, categorySections, activeCategory]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -2028,6 +2032,20 @@ const StudioWorkspace: React.FC = () => {
                         ritualStats={ritualStats}
                     />
                 );
+            case 'notes':
+                return (
+                    <NotesView
+                        notes={notes}
+                        sessions={sessions}
+                        beats={beats}
+                        onNotesChange={setNotes}
+                        onOpenRecorder={() => {
+                            setShowRecorder(true);
+                            setRecorderMinimized(true);
+                            setRecorderAutoStart(true);
+                        }}
+                    />
+                );
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
@@ -2465,11 +2483,11 @@ const StudioWorkspace: React.FC = () => {
                     </button>
 
                     <button
-                        onClick={() => setViewMode('vault')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'vault' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Vault"
+                        onClick={() => setViewMode('notes')}
+                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'notes' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                        title="Notes"
                     >
-                        <History className="h-6 w-6" />
+                        <BookText className="h-6 w-6" />
                     </button>
 
                     <button
