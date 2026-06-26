@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, useMotionValue, animate, PanInfo } from 'framer-motion';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
 import { Ritual, RitualStat, RitualExercise } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { getRandomPrompt, getMethodById } from '../../lib/creative/SongwritingKnowledge';
@@ -12,7 +13,194 @@ interface RitualsViewProps {
     onCompleteRitual: (stat: RitualStat) => void;
 }
 
-const CATEGORIES = ['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'];
+// ─── Card deck config ─────────────────────────────────────────────────────────
+
+const CARD_ORDER = [
+    'Technique',
+    'Idea Curation',
+    'Idea Generation',
+    'Idea Development',
+    'Idea Review',
+    'Optimization',
+];
+
+const CARD_META: Record<string, {
+    gradient: string;
+    accentColor: string;
+    label: string;
+}> = {
+    'Technique': {
+        gradient: 'radial-gradient(ellipse at 20% 85%, #c8f5e0 0%, #e0d8ff 45%, #ffd6eb 80%, #fffbd4 100%)',
+        accentColor: '#4ade80',
+        label: 'TECHNIQUE',
+    },
+    'Idea Curation': {
+        gradient: 'radial-gradient(ellipse at 75% 20%, #e0d8ff 0%, #ffd6eb 50%, #d6f0ff 100%)',
+        accentColor: '#c084fc',
+        label: 'CURATION',
+    },
+    'Idea Generation': {
+        gradient: 'radial-gradient(ellipse at 20% 20%, #ffd6eb 0%, #ffe4d6 45%, #fffbd4 100%)',
+        accentColor: '#fb923c',
+        label: 'GENERATION',
+    },
+    'Idea Development': {
+        gradient: 'radial-gradient(ellipse at 80% 80%, #d6f0ff 0%, #c8f5e0 50%, #fffbd4 100%)',
+        accentColor: '#38bdf8',
+        label: 'DEVELOPMENT',
+    },
+    'Idea Review': {
+        gradient: 'radial-gradient(ellipse at 50% 10%, #fffbd4 0%, #ffd6eb 50%, #e0d8ff 100%)',
+        accentColor: '#facc15',
+        label: 'REVIEW',
+    },
+    'Optimization': {
+        gradient: 'radial-gradient(ellipse at 80% 20%, #c8f5e0 0%, #d6f0ff 50%, #e0d8ff 100%)',
+        accentColor: '#34d399',
+        label: 'OPTIMIZATION',
+    },
+};
+
+// ─── SVG illustrations (one per category) ─────────────────────────────────────
+
+const StaircaseIllustration = () => (
+    <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+        {[0, 1, 2, 3, 4, 5, 6].map(i => (
+            <rect
+                key={i}
+                x={22 + i * 27}
+                y={105 - i * 15}
+                width={22 + i * 1.5}
+                height={9}
+                rx={4.5}
+                fill={`rgba(0,0,0,${0.10 + i * 0.11})`}
+            />
+        ))}
+    </svg>
+);
+
+const SparkIllustration = () => {
+    const points = [
+        { x: 40, y: 100, r: 5, o: 0.15 }, { x: 65, y: 88, r: 4, o: 0.2 },
+        { x: 55, y: 70, r: 3.5, o: 0.25 }, { x: 90, y: 78, r: 5.5, o: 0.28 },
+        { x: 80, y: 55, r: 4, o: 0.35 }, { x: 110, y: 65, r: 6, o: 0.38 },
+        { x: 100, y: 42, r: 4.5, o: 0.45 }, { x: 135, y: 50, r: 7, o: 0.5 },
+        { x: 125, y: 28, r: 5, o: 0.58 }, { x: 160, y: 35, r: 8, o: 0.65 },
+        { x: 150, y: 15, r: 5.5, o: 0.72 }, { x: 185, y: 22, r: 9, o: 0.8 },
+    ];
+    return (
+        <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+            {points.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={p.r} fill={`rgba(0,0,0,${p.o})`} />
+            ))}
+        </svg>
+    );
+};
+
+const BranchIllustration = () => (
+    <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+        <circle cx={110} cy={110} r={7} fill="rgba(0,0,0,0.55)" />
+        <line x1={110} y1={103} x2={70} y2={72} stroke="rgba(0,0,0,0.25)" strokeWidth={2} strokeLinecap="round" />
+        <line x1={110} y1={103} x2={150} y2={72} stroke="rgba(0,0,0,0.25)" strokeWidth={2} strokeLinecap="round" />
+        <circle cx={70} cy={65} r={6} fill="rgba(0,0,0,0.45)" />
+        <circle cx={150} cy={65} r={6} fill="rgba(0,0,0,0.45)" />
+        <line x1={70} y1={59} x2={45} y2={32} stroke="rgba(0,0,0,0.2)" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={70} y1={59} x2={95} y2={32} stroke="rgba(0,0,0,0.2)" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={150} y1={59} x2={125} y2={32} stroke="rgba(0,0,0,0.2)" strokeWidth={1.5} strokeLinecap="round" />
+        <line x1={150} y1={59} x2={175} y2={32} stroke="rgba(0,0,0,0.2)" strokeWidth={1.5} strokeLinecap="round" />
+        {[45, 95, 125, 175].map((x, i) => (
+            <circle key={i} cx={x} cy={25} r={4.5} fill={`rgba(0,0,0,${0.28 + i * 0.04})`} />
+        ))}
+    </svg>
+);
+
+const StackIllustration = () => (
+    <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+        {[0, 1, 2, 3].map(i => (
+            <rect
+                key={i}
+                x={35 + i * 6}
+                y={30 + i * 22}
+                width={150 - i * 12}
+                height={16}
+                rx={8}
+                fill={`rgba(0,0,0,${0.55 - i * 0.1})`}
+            />
+        ))}
+    </svg>
+);
+
+const ConcentricsIllustration = () => (
+    <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+        {[48, 36, 24, 14, 6].map((r, i) => (
+            <circle
+                key={i}
+                cx={110}
+                cy={65}
+                r={r}
+                stroke={`rgba(0,0,0,${0.15 + i * 0.12})`}
+                strokeWidth={i === 4 ? 6 : 2}
+                fill="none"
+            />
+        ))}
+    </svg>
+);
+
+const WaveIllustration = () => {
+    const pts = [20, 45, 70, 95, 120, 145, 170, 195];
+    const ys = [80, 50, 75, 40, 70, 45, 80, 55];
+    const d = pts.map((x, i) => `${i === 0 ? 'M' : 'L'} ${x} ${ys[i]}`).join(' ');
+    return (
+        <svg viewBox="0 0 220 130" fill="none" className="w-full h-full">
+            <path d={d} stroke="rgba(0,0,0,0.18)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+            {pts.map((x, i) => (
+                <circle key={i} cx={x} cy={ys[i]} r={5} fill={`rgba(0,0,0,${0.2 + i * 0.08})`} />
+            ))}
+        </svg>
+    );
+};
+
+const ILLUSTRATIONS: Record<string, React.FC> = {
+    'Technique': StaircaseIllustration,
+    'Idea Curation': StackIllustration,
+    'Idea Generation': SparkIllustration,
+    'Idea Development': BranchIllustration,
+    'Idea Review': ConcentricsIllustration,
+    'Optimization': WaveIllustration,
+};
+
+// ─── Segmented ring icon ──────────────────────────────────────────────────────
+
+const SegmentedRingIcon = ({ color }: { color: string }) => {
+    const segments = 8;
+    const r = 10;
+    const cx = 14;
+    const cy = 14;
+    const segAngle = (2 * Math.PI) / segments;
+    const gap = 0.45;
+
+    return (
+        <svg width={28} height={28} viewBox="0 0 28 28" fill="none">
+            {Array.from({ length: segments }, (_, i) => {
+                const start = i * segAngle - Math.PI / 2;
+                const end = start + segAngle - gap;
+                const x1 = cx + r * Math.cos(start);
+                const y1 = cy + r * Math.sin(start);
+                const x2 = cx + r * Math.cos(end);
+                const y2 = cy + r * Math.sin(end);
+                return (
+                    <path
+                        key={i}
+                        d={`M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`}
+                        stroke={color}
+                        strokeWidth={2.2}
+                        strokeLinecap="round"
+                    />
+                );
+            })}
+        </svg>
+    );
+};
 
 // ─── Exercise Panel ───────────────────────────────────────────────────────────
 
@@ -23,7 +211,6 @@ interface ExercisePanelProps {
 
 const ExercisePanel: React.FC<ExercisePanelProps> = ({ exercise, index }) => {
     const [answers, setAnswers] = useState<Record<number, string>>({});
-
     const setAnswer = (i: number, val: string) =>
         setAnswers(prev => ({ ...prev, [i]: val }));
 
@@ -132,7 +319,6 @@ const LiveToolsPanel: React.FC<LiveToolsPanelProps> = ({ ritual }) => {
             <h3 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider px-1">
                 Live Tools
             </h3>
-
             {wordTool && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
                     <p className="text-xs text-[var(--text-secondary)]">{wordTool.label}</p>
@@ -168,7 +354,6 @@ const LiveToolsPanel: React.FC<LiveToolsPanelProps> = ({ ritual }) => {
                     )}
                 </div>
             )}
-
             {geminiTool && (
                 <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -198,15 +383,8 @@ const LiveToolsPanel: React.FC<LiveToolsPanelProps> = ({ ritual }) => {
 
 // ─── Songstarter Prompt Button ────────────────────────────────────────────────
 
-interface PromptButtonProps {
-    categoryId: string;
-}
-
-const PromptButton: React.FC<PromptButtonProps> = ({ categoryId }) => {
+const PromptButton: React.FC<{ categoryId: string }> = ({ categoryId }) => {
     const [prompt, setPrompt] = useState('');
-
-    const handleGet = () => setPrompt(getRandomPrompt(categoryId));
-
     return (
         <div className="w-full max-w-md">
             <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
@@ -216,7 +394,7 @@ const PromptButton: React.FC<PromptButtonProps> = ({ categoryId }) => {
                         Writing Prompt
                     </h3>
                     <button
-                        onClick={handleGet}
+                        onClick={() => setPrompt(getRandomPrompt(categoryId))}
                         className="px-3 py-1.5 border border-[var(--border-main)] hover:border-[var(--accent)] rounded-lg text-xs transition-colors flex items-center gap-1"
                     >
                         {prompt ? <RefreshCw size={11} /> : <Sparkles size={11} className="text-[var(--accent)]" />}
@@ -235,15 +413,9 @@ const PromptButton: React.FC<PromptButtonProps> = ({ categoryId }) => {
 
 // ─── Method Chips ─────────────────────────────────────────────────────────────
 
-interface MethodChipsProps {
-    methodIds: string[];
-}
-
-const MethodChips: React.FC<MethodChipsProps> = ({ methodIds }) => {
+const MethodChips: React.FC<{ methodIds: string[] }> = ({ methodIds }) => {
     const [expanded, setExpanded] = useState<string | null>(null);
-
     if (methodIds.length === 0) return null;
-
     return (
         <div className="flex flex-wrap gap-2 justify-center">
             {methodIds.map(id => {
@@ -280,13 +452,183 @@ const MethodChips: React.FC<MethodChipsProps> = ({ methodIds }) => {
     );
 };
 
+// ─── Stacked Card Deck ────────────────────────────────────────────────────────
+
+const PEEK_HEIGHT = 66;
+const CARD_INSET = 13;
+const NUM_BACK = 4;
+
+interface CardDeckProps {
+    onSelectCategory: (category: string) => void;
+    ritualStats: RitualStat[];
+}
+
+const CardDeck: React.FC<CardDeckProps> = ({ onSelectCategory, ritualStats }) => {
+    const [frontIndex, setFrontIndex] = useState(0);
+    const y = useMotionValue(0);
+    const isDragging = useRef(false);
+
+    const getCard = (offset: number) =>
+        CARD_ORDER[(frontIndex + offset) % CARD_ORDER.length];
+
+    const advanceCard = () => {
+        animate(y, -700, { duration: 0.32, ease: [0.4, 0, 0.2, 1] }).then(() => {
+            setFrontIndex(i => (i + 1) % CARD_ORDER.length);
+            y.set(0);
+        });
+    };
+
+    const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+        if (info.offset.y < -55 || info.velocity.y < -350) {
+            advanceCard();
+        } else {
+            animate(y, 0, { type: 'spring', stiffness: 380, damping: 30 });
+        }
+        isDragging.current = false;
+    };
+
+    const frontCategory = getCard(0);
+    const frontMeta = CARD_META[frontCategory];
+    const Illustration = ILLUSTRATIONS[frontCategory];
+    const ritualCount = MASTER_RITUALS.filter(r => r.category === frontCategory).length;
+    const completedToday = ritualStats.filter(s =>
+        MASTER_RITUALS.find(r => r.id === s.ritualId && r.category === frontCategory) &&
+        new Date(s.completedAt).toDateString() === new Date().toDateString()
+    ).length;
+
+    return (
+        <div className="flex flex-col items-center justify-end h-full pb-8 px-5 select-none">
+            {/* Swipe hint */}
+            <p className="text-[10px] tracking-widest uppercase text-[var(--text-tertiary)] mb-5 opacity-60">
+                swipe up to browse · tap to start
+            </p>
+
+            {/* Stack container */}
+            <div
+                className="relative w-full"
+                style={{ height: 400 + NUM_BACK * PEEK_HEIGHT }}
+            >
+                {/* Back cards — rendered bottom-to-top (farthest first) */}
+                {Array.from({ length: NUM_BACK }, (_, i) => {
+                    const backPos = NUM_BACK - 1 - i; // 3,2,1,0 — farthest to closest
+                    const category = getCard(backPos + 1);
+                    const meta = CARD_META[category];
+                    const inset = (backPos + 1) * CARD_INSET;
+                    const topOffset = (NUM_BACK - 1 - backPos) * PEEK_HEIGHT;
+
+                    return (
+                        <div
+                            key={`${category}-${backPos}`}
+                            className="absolute rounded-3xl overflow-hidden"
+                            style={{
+                                top: topOffset,
+                                left: inset,
+                                right: inset,
+                                height: 400,
+                                zIndex: 5 + backPos,
+                                background: '#f8f7ff',
+                                boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                            }}
+                        >
+                            <div className="flex items-center gap-2.5 px-5 py-5">
+                                <SegmentedRingIcon color={meta.accentColor} />
+                                <span
+                                    className="text-sm font-semibold tracking-widest"
+                                    style={{ color: '#9ca3af' }}
+                                >
+                                    {meta.label}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {/* Front card */}
+                <motion.div
+                    drag="y"
+                    dragConstraints={{ bottom: 0, top: -20 }}
+                    dragElastic={{ top: 0.35, bottom: 0 }}
+                    onDragStart={() => { isDragging.current = true; }}
+                    onDragEnd={handleDragEnd}
+                    style={{ y, zIndex: 30, top: NUM_BACK * PEEK_HEIGHT }}
+                    className="absolute left-0 right-0 rounded-3xl overflow-hidden cursor-grab active:cursor-grabbing"
+                    onClick={() => {
+                        if (!isDragging.current) onSelectCategory(frontCategory);
+                    }}
+                    whileTap={{ scale: 0.985 }}
+                >
+                    <div
+                        className="w-full flex flex-col"
+                        style={{
+                            height: 400,
+                            background: frontMeta.gradient,
+                            boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+                        }}
+                    >
+                        {/* Card header */}
+                        <div className="flex items-center justify-between px-5 pt-5 pb-2">
+                            <div className="flex items-center gap-2.5">
+                                <SegmentedRingIcon color={frontMeta.accentColor} />
+                                <span
+                                    className="text-sm font-semibold tracking-widest"
+                                    style={{ color: frontMeta.accentColor }}
+                                >
+                                    {frontMeta.label}
+                                </span>
+                            </div>
+                            {completedToday > 0 && (
+                                <div className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full bg-black/10 text-black/50">
+                                    <CheckCircle2 size={11} />
+                                    {completedToday} done
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Illustration */}
+                        <div className="flex-1 flex items-center justify-center px-6 py-2">
+                            <div className="w-full h-32">
+                                <Illustration />
+                            </div>
+                        </div>
+
+                        {/* Card footer */}
+                        <div className="px-5 pb-6 pt-2">
+                            <p className="text-[22px] font-bold text-black/80 leading-tight">
+                                {frontCategory}
+                            </p>
+                            <p className="text-sm text-black/40 mt-1">
+                                {ritualCount} ritual{ritualCount !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+
+            {/* Dot indicators */}
+            <div className="flex gap-1.5 mt-6">
+                {CARD_ORDER.map((_, i) => (
+                    <div
+                        key={i}
+                        className="rounded-full transition-all duration-300"
+                        style={{
+                            width: i === frontIndex % CARD_ORDER.length ? 16 : 6,
+                            height: 6,
+                            background: i === frontIndex % CARD_ORDER.length
+                                ? 'var(--accent)'
+                                : 'var(--border-main)',
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitual }) => {
     const [activeRitual, setActiveRitual] = useState<Ritual | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const [showFilters, setShowFilters] = useState(false);
-    const [filterCategory, setFilterCategory] = useState<string | null>(null);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [endTime, setEndTime] = useState<number | null>(null);
     const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
@@ -297,7 +639,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     useEffect(() => {
         if (endTime === null) return;
         const timer = setInterval(() => {
-            const now = new Date().getTime();
+            const now = Date.now();
             const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
             setTimeLeft(remaining);
             if (remaining <= 0) setEndTime(null);
@@ -308,7 +650,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const handleStartRitual = (ritual: Ritual) => {
         setActiveRitual(ritual);
         setTimeLeft(ritual.durationMinutes * 60);
-        setEndTime(new Date().getTime() + ritual.durationMinutes * 60 * 1000);
+        setEndTime(Date.now() + ritual.durationMinutes * 60 * 1000);
         setCompletedSteps(new Set());
         setRitualNotes('');
         setPrepStepsOpen(true);
@@ -320,7 +662,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
             onCompleteRitual({
                 ritualId: activeRitual.id,
                 completedAt: new Date().toISOString(),
-                durationMinutes: activeRitual.durationMinutes
+                durationMinutes: activeRitual.durationMinutes,
             });
             setActiveRitual(null);
             setTimeLeft(null);
@@ -331,8 +673,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const toggleStep = (index: number) => {
         setCompletedSteps(prev => {
             const next = new Set(prev);
-            if (next.has(index)) next.delete(index);
-            else next.add(index);
+            if (next.has(index)) next.delete(index); else next.add(index);
             return next;
         });
     };
@@ -346,7 +687,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         }
     };
 
-    // ── Active ritual timer screen ────────────────────────────────────────────
+    // ── Active ritual session ─────────────────────────────────────────────────
     if (activeRitual) {
         const hasExercises = (activeRitual.exercises?.length ?? 0) > 0;
         const hasPromptCategory = !!activeRitual.promptCategory;
@@ -368,13 +709,10 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                             {activeRitual.durationMinutes}m Session
                         </div>
                     </div>
-                    <button className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -mr-2 opacity-0 pointer-events-none">
-                        <MoreVertical size={20} />
-                    </button>
+                    <div className="w-9" />
                 </header>
 
                 <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-4">
-                    {/* Timer + description */}
                     <div className="my-4 text-center space-y-2">
                         <div className="text-6xl font-light tracking-tighter font-mono">
                             {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
@@ -382,12 +720,10 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         <p className="text-[var(--text-secondary)] text-sm">{activeRitual.description}</p>
                     </div>
 
-                    {/* Method chips — tappable to expand formula card */}
                     {(activeRitual.methods?.length ?? 0) > 0 && (
                         <MethodChips methodIds={activeRitual.methods!} />
                     )}
 
-                    {/* Prep Steps */}
                     <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
                         <button
                             onClick={() => setPrepStepsOpen(!prepStepsOpen)}
@@ -397,9 +733,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                 <CheckCircle2 size={16} className="text-[var(--accent)]" />
                                 Prep Steps
                             </h3>
-                            {prepStepsOpen
-                                ? <ChevronUp size={16} className="text-[var(--text-secondary)]" />
-                                : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
+                            {prepStepsOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]" /> : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
                         </button>
                         {prepStepsOpen && (
                             <div className="px-4 pb-4 space-y-2">
@@ -422,7 +756,6 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         )}
                     </div>
 
-                    {/* Exercises section */}
                     {hasExercises && (
                         <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
                             <button
@@ -433,9 +766,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                     <Sparkles size={16} className="text-[var(--accent)]" />
                                     Exercises
                                 </h3>
-                                {exercisesOpen
-                                    ? <ChevronUp size={16} className="text-[var(--text-secondary)]" />
-                                    : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
+                                {exercisesOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]" /> : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
                             </button>
                             {exercisesOpen && (
                                 <div className="px-4 pb-4 space-y-3">
@@ -447,17 +778,9 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                         </div>
                     )}
 
-                    {/* Writing prompt */}
-                    {hasPromptCategory && (
-                        <PromptButton categoryId={activeRitual.promptCategory!} />
-                    )}
+                    {hasPromptCategory && <PromptButton categoryId={activeRitual.promptCategory!} />}
+                    {hasLiveTools && <LiveToolsPanel ritual={activeRitual} />}
 
-                    {/* Live tools (Datamuse rhyme/synonym + Gemini) */}
-                    {hasLiveTools && (
-                        <LiveToolsPanel ritual={activeRitual} />
-                    )}
-
-                    {/* Scratchpad */}
                     <div className="w-full max-w-md flex flex-col min-h-[180px]">
                         <h3 className="text-xs font-medium mb-2 text-[var(--text-tertiary)] uppercase tracking-wider px-1">
                             {activeRitual.category?.includes('Idea') ? 'Scratchpad' : 'Session Notes'}
@@ -485,9 +808,10 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         );
     }
 
-    // ── Category ritual list view ─────────────────────────────────────────────
-    if (selectedCategory && !activeRitual) {
+    // ── Category ritual list ──────────────────────────────────────────────────
+    if (selectedCategory) {
         const categoryRituals = MASTER_RITUALS.filter(r => r.category === selectedCategory);
+        const meta = CARD_META[selectedCategory];
 
         return (
             <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
@@ -498,10 +822,11 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     >
                         <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
                     </button>
-                    <h2 className="text-lg font-medium">{selectedCategory}</h2>
-                    <button className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -mr-2 opacity-0 pointer-events-none">
-                        <MoreVertical size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {meta && <SegmentedRingIcon color={meta.accentColor} />}
+                        <h2 className="text-base font-semibold">{selectedCategory}</h2>
+                    </div>
+                    <div className="w-9" />
                 </header>
 
                 <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -520,13 +845,11 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                             >
                                 <div className="flex justify-between items-start mb-3">
                                     <h3 className="font-medium">{ritual.title}</h3>
-                                    {isCompletedToday && <CheckCircle2 size={16} className="text-green-400" />}
+                                    {isCompletedToday && <CheckCircle2 size={16} className="text-green-400 shrink-0" />}
                                 </div>
-
                                 <p className="text-sm text-[var(--text-secondary)] mb-4 flex-1">
                                     {ritual.description}
                                 </p>
-
                                 {hasExtras && (
                                     <div className="flex flex-wrap gap-1 mb-3">
                                         {(ritual.exercises?.length ?? 0) > 0 && (
@@ -546,7 +869,6 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                                         )}
                                     </div>
                                 )}
-
                                 <div className="flex items-center gap-2 mt-auto">
                                     <span className="flex items-center gap-1 text-xs text-[var(--text-tertiary)] bg-[var(--bg-main)] px-2 py-1 rounded-md">
                                         <Clock size={12} />
@@ -565,63 +887,21 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         );
     }
 
-    // ── Category grid (main view) ─────────────────────────────────────────────
-    const categoriesToShow = filterCategory && filterCategory !== 'All'
-        ? CATEGORIES.filter(c => c === filterCategory)
-        : CATEGORIES;
-
+    // ── Card deck main view ───────────────────────────────────────────────────
     return (
         <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-            <header className="px-6 py-8 border-b border-[var(--border-main)] surface z-10 sticky top-0 flex items-center justify-between">
+            <header className="px-6 pt-8 pb-4">
                 <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
-                <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}
-                >
-                    <Sliders size={20} className={showFilters ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
-                </button>
+                <p className="text-sm text-[var(--text-tertiary)] mt-0.5">
+                    {stats.filter(s => new Date(s.completedAt).toDateString() === new Date().toDateString()).length} completed today
+                </p>
             </header>
 
-            <div className={`overflow-hidden transition-all duration-200 ${showFilters ? 'max-h-12' : 'max-h-0'}`}>
-                <div className="px-6 py-3 border-b border-[var(--border-main)] surface sticky top-[80px] z-10">
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                        <button
-                            onClick={() => setFilterCategory(null)}
-                            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
-                                !filterCategory
-                                    ? 'bg-[var(--accent)] text-[var(--bg-main)]'
-                                    : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
-                            }`}
-                        >
-                            All
-                        </button>
-                        {CATEGORIES.map(category => (
-                            <button
-                                key={category}
-                                onClick={() => setFilterCategory(category)}
-                                className={`shrink-0 rounded-full px-4 py-1.5 text-sm transition-colors whitespace-nowrap ${
-                                    filterCategory === category
-                                        ? 'bg-[var(--accent)] text-[var(--bg-main)] font-medium'
-                                        : 'border border-[var(--border-main)] text-[var(--text-main)] hover:border-[var(--text-secondary)]'
-                                }`}
-                            >
-                                {category}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categoriesToShow.map(category => (
-                    <button
-                        key={category}
-                        onClick={() => setSelectedCategory(category)}
-                        className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-8 hover:border-[var(--text-tertiary)] transition-colors flex items-center justify-center min-h-[160px]"
-                    >
-                        <h2 className="text-xl font-medium text-center">{category}</h2>
-                    </button>
-                ))}
+            <div className="flex-1 overflow-hidden">
+                <CardDeck
+                    onSelectCategory={setSelectedCategory}
+                    ritualStats={stats}
+                />
             </div>
         </div>
     );
