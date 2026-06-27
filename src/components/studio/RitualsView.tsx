@@ -338,7 +338,7 @@ const CardDeck: React.FC<CardDeckProps> = ({ onSelectCategory, ritualStats }) =>
                                 {frontCat}
                             </p>
                             <p className="text-[13px] text-black/35 mt-1 font-medium">
-                                {ritualCount} ritual{ritualCount !== 1 ? 's' : ''} · tap to explore
+                                {ritualCount} practice{ritualCount !== 1 ? 's' : ''} · tap to explore
                             </p>
                         </div>
                     </div>
@@ -369,153 +369,6 @@ const CardDeck: React.FC<CardDeckProps> = ({ onSelectCategory, ritualStats }) =>
 };
 
 // ─── Exercise Panel ───────────────────────────────────────────────────────────
-
-const ExercisePanel: React.FC<{ exercise: RitualExercise; index: number }> = ({ exercise, index }) => {
-    const [answers, setAnswers] = useState<Record<number, string>>({});
-    const setAnswer = (i: number, val: string) => setAnswers(p => ({ ...p, [i]: val }));
-
-    return (
-        <div className="border border-[var(--border-main)] rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-[var(--bg-hover)]">
-                <span className="text-xs text-[var(--accent)] font-mono uppercase tracking-wider mr-2">Exercise {index + 1}</span>
-                <span className="text-sm font-medium">{exercise.title}</span>
-            </div>
-            <div className="px-4 py-3 space-y-3">
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{exercise.instruction}</p>
-                {exercise.inputFields && exercise.inputFields.length > 0 ? (
-                    <div className="space-y-2">
-                        {exercise.inputFields.map((label, i) => (
-                            <div key={i}>
-                                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">{label}</label>
-                                <textarea rows={2} value={answers[i] ?? ''} onChange={e => setAnswer(i, e.target.value)}
-                                    placeholder="Write here..."
-                                    className="w-full bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors" />
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <textarea rows={4} value={answers[0] ?? ''} onChange={e => setAnswer(0, e.target.value)}
-                        placeholder="Write here..."
-                        className="w-full bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg p-2.5 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors" />
-                )}
-            </div>
-        </div>
-    );
-};
-
-// ─── Live Tools Panel ─────────────────────────────────────────────────────────
-
-const LiveToolsPanel: React.FC<{ ritual: Ritual }> = ({ ritual }) => {
-    const [wordInput, setWordInput] = useState('');
-    const [results, setResults] = useState<string[]>([]);
-    const [aiResult, setAiResult] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [activeToolType, setActiveToolType] = useState<'rhyme' | 'synonym' | null>(null);
-
-    const wordTool = ritual.liveTools?.find(t => t.type === 'rhyme' || t.type === 'synonym') ?? null;
-    const geminiTool = ritual.liveTools?.find(t => t.type === 'gemini-prompt') ?? null;
-
-    const handleWordLookup = useCallback(async () => {
-        if (!wordInput.trim() || !wordTool) return;
-        setLoading(true); setResults([]); setActiveToolType(wordTool.type as 'rhyme' | 'synonym');
-        try {
-            const res = wordTool.type === 'rhyme'
-                ? await creative.getRhymes(wordInput.trim())
-                : await creative.getSynonyms(wordInput.trim());
-            setResults(res.slice(0, 16));
-        } catch { setResults([]); }
-        finally { setLoading(false); }
-    }, [wordInput, wordTool]);
-
-    const handleGeminiSuggest = useCallback(async () => {
-        if (!geminiTool) return;
-        setLoading(true); setAiResult(''); setActiveToolType(null);
-        try {
-            const { reply } = await chatWithFacilitator(
-                `I'm doing a "${ritual.title}" session. Give me one specific songwriting action I can take right now based on the methods for this ritual.`,
-                { projectTitle: '', sections: [], scraps: [], recentSessions: [], activeView: 'rituals', ritualContext: `${ritual.title} — ${ritual.description}`, sessionPhase: 'starting' }
-            );
-            setAiResult(reply);
-        } catch { setAiResult('Could not reach the AI. Try again in a moment.'); }
-        finally { setLoading(false); }
-    }, [ritual, geminiTool]);
-
-    if (!wordTool && !geminiTool) return null;
-
-    return (
-        <div className="w-full max-w-md space-y-3">
-            <h3 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider px-1">Live Tools</h3>
-            {wordTool && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
-                    <p className="text-xs text-[var(--text-secondary)]">{wordTool.label}</p>
-                    <div className="flex gap-2">
-                        <input value={wordInput} onChange={e => setWordInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleWordLookup()} placeholder="Enter a word..."
-                            className="flex-1 bg-[var(--bg-main)] border border-[var(--border-main)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] transition-colors" />
-                        <button onClick={handleWordLookup} disabled={loading || !wordInput.trim()}
-                            className="px-3 py-2 bg-[var(--accent)] text-[var(--bg-main)] rounded-lg text-sm font-medium disabled:opacity-40 transition-opacity flex items-center gap-1">
-                            {loading && activeToolType ? <RefreshCw size={14} className="animate-spin" /> : <ArrowRight size={14} />}
-                        </button>
-                    </div>
-                    {results.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                            {results.map((r, i) => (
-                                <button key={i} onClick={() => navigator.clipboard.writeText(r)} title="Copy"
-                                    className="px-2.5 py-1 rounded-full bg-[var(--bg-main)] border border-[var(--border-main)] text-xs hover:border-[var(--accent)] transition-colors active:scale-95">
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-            {geminiTool && (
-                <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs text-[var(--text-secondary)] flex items-center gap-1.5">
-                            <Sparkles size={12} className="text-[var(--accent)]" />
-                            {geminiTool.label}
-                        </p>
-                        <button onClick={handleGeminiSuggest} disabled={loading}
-                            className="px-3 py-1.5 bg-[var(--accent)] text-[var(--bg-main)] rounded-lg text-xs font-medium disabled:opacity-40 transition-opacity flex items-center gap-1.5">
-                            {loading && !activeToolType ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                            Suggest
-                        </button>
-                    </div>
-                    {aiResult && (
-                        <p className="text-sm text-[var(--text-main)] leading-relaxed border-l-2 border-[var(--accent)] pl-3">{aiResult}</p>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
-// ─── Writing Prompt Button ────────────────────────────────────────────────────
-
-const PromptButton: React.FC<{ categoryId: string }> = ({ categoryId }) => {
-    const [prompt, setPrompt] = useState('');
-    return (
-        <div className="w-full max-w-md">
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles size={12} className="text-[var(--accent)]" />
-                        Writing Prompt
-                    </h3>
-                    <button onClick={() => setPrompt(getRandomPrompt(categoryId))}
-                        className="px-3 py-1.5 border border-[var(--border-main)] hover:border-[var(--accent)] rounded-lg text-xs transition-colors flex items-center gap-1">
-                        {prompt ? <RefreshCw size={11} /> : <Sparkles size={11} className="text-[var(--accent)]" />}
-                        {prompt ? 'New prompt' : 'Get a prompt'}
-                    </button>
-                </div>
-                {prompt && (
-                    <p className="text-sm text-[var(--text-main)] leading-relaxed italic border-l-2 border-[var(--accent)] pl-3">{prompt}</p>
-                )}
-            </div>
-        </div>
-    );
-};
 
 // ─── Method Chips ─────────────────────────────────────────────────────────────
 
@@ -560,6 +413,16 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const [exercisesOpen, setExercisesOpen] = useState(true);
     const [ritualNotes, setRitualNotes] = useState('');
 
+    // --- Redesigned Active Session States ---
+    const [activeMode, setActiveMode] = useState<'guide' | 'sandbox'>('guide');
+    const [activeToolTab, setActiveToolTab] = useState<'prompt' | 'ai' | 'dictionary' | null>(null);
+    const [currentPrompt, setCurrentPrompt] = useState('');
+    const [wordInput, setWordInput] = useState('');
+    const [lookupResults, setLookupResults] = useState<string[]>([]);
+    const [aiResult, setAiResult] = useState('');
+    const [loadingTool, setLoadingTool] = useState(false);
+    const [activeToolType, setActiveToolType] = useState<'rhyme' | 'synonym' | null>(null);
+
     useEffect(() => {
         if (endTime === null) return;
         const timer = setInterval(() => {
@@ -570,6 +433,41 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         return () => clearInterval(timer);
     }, [endTime]);
 
+    const handleWordLookup = useCallback(async (wordTool: { type: string; label: string }) => {
+        if (!wordInput.trim() || !wordTool) return;
+        setLoadingTool(true);
+        setLookupResults([]);
+        setActiveToolType(wordTool.type as 'rhyme' | 'synonym');
+        try {
+            const res = wordTool.type === 'rhyme'
+                ? await creative.getRhymes(wordInput.trim())
+                : await creative.getSynonyms(wordInput.trim());
+            setLookupResults(res.slice(0, 16));
+        } catch {
+            setLookupResults([]);
+        } finally {
+            setLoadingTool(false);
+        }
+    }, [wordInput]);
+
+    const handleGeminiSuggest = useCallback(async (ritual: Ritual, geminiTool: { type: string; label: string }) => {
+        if (!geminiTool) return;
+        setLoadingTool(true);
+        setAiResult('');
+        setActiveToolType(null);
+        try {
+            const { reply } = await chatWithFacilitator(
+                `I'm doing a "${ritual.title}" session. Give me one specific songwriting action I can take right now based on the methods for this ritual.`,
+                { projectTitle: '', sections: [], scraps: [], recentSessions: [], activeView: 'rituals', ritualContext: `${ritual.title} — ${ritual.description}`, sessionPhase: 'starting' }
+            );
+            setAiResult(reply);
+        } catch {
+            setAiResult('Could not reach the AI. Try again in a moment.');
+        } finally {
+            setLoadingTool(false);
+        }
+    }, []);
+
     const handleStartRitual = (ritual: Ritual) => {
         setActiveRitual(ritual);
         setTimeLeft(ritual.durationMinutes * 60);
@@ -578,6 +476,27 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         setRitualNotes('');
         setPrepStepsOpen(true);
         setExercisesOpen(true);
+        setActiveMode('guide');
+
+        // Reset sandbox toolkit states
+        setCurrentPrompt('');
+        setWordInput('');
+        setLookupResults([]);
+        setAiResult('');
+
+        // Determine first available tab
+        const wordTool = ritual.liveTools?.find(t => t.type === 'rhyme' || t.type === 'synonym') ?? null;
+        const geminiTool = ritual.liveTools?.find(t => t.type === 'gemini-prompt') ?? null;
+        const hasPrompt = !!ritual.promptCategory;
+        if (hasPrompt) {
+            setActiveToolTab('prompt');
+        } else if (geminiTool) {
+            setActiveToolTab('ai');
+        } else if (wordTool) {
+            setActiveToolTab('dictionary');
+        } else {
+            setActiveToolTab(null);
+        }
     };
 
     const handleCompleteRitual = () => {
@@ -591,7 +510,18 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     const toggleStep = (index: number) => {
         setCompletedSteps(prev => {
             const next = new Set(prev);
-            if (next.has(index)) next.delete(index); else next.add(index);
+            if (next.has(index)) {
+                next.delete(index);
+            } else {
+                next.add(index);
+            }
+            
+            // Auto collapse when all prep steps are checked
+            if (activeRitual && next.size === activeRitual.prepSteps.length) {
+                setPrepStepsOpen(false);
+            } else {
+                setPrepStepsOpen(true);
+            }
             return next;
         });
     };
@@ -610,85 +540,358 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
         const hasExercises = (activeRitual.exercises?.length ?? 0) > 0;
         const hasPromptCategory = !!activeRitual.promptCategory;
         const hasLiveTools = (activeRitual.liveTools?.length ?? 0) > 0;
+        const wordTool = activeRitual.liveTools?.find(t => t.type === 'rhyme' || t.type === 'synonym') ?? null;
+        const geminiTool = activeRitual.liveTools?.find(t => t.type === 'gemini-prompt') ?? null;
 
         return (
-            <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
-                <header className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 surface">
-                    <button onClick={() => setActiveRitual(null)} className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2">
-                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
+            <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden">
+                {/* Header with integrated small timer */}
+                <header className="px-6 py-3 border-b border-[var(--border-main)] flex items-center justify-between sticky top-0 z-10 bg-[var(--bg-main)]/90 backdrop-blur-md">
+                    <button 
+                        onClick={() => setActiveRitual(null)} 
+                        className="p-2 hover:bg-[var(--bg-hover)] rounded-full transition-colors -ml-2"
+                        title="Go Back"
+                    >
+                        <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
                     </button>
-                    <div className="text-center">
-                        <h2 className="text-sm font-medium">{activeRitual.title}</h2>
-                        <div className="text-xs text-[var(--text-tertiary)] flex items-center justify-center gap-1 mt-0.5">
-                            <Clock size={12} />{activeRitual.durationMinutes}m Session
-                        </div>
-                    </div>
-                    <div className="w-9" />
-                </header>
-
-                <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-4">
-                    <div className="my-4 text-center space-y-2">
-                        <div className="text-6xl font-light tracking-tighter font-mono">
-                            {timeLeft !== null ? formatTime(timeLeft) : '0:00'}
-                        </div>
-                        <p className="text-[var(--text-secondary)] text-sm">{activeRitual.description}</p>
-                    </div>
-
-                    {(activeRitual.methods?.length ?? 0) > 0 && <MethodChips methodIds={activeRitual.methods!} />}
-
-                    <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
-                        <button onClick={() => setPrepStepsOpen(!prepStepsOpen)} className="w-full p-4 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors">
-                            <h3 className="text-sm font-medium flex items-center gap-2"><CheckCircle2 size={16} className="text-[var(--accent)]" />Prep Steps</h3>
-                            {prepStepsOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]" /> : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
-                        </button>
-                        {prepStepsOpen && (
-                            <div className="px-4 pb-4 space-y-2">
-                                {activeRitual.prepSteps.map((step, idx) => {
-                                    const isDone = completedSteps.has(idx);
-                                    return (
-                                        <button key={idx} onClick={() => toggleStep(idx)}
-                                            className={`w-full flex items-start gap-3 text-left p-3 rounded-xl transition-all ${isDone ? 'bg-[var(--bg-main)] text-[var(--text-tertiary)] line-through opacity-70' : 'hover:bg-[var(--bg-hover)]'}`}>
-                                            <div className={`mt-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${isDone ? 'bg-[var(--accent)] border-[var(--accent)] text-black' : 'border-[var(--text-tertiary)]'}`}>
-                                                {isDone && <CheckCircle2 size={12} />}
-                                            </div>
-                                            <span className="text-sm">{step}</span>
-                                        </button>
-                                    );
-                                })}
+                    
+                    <div className="text-center flex-1 mx-3 min-w-0">
+                        <h2 className="text-xs font-semibold tracking-wide truncate uppercase text-[var(--text-secondary)]">
+                            {activeRitual.title}
+                        </h2>
+                        {timeLeft !== null && (
+                            <div className="text-sm font-mono tracking-tight font-semibold text-[var(--accent)] flex items-center justify-center gap-1.5 mt-0.5">
+                                <Clock size={12} className="text-[var(--text-tertiary)]" />
+                                <span>{formatTime(timeLeft)}</span>
+                                <span className="text-[var(--text-tertiary)] font-sans font-normal text-xs">/ {activeRitual.durationMinutes}m</span>
                             </div>
                         )}
                     </div>
+                    
+                    {/* Placeholder matching width of back button to keep title perfectly centered */}
+                    <div className="w-9 h-9" />
+                </header>
 
-                    {hasExercises && (
-                        <div className="w-full max-w-md bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl overflow-hidden">
-                            <button onClick={() => setExercisesOpen(!exercisesOpen)} className="w-full p-4 flex items-center justify-between hover:bg-[var(--bg-hover)] transition-colors">
-                                <h3 className="text-sm font-medium flex items-center gap-2"><Sparkles size={16} className="text-[var(--accent)]" />Exercises</h3>
-                                {exercisesOpen ? <ChevronUp size={16} className="text-[var(--text-secondary)]" /> : <ChevronDown size={16} className="text-[var(--text-secondary)]" />}
-                            </button>
-                            {exercisesOpen && (
-                                <div className="px-4 pb-4 space-y-3">
-                                    {activeRitual.exercises!.map((ex, i) => <ExercisePanel key={i} exercise={ex} index={i} />)}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                {/* Sub-header horizontal progress bar */}
+                <div className="h-0.5 w-full bg-[var(--border-subtle)] relative shrink-0">
+                    <div 
+                        className="h-full bg-[var(--accent)] transition-all duration-1000 ease-linear"
+                        style={{ 
+                            width: `${timeLeft !== null ? (1 - (timeLeft / (activeRitual.durationMinutes * 60))) * 100 : 100}%` 
+                        }}
+                    />
+                </div>
 
-                    {hasPromptCategory && <PromptButton categoryId={activeRitual.promptCategory!} />}
-                    {hasLiveTools && <LiveToolsPanel ritual={activeRitual} />}
-
-                    <div className="w-full max-w-md flex flex-col min-h-[180px]">
-                        <h3 className="text-xs font-medium mb-2 text-[var(--text-tertiary)] uppercase tracking-wider px-1">
-                            {activeRitual.category?.includes('Idea') ? 'Scratchpad' : 'Session Notes'}
-                        </h3>
-                        <textarea value={ritualNotes} onChange={e => setRitualNotes(e.target.value)}
-                            placeholder={activeRitual.category?.includes('Idea') ? 'Capture lyrics, ideas, and song thoughts here...' : 'Jot down technical notes, practice insights, or progress...'}
-                            className="flex-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-4 text-sm resize-none focus:outline-none focus:border-[var(--accent)] transition-colors min-h-[180px]" />
+                {/* Main Toggle (Guide vs Workspace) */}
+                <div className="px-4 pt-4 shrink-0 max-w-md w-full mx-auto">
+                    <div className="flex bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-0.5 rounded-xl">
+                        <button
+                            onClick={() => setActiveMode('guide')}
+                            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                                activeMode === 'guide'
+                                    ? 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-main)] shadow-sm'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] border border-transparent'
+                            }`}
+                        >
+                            Routine Guide
+                        </button>
+                        <button
+                            onClick={() => setActiveMode('sandbox')}
+                            className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                                activeMode === 'sandbox'
+                                    ? 'bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-main)] shadow-sm'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] border border-transparent'
+                            }`}
+                        >
+                            Sandbox Workspace
+                        </button>
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border-main)] surface">
-                    <button onClick={handleCompleteRitual} className="w-full py-4 rounded-xl font-medium bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 transition-opacity">
-                        Mark Complete
+                {/* Main Content Area */}
+                <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center gap-4 max-w-md w-full mx-auto pb-24">
+                    
+                    {/* Method Chips (contextual) */}
+                    {(activeRitual.methods?.length ?? 0) > 0 && (
+                        <div className="w-full shrink-0 flex justify-center py-1">
+                            <MethodChips methodIds={activeRitual.methods!} />
+                        </div>
+                    )}
+
+                    {activeMode === 'guide' ? (
+                        /* ================== ROUTINE GUIDE VIEW ================== */
+                        <div className="w-full space-y-4">
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4 space-y-4 shadow-md">
+                                <button
+                                    onClick={() => setPrepStepsOpen(!prepStepsOpen)}
+                                    className="w-full flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 text-left hover:text-[var(--text-main)] transition-colors group focus-visible:outline-none"
+                                >
+                                    <h3 className="text-[11px] font-medium text-[var(--text-tertiary)] flex items-center gap-2 group-hover:text-[var(--text-secondary)] transition-colors">
+                                        warm-up steps
+                                        {completedSteps.size === activeRitual.prepSteps.length && (
+                                            <span className="text-[10px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded-full border border-green-500/20 font-normal">
+                                                all done
+                                            </span>
+                                        )}
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                                            {completedSteps.size} / {activeRitual.prepSteps.length}
+                                        </span>
+                                        {prepStepsOpen ? <ChevronUp size={14} className="text-[var(--text-tertiary)]" /> : <ChevronDown size={14} className="text-[var(--text-tertiary)]" />}
+                                    </div>
+                                </button>
+
+                                {/* Prep steps */}
+                                {prepStepsOpen && (
+                                    <div className="space-y-1 pt-2">
+                                        {activeRitual.prepSteps.map((step, idx) => {
+                                            const isDone = completedSteps.has(idx);
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => toggleStep(idx)}
+                                                    className={`w-full flex items-start gap-3 text-left p-2.5 rounded-xl transition-all ${
+                                                        isDone 
+                                                            ? 'text-[var(--text-tertiary)] line-through opacity-60' 
+                                                            : 'hover:bg-[var(--bg-hover)]'
+                                                    }`}
+                                                >
+                                                    <div
+                                                        className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-200 ${
+                                                            isDone
+                                                                ? 'bg-[var(--accent)]'
+                                                                : 'border border-[var(--text-tertiary)]/50'
+                                                        }`}
+                                                    />
+                                                    <span className="text-xs leading-normal">{step}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Exercises */}
+                                {hasExercises && (
+                                    <div className="space-y-4 pt-4 border-t border-[var(--border-subtle)]">
+                                        <h4 className="text-[11px] font-medium text-[var(--text-tertiary)]">exercises</h4>
+                                        <div className="space-y-4">
+                                            {activeRitual.exercises!.map((ex, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    className="border-l-2 border-[var(--accent)]/40 pl-3.5 py-1 space-y-2"
+                                                >
+                                                    <div className="space-y-0.5">
+                                                        <span className="text-[9px] text-[var(--accent)]/60 font-mono tracking-widest uppercase">
+                                                            {String(i + 1).padStart(2, '0')}
+                                                        </span>
+                                                        <p className="text-sm font-semibold text-[var(--text-main)] leading-tight">
+                                                            {ex.title}
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                                                        {ex.instruction}
+                                                    </p>
+                                                    
+                                                    {/* Minimal Exercise input fields */}
+                                                    {ex.inputFields && ex.inputFields.length > 0 ? (
+                                                        <div className="space-y-4 pt-2">
+                                                            {ex.inputFields.map((label, fIdx) => (
+                                                                <div key={fIdx} className="space-y-1.5">
+                                                                    <label className="text-[10px] text-[var(--text-tertiary)]/70 italic block">
+                                                                        {label}
+                                                                    </label>
+                                                                    <textarea
+                                                                        rows={2}
+                                                                        placeholder="just write…"
+                                                                        className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)]/60 rounded-none px-0 pb-2 pt-0.5 text-xs resize-none focus:outline-none focus:border-b-[var(--accent)] transition-colors text-[var(--text-main)] leading-relaxed placeholder:text-[var(--text-tertiary)]/30 placeholder:italic"
+                                                                        style={{ borderBottomWidth: '1px' }}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="pt-2">
+                                                            <textarea
+                                                                rows={3}
+                                                                placeholder="whatever comes…"
+                                                                className="w-full bg-transparent border-0 border-b border-[var(--border-subtle)]/60 rounded-none px-0 pb-2 pt-0.5 text-xs resize-none focus:outline-none transition-colors text-[var(--text-main)] leading-relaxed placeholder:text-[var(--text-tertiary)]/30 placeholder:italic"
+                                                                style={{ borderBottomWidth: '1px' }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        /* ================== SANDBOX WORKSPACE VIEW ================== */
+                        <div className="w-full space-y-4">
+                            {/* Tabbed Creative Toolkit */}
+                            {(hasPromptCategory || hasLiveTools) && (
+                                <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl overflow-hidden flex flex-col shadow-md">
+                                    {/* Tabs Header */}
+                                    <div className="flex bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] px-2">
+                                        {hasPromptCategory && (
+                                            <button
+                                                onClick={() => setActiveToolTab('prompt')}
+                                                className={`py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+                                                    activeToolTab === 'prompt'
+                                                        ? 'border-[var(--accent)] text-[var(--text-main)] font-semibold'
+                                                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                                                }`}
+                                            >
+                                                Prompt
+                                            </button>
+                                        )}
+                                        {geminiTool && (
+                                            <button
+                                                onClick={() => setActiveToolTab('ai')}
+                                                className={`py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+                                                    activeToolTab === 'ai'
+                                                        ? 'border-[var(--accent)] text-[var(--text-main)] font-semibold'
+                                                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                                                }`}
+                                            >
+                                                AI Assist
+                                            </button>
+                                        )}
+                                        {wordTool && (
+                                            <button
+                                                onClick={() => setActiveToolTab('dictionary')}
+                                                className={`py-2 px-3 text-xs font-semibold border-b-2 transition-all ${
+                                                    activeToolTab === 'dictionary'
+                                                        ? 'border-[var(--accent)] text-[var(--text-main)] font-semibold'
+                                                        : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                                                }`}
+                                            >
+                                                Lookup
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Tab Contents */}
+                                    <div className="p-4 min-h-[96px] flex flex-col justify-center bg-[var(--bg-card)]">
+                                        {activeToolTab === 'prompt' && hasPromptCategory && (
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">Creative Spark</span>
+                                                    <button 
+                                                        onClick={() => setCurrentPrompt(getRandomPrompt(activeRitual.promptCategory!))}
+                                                        className="text-[10px] text-[var(--accent)] hover:underline flex items-center gap-1 font-semibold"
+                                                    >
+                                                        <RefreshCw size={10} className={loadingTool ? 'animate-spin' : ''} />
+                                                        {currentPrompt ? 'New Prompt' : 'Generate'}
+                                                    </button>
+                                                </div>
+                                                {currentPrompt ? (
+                                                    <p className="text-xs text-[var(--text-main)] italic leading-relaxed border-l border-[var(--accent)]/40 pl-3">
+                                                        {currentPrompt}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic text-center py-2">
+                                                        Tap generate to get a writing prompt
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {activeToolTab === 'ai' && geminiTool && (
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">Facilitator Suggestions</span>
+                                                    <button 
+                                                        onClick={() => handleGeminiSuggest(activeRitual, geminiTool)}
+                                                        disabled={loadingTool}
+                                                        className="text-[10px] text-[var(--accent)] hover:underline disabled:opacity-40 flex items-center gap-1 font-semibold"
+                                                    >
+                                                        <Sparkles size={10} className={loadingTool ? 'animate-spin' : ''} />
+                                                        {loadingTool ? 'Thinking…' : aiResult ? 'Suggest New' : 'Get Suggestion'}
+                                                    </button>
+                                                </div>
+                                                {aiResult ? (
+                                                    <p className="text-xs text-[var(--text-main)] leading-relaxed border-l border-[var(--accent)]/40 pl-3">
+                                                        {aiResult}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-[var(--text-tertiary)] italic text-center py-2">
+                                                        Request an AI-generated actionable suggestion
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {activeToolTab === 'dictionary' && wordTool && (
+                                            <div className="space-y-3">
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        value={wordInput} 
+                                                        onChange={e => setWordInput(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && handleWordLookup(wordTool)} 
+                                                        placeholder={`Enter word for ${wordTool.type}s…`}
+                                                        className="flex-1 bg-black/15 border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)] text-[var(--text-main)]"
+                                                    />
+                                                    <button 
+                                                        onClick={() => handleWordLookup(wordTool)} 
+                                                        disabled={loadingTool || !wordInput.trim()}
+                                                        className="px-3 bg-[var(--accent)] text-[var(--bg-main)] rounded-lg text-xs font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
+                                                    >
+                                                        {loadingTool ? <RefreshCw size={12} className="animate-spin" /> : <ArrowRight size={12} />}
+                                                    </button>
+                                                </div>
+                                                {lookupResults.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 pt-1">
+                                                        {lookupResults.map((r, i) => (
+                                                            <button 
+                                                                key={i} 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(r);
+                                                                }} 
+                                                                title="Click to Copy"
+                                                                className="px-2.5 py-0.5 rounded-full bg-black/15 border border-[var(--border-subtle)] text-[10px] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--text-main)] transition-colors active:scale-95"
+                                                            >
+                                                                {r}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scratchpad Card */}
+                            <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4 flex flex-col space-y-3 shadow-md">
+                                <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2.5">
+                                    <h3 className="text-[11px] font-medium text-[var(--text-tertiary)]">
+                                        {activeRitual.category?.includes('Idea') ? 'scratchpad' : 'session notes'}
+                                    </h3>
+                                    <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-mono">
+                                        {ritualNotes.split(/\s+/).filter(Boolean).length} words
+                                    </span>
+                                </div>
+                                <textarea 
+                                    value={ritualNotes} 
+                                    onChange={e => setRitualNotes(e.target.value)}
+                                    placeholder={activeRitual.category?.includes('Idea') ? 'Capture lyrics, ideas, and song thoughts here…' : 'Jot down technical notes, practice insights, or progress…'}
+                                    className="w-full min-h-[220px] bg-black/10 border border-[var(--border-subtle)] rounded-xl p-3 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)] focus:border-[var(--accent)] transition-all text-[var(--text-main)] leading-relaxed" 
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Sticky Complete Footer */}
+                <div className="p-4 border-t border-[var(--border-main)] bg-[var(--bg-main)]/90 backdrop-blur-md sticky bottom-0 z-10 flex justify-center shrink-0">
+                    <button 
+                        onClick={handleCompleteRitual} 
+                        className="w-full max-w-md py-3.5 rounded-xl font-semibold bg-[var(--text-main)] text-[var(--bg-main)] hover:opacity-90 active:scale-[0.98] transition-all text-sm"
+                    >
+                        Complete this practice
                     </button>
                 </div>
             </div>
@@ -778,7 +981,7 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
                     </button>
                 )}
                 <div>
-                    <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
+                    <h1 className="text-2xl font-medium tracking-tight">Practice</h1>
                     <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                         {todayCount === 0 ? 'None completed today' : `${todayCount} completed today`}
                     </p>

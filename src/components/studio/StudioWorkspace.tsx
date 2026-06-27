@@ -379,7 +379,7 @@ const StudioWorkspace: React.FC = () => {
     const [ritualStats, setRitualStats] = useState<RitualStat[]>([]);
     const handleCompleteRitual = (stat: RitualStat) => {
         setRitualStats(prev => [...prev, stat]);
-        toast.success("Ritual completed!");
+        toast.success("Practice complete!");
     };
     const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
@@ -2514,7 +2514,7 @@ const StudioWorkspace: React.FC = () => {
                                     { id: 'collection', label: 'Library', icon: House },
                                     { id: 'notes', label: 'Songs', icon: BookText },
                                     { id: 'studio', label: 'Studio', icon: Disc },
-                                    { id: 'rituals', label: 'Rituals', icon: Sun },
+                                    { id: 'rituals', label: 'Practice', icon: Sun },
                                     { id: 'settings', label: 'Settings', icon: Settings },
                                 ].map((item) => {
                                     const Icon = item.icon;
