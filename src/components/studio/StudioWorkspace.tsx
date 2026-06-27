@@ -366,7 +366,7 @@ const StudioWorkspace: React.FC = () => {
         const nextIndex = (currentIndex + 1) % themes.length;
         setTheme(themes[nextIndex]);
     };
-    const [viewMode, setViewMode] = useState<ViewMode>('studio');
+    const [viewMode, setViewMode] = useState<ViewMode>('collection');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [previousViewMode, setPreviousViewMode] = useState<ViewMode>('collection');
 
