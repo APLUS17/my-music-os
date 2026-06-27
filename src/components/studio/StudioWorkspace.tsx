@@ -2205,7 +2205,9 @@ const StudioWorkspace: React.FC = () => {
                             <div className="flex items-center justify-between border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
                                 <div className="flex items-center">
                                     <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
+                                    {/* Archived/Hidden Takes Tab
                                     <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
+                                    */}
                                     <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
                                 </div>
                                 <button
@@ -2384,7 +2386,8 @@ const StudioWorkspace: React.FC = () => {
                                                     )}
                                                 </AnimatePresence>
                                             </>
-                                        ) : activeTab === 'takes' ? (
+                                        ) : /* Archived/Hidden Takes View
+                                        activeTab === 'takes' ? (
                                             <RecordingThread
                                                 sessions={displaySessions}
                                                 activeSessionId={activeSessionId}
@@ -2414,7 +2417,7 @@ const StudioWorkspace: React.FC = () => {
                                                 onTogglePlay={togglePlayback}
                                                 onSeek={seekTo}
                                             />
-                                        ) : null}
+                                        ) : */ null}
                                     </div>
                                 </div>
                             )}
