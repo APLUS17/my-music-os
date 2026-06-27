@@ -105,7 +105,7 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
                     className="flex items-center gap-0.5 text-[var(--accent)] py-2 pr-3 active:opacity-70"
                 >
                     <ChevronLeft size={24} />
-                    <span className="text-base font-medium">Notes</span>
+                    <span className="text-base font-medium">Songs</span>
                 </button>
                 <button
                     onClick={() => setShowMenu(!showMenu)}
@@ -128,7 +128,7 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
                             className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-main)] hover:bg-white/5 active:bg-white/10"
                         >
                             <Pin size={16} className={note.isPinned ? 'text-[var(--accent)]' : ''} />
-                            <span className="text-sm">{note.isPinned ? 'Unpin Note' : 'Pin Note'}</span>
+                            <span className="text-sm">{note.isPinned ? 'Unpin Song' : 'Pin Song'}</span>
                         </button>
                         <div className="h-px bg-white/10" />
                         <button
@@ -140,7 +140,7 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
                             className="w-full flex items-center gap-3 px-4 py-3.5 text-red-400 hover:bg-white/5 active:bg-white/10"
                         >
                             <Trash2 size={16} />
-                            <span className="text-sm">Delete Note</span>
+                            <span className="text-sm">Delete Song</span>
                         </button>
                     </div>
                 </>
@@ -173,18 +173,9 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
                 />
             </div>
 
-            {/* Bottom formatting toolbar */}
-            <div className="flex-shrink-0 glass border-t border-white/10 px-4 py-2 pb-safe flex items-center gap-1"
+            {/* Bottom toolbar */}
+            <div className="flex-shrink-0 glass border-t border-white/10 px-4 py-2 pb-safe flex items-center justify-end"
                 style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
-                <button className="font-bold text-sm px-3 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-white/10 active:bg-white/20">B</button>
-                <button className="italic text-sm px-3 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-white/10 active:bg-white/20">I</button>
-                <button className="underline text-sm px-3 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-white/10 active:bg-white/20">U</button>
-                <div className="w-px h-5 bg-white/10 mx-1" />
-                <button className="text-sm px-3 py-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-white/10 active:bg-white/20 flex items-center gap-1">
-                    <span className="text-base leading-none">•</span>
-                    <span className="text-xs">List</span>
-                </button>
-                <div className="flex-1" />
                 <button
                     onClick={handleBack}
                     className="text-[var(--accent)] text-sm font-medium px-2 py-1"

@@ -2437,19 +2437,6 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                <AnimatePresence>
-                    {!showRecorder && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10, x: '-50%' }}
-                            animate={{ opacity: 1, y: 0, x: '-50%' }}
-                            exit={{ opacity: 0, y: 10, x: '-50%' }}
-                            className="fixed bottom-[84px] left-1/2 z-[100] px-3 py-1.5 bg-white text-black rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-2xl whitespace-nowrap border border-black/5"
-                        >
-                            Tap • Hold to record
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
                 <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2 flex items-center gap-6 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0 shadow-2xl border border-white/10'}`}>
                     <button
                         onClick={() => setViewMode('collection')}
@@ -2485,7 +2472,7 @@ const StudioWorkspace: React.FC = () => {
                     <button
                         onClick={() => setViewMode('notes')}
                         className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'notes' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Notes"
+                        title="Songs"
                     >
                         <BookText className="h-6 w-6" />
                     </button>

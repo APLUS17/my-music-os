@@ -141,7 +141,7 @@ function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onO
                     <div className="flex items-center gap-1.5 mb-0.5">
                         {note.isPinned && <Pin size={11} className="flex-shrink-0" style={{ color: 'var(--accent)' }} fill="currentColor" />}
                         <p className="text-[15px] font-semibold text-[var(--text-main)] truncate">
-                            {note.title || 'New Note'}
+                            {note.title || 'New Song'}
                         </p>
                     </div>
                     <p className="text-[13px] text-[var(--text-secondary)] truncate">
@@ -188,7 +188,7 @@ function GalleryCard({ note, selectMode, isSelected, onToggle, onOpen }: {
                 </p>
             </div>
             <div className="mt-1.5 px-0.5">
-                <p className="text-[11px] font-semibold text-[var(--text-main)] truncate">{note.title || 'New Note'}</p>
+                <p className="text-[11px] font-semibold text-[var(--text-main)] truncate">{note.title || 'New Song'}</p>
                 <p className="text-[10px] text-[var(--text-secondary)]">{formatNoteDate(note.modifiedAt)}</p>
             </div>
         </div>
@@ -294,9 +294,9 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                 <div className="px-5 pt-6 pb-2">
                     <div className="flex items-start justify-between">
                         <div>
-                            <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Notes</h1>
+                            <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Songs</h1>
                             <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
+                                {notes.length} {notes.length === 1 ? 'Song' : 'Songs'}
                             </p>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
@@ -356,7 +356,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                     {notes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center pt-24 pb-12 text-center">
                             <PenSquare size={60} className="mb-5 opacity-20" style={{ color: 'var(--text-secondary)' }} />
-                            <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>No Notes</p>
+                            <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>No Songs</p>
                             <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
                                 Tap the compose button to get started
                             </p>
@@ -427,7 +427,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                             className="flex items-center gap-2 bg-red-500 text-white rounded-full px-6 py-3 font-semibold text-sm shadow-2xl active:scale-95 transition-transform"
                         >
                             <Trash2 size={16} />
-                            Delete {selectedIds.size} {selectedIds.size === 1 ? 'Note' : 'Notes'}
+                            Delete {selectedIds.size} {selectedIds.size === 1 ? 'Song' : 'Songs'}
                         </button>
                     </motion.div>
                 )}
@@ -525,7 +525,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                 className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-main)] hover:bg-white/5 active:bg-white/10"
                             >
                                 <CheckCircle2 size={17} />
-                                <span className="text-sm">Select Notes</span>
+                                <span className="text-sm">Select Songs</span>
                             </button>
                             <div className="h-px bg-white/10" />
                             <button
