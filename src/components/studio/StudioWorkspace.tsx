@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2, Bookmark } from 'lucide-react';
+import { ChevronDown, CheckCircle2, Bookmark, Menu, ChevronLeft } from 'lucide-react';
 
 // --- Database Logic Inline (to avoid module resolution errors) ---
 const DB_NAME = 'StudioProDB';
@@ -367,6 +367,15 @@ const StudioWorkspace: React.FC = () => {
         setTheme(themes[nextIndex]);
     };
     const [viewMode, setViewMode] = useState<ViewMode>('studio');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [previousViewMode, setPreviousViewMode] = useState<ViewMode>('collection');
+
+    useEffect(() => {
+        if (viewMode !== 'studio' && viewMode !== 'settings') {
+            setPreviousViewMode(viewMode);
+        }
+    }, [viewMode]);
+
     const [ritualStats, setRitualStats] = useState<RitualStat[]>([]);
     const handleCompleteRitual = (stat: RitualStat) => {
         setRitualStats(prev => [...prev, stat]);
@@ -1618,8 +1627,12 @@ const StudioWorkspace: React.FC = () => {
                 return (
                     <div className="h-full flex flex-col pt-12 animate-in fade-in duration-500 px-6">
                         <div className="flex items-center gap-3 mb-8">
-                            <button onClick={() => setViewMode('collection')} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors">
-                                <ChevronRight size={20} className="rotate-180" />
+                            <button
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all cursor-pointer"
+                                title="Open Menu"
+                            >
+                                <Menu size={20} />
                             </button>
                             <h1 className="text-2xl font-medium tracking-tight text-[var(--text-main)]">Settings</h1>
                         </div>
@@ -1691,7 +1704,16 @@ const StudioWorkspace: React.FC = () => {
                     <div className="h-full flex flex-col pt-6 relative text-[var(--text-main)] bg-[var(--bg-main)] select-none">
                         {/* Top Bar Header */}
                         <div className="px-6 py-4 flex items-center justify-between z-30">
-                            <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsSidebarOpen(true)}
+                                    className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all cursor-pointer"
+                                    title="Open Menu"
+                                >
+                                    <Menu size={20} />
+                                </button>
+                                <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
+                            </div>
                             <button
                                 onClick={cycleTheme}
                                 className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
@@ -2012,6 +2034,7 @@ const StudioWorkspace: React.FC = () => {
                         <RitualsView
                             stats={ritualStats}
                             onCompleteRitual={handleCompleteRitual}
+                            onOpenSidebar={() => setIsSidebarOpen(true)}
                         />
                     </div>
                 );
@@ -2044,6 +2067,7 @@ const StudioWorkspace: React.FC = () => {
                             setRecorderMinimized(true);
                             setRecorderAutoStart(true);
                         }}
+                        onOpenSidebar={() => setIsSidebarOpen(true)}
                     />
                 );
             case 'studio':
@@ -2054,7 +2078,14 @@ const StudioWorkspace: React.FC = () => {
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <div className="group relative flex items-center">
+                                        <button
+                                            onClick={() => setViewMode(previousViewMode)}
+                                            className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all cursor-pointer mr-1"
+                                            title="Back"
+                                        >
+                                            <ChevronLeft size={20} />
+                                        </button>
+                                        <div className="group relative flex items-center flex-1">
                                             <input
                                                 value={projectTitle}
                                                 onChange={(e) => setProjectTitle(e.target.value)}
@@ -2437,55 +2468,96 @@ const StudioWorkspace: React.FC = () => {
                     {getActiveView()}
                 </div>
 
-                <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] transition-all duration-500 glass rounded-full px-6 py-2 flex items-center gap-6 ${showRecorder && !recorderMinimized ? 'opacity-0 translate-y-full pointer-events-none' : 'opacity-100 translate-y-0 shadow-2xl border border-white/10'}`}>
-                    <button
-                        onClick={() => setViewMode('collection')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'collection' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Library"
-                    >
-                        <House className="h-6 w-6" />
-                    </button>
-
-                    <button
-                        onClick={() => setViewMode('rituals')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'rituals' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Rituals"
-                    >
-                        <Sun className="h-6 w-6" />
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            setShowRecorder(true);
-                            setRecorderMinimized(true);
-                            setRecorderAutoStart(true);
-                        }}
-                        className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-lg group"
-                        title="Record"
-                    >
-                        <div className="absolute inset-0 rounded-full bg-red-500/20 group-hover:bg-red-500/30 transition-all scale-110" />
-                        <div className="w-11 h-11 rounded-full bg-red-600 flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)] border-2 border-white/20">
-                            <div className="w-4 h-4 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => setViewMode('notes')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'notes' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Songs"
-                    >
-                        <BookText className="h-6 w-6" />
-                    </button>
-
-                    <button
-                        onClick={() => setViewMode('studio')}
-                        className={`p-2 rounded-full transition-all active:scale-95 ${viewMode === 'studio' ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                        title="Studio"
-                    >
-                        <Disc className="h-6 w-6" />
-                    </button>
-                </nav>
             </main>
+
+            {/* Sliding Sidebar Drawer */}
+            <AnimatePresence>
+                {isSidebarOpen && (
+                    <>
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsSidebarOpen(false)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
+                        />
+
+                        {/* Sidebar Panel */}
+                        <motion.div
+                            initial={{ x: '-100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '-100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                            className="fixed inset-y-0 left-0 w-72 bg-[var(--bg-card)] border-r border-[var(--border-main)] z-[201] flex flex-col p-6 shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between pb-6 border-b border-[var(--border-main)]">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center font-black text-lg">
+                                        L
+                                    </div>
+                                    <span className="text-xl font-bold tracking-wider">LYRIQ</span>
+                                </div>
+                                <button
+                                    onClick={() => setIsSidebarOpen(false)}
+                                    className="p-2 hover:bg-white/5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors active:scale-95 cursor-pointer"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
+                                {[
+                                    { id: 'collection', label: 'Library', icon: House },
+                                    { id: 'notes', label: 'Songs', icon: BookText },
+                                    { id: 'studio', label: 'Studio', icon: Disc },
+                                    { id: 'rituals', label: 'Rituals', icon: Sun },
+                                    { id: 'settings', label: 'Settings', icon: Settings },
+                                ].map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = viewMode === item.id;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                setViewMode(item.id as ViewMode);
+                                                setIsSidebarOpen(false);
+                                            }}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer font-medium text-sm ${
+                                                isActive
+                                                    ? 'bg-[var(--accent)] text-[var(--bg-main)] shadow-lg shadow-[var(--accent)]/10 font-semibold'
+                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
+                                            }`}
+                                        >
+                                            <Icon size={18} className={isActive ? 'text-[var(--bg-main)]' : 'text-[var(--text-secondary)]'} />
+                                            <span>{item.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </nav>
+
+                            <div className="pt-4 border-t border-[var(--border-main)] bg-[var(--bg-secondary)]/30 rounded-2xl p-4 space-y-3">
+                                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                                    <span>Quick Capture</span>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setIsSidebarOpen(false);
+                                        setShowRecorder(true);
+                                        setRecorderMinimized(true);
+                                        setRecorderAutoStart(true);
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-98 font-semibold text-sm cursor-pointer"
+                                >
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                                    <span>Record Audio</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
 
             {showRecorder && (
                 <RecorderDrawer

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, Zap, ArrowLeft, MoreVertical, ChevronDown, ChevronUp, Sliders, Sparkles, ArrowRight, RefreshCw, Menu } from 'lucide-react';
 import { Ritual, RitualStat, RitualExercise } from '../../types';
 import { MASTER_RITUALS } from '../../lib/data/rituals';
 import { getRandomPrompt, getMethodById } from '../../lib/creative/SongwritingKnowledge';
@@ -10,6 +10,7 @@ import { formatTime } from '@/lib/utils/time';
 interface RitualsViewProps {
     stats: RitualStat[];
     onCompleteRitual: (stat: RitualStat) => void;
+    onOpenSidebar?: () => void;
 }
 
 const CATEGORIES = ['Idea Generation', 'Idea Development', 'Idea Review', 'Idea Curation', 'Optimization', 'Technique'];
@@ -282,7 +283,7 @@ const MethodChips: React.FC<MethodChipsProps> = ({ methodIds }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitual }) => {
+export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitual, onOpenSidebar }) => {
     const [activeRitual, setActiveRitual] = useState<Ritual | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [showFilters, setShowFilters] = useState(false);
@@ -573,7 +574,18 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
     return (
         <div className="h-full flex flex-col bg-[var(--bg-main)] text-[var(--text-main)]">
             <header className="px-6 py-8 border-b border-[var(--border-main)] surface z-10 sticky top-0 flex items-center justify-between">
-                <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
+                <div className="flex items-center gap-3">
+                    {onOpenSidebar && (
+                        <button
+                            onClick={onOpenSidebar}
+                            className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all cursor-pointer"
+                            title="Open Menu"
+                        >
+                            <Menu size={20} />
+                        </button>
+                    )}
+                    <h1 className="text-2xl font-medium tracking-tight">Rituals</h1>
+                </div>
                 <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`p-2 rounded-full transition-colors ${showFilters ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]'}`}

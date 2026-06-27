@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, Mic, PenSquare, MoreHorizontal,
     List, Grid3X3, CheckCircle2, Paperclip,
-    Check, Pin, Trash2, X
+    Check, Pin, Trash2, X, Menu
 } from 'lucide-react';
 import { Note, RecordingSession, Beat } from '../../types';
 import { NoteEditorView } from './NoteEditorView';
@@ -203,9 +203,10 @@ interface NotesViewProps {
     beats: Beat[];
     onNotesChange: (notes: Note[]) => void;
     onOpenRecorder?: () => void;
+    onOpenSidebar?: () => void;
 }
 
-export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder }: NotesViewProps) {
+export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder, onOpenSidebar }: NotesViewProps) {
     const [viewStyle, setViewStyle] = useState<'list' | 'gallery'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('studio-pro-notes-prefs') as 'list' | 'gallery') || 'list';
@@ -293,11 +294,23 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                 {/* Header */}
                 <div className="px-5 pt-6 pb-2">
                     <div className="flex items-start justify-between">
-                        <div>
-                            <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Songs</h1>
-                            <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                {notes.length} {notes.length === 1 ? 'Song' : 'Songs'}
-                            </p>
+                        <div className="flex items-center gap-3">
+                            {onOpenSidebar && (
+                                <button
+                                    onClick={onOpenSidebar}
+                                    className="p-2 -ml-2 rounded-xl hover:bg-white/5 active:scale-95 transition-all cursor-pointer mt-1"
+                                    style={{ color: 'var(--text-secondary)' }}
+                                    title="Open Menu"
+                                >
+                                    <Menu size={22} />
+                                </button>
+                            )}
+                            <div>
+                                <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Songs</h1>
+                                <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                                    {notes.length} {notes.length === 1 ? 'Song' : 'Songs'}
+                                </p>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
                             {selectMode ? (
