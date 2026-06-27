@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, MoreHorizontal, Pin, Trash2 } from 'lucide-react';
 import { Note } from '../../types';
+import { useVisualViewport } from '../../hooks/useVisualViewport';
 
 interface NoteEditorViewProps {
     note: Note;
@@ -14,6 +15,7 @@ interface NoteEditorViewProps {
 }
 
 export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEditorViewProps) {
+    const viewport = useVisualViewport();
     const [title, setTitle] = useState(note.title);
     const [body, setBody] = useState(note.body);
     const [showMenu, setShowMenu] = useState(false);
@@ -88,8 +90,13 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed inset-0 z-[120] flex flex-col"
-            style={{ background: 'var(--bg-main)' }}
+            className="fixed left-0 right-0 z-[120] flex flex-col"
+            style={{
+                background: 'var(--bg-main)',
+                height: `${viewport.height}px`,
+                top: `${viewport.offsetTop}px`,
+                position: 'fixed'
+            }}
         >
             {/* Header */}
             <div className="flex items-center justify-between px-3 pt-4 pb-1 flex-shrink-0">
