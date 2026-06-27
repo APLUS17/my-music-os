@@ -723,12 +723,12 @@ export const RitualsView: React.FC<RitualsViewProps> = ({ stats, onCompleteRitua
 
                         return (
                             <button key={ritual.id} onClick={() => handleStartRitual(ritual)}
-                                className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 hover:border-[var(--text-tertiary)] transition-colors flex flex-col relative overflow-hidden">
+                                className="text-left bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-2xl p-5 hover:border-[var(--text-tertiary)] transition-colors flex flex-col relative overflow-hidden h-[200px]">
                                 <div className="flex justify-between items-start mb-3">
                                     <h3 className="font-medium">{ritual.title}</h3>
                                     {isCompletedToday && <CheckCircle2 size={16} className="text-green-400 shrink-0" />}
                                 </div>
-                                <p className="text-sm text-[var(--text-secondary)] mb-4 flex-1">{ritual.description}</p>
+                                <p className="text-sm text-[var(--text-secondary)] line-clamp-3">{ritual.description}</p>
                                 {hasExtras && (
                                     <div className="flex flex-wrap gap-1 mb-3">
                                         {(ritual.exercises?.length ?? 0) > 0 && (
