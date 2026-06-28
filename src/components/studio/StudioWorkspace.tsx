@@ -2304,15 +2304,6 @@ const StudioWorkspace: React.FC = () => {
                             <AnimatePresence>
                                 {showPlayerSheet && (
                                     <>
-                                        {/* Backdrop */}
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.25 }}
-                                            onClick={() => setShowPlayerSheet(false)}
-                                            className="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"
-                                        />
                                         {/* Sheet */}
                                         <motion.div
                                             initial={{ y: '100%' }}
@@ -2327,22 +2318,16 @@ const StudioWorkspace: React.FC = () => {
                                             }}
                                             className="absolute bottom-0 left-0 right-0 z-50 rounded-t-[28px] overflow-hidden"
                                             style={{
-                                                background: 'rgba(10,10,10,0.92)',
-                                                backdropFilter: 'blur(32px)',
-                                                WebkitBackdropFilter: 'blur(32px)',
-                                                border: '1px solid rgba(255,255,255,0.08)',
-                                                borderBottom: 'none',
-                                                maxHeight: '88vh',
+                                                background: 'var(--bg-main)',
+                                                height: '100%',
+                                                willChange: 'transform',
                                             }}
                                         >
-                                            {/* Drag handle */}
-                                            <div className="flex justify-center pt-3 pb-1">
-                                                <div className="w-9 h-1 rounded-full bg-white/20" />
-                                            </div>
                                             <PlayerTab
                                                 projectTitle={projectTitle || "Untitled Project"}
                                                 session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                                 onOpenFX={() => setShowFXPanel(true)}
+                                                onDismiss={() => setShowPlayerSheet(false)}
                                                 sessions={sessions}
                                                 beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                                 beatSrc={uploadedBeat}

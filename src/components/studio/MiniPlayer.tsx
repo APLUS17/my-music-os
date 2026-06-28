@@ -34,7 +34,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40"
-            style={{ width: 'calc(100% - 48px)', maxWidth: '360px' }}
+            style={{ width: 'calc(100% - 48px)', maxWidth: '360px', touchAction: 'manipulation' }}
         >
             <div
                 onClick={onExpand}
@@ -81,7 +81,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     <motion.button
                         onClick={(e) => { e.stopPropagation(); onTogglePlay(); }}
                         whileTap={{ scale: 0.88 }}
-                        className="w-10 h-10 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 cursor-pointer shadow-[0_0_16px_rgba(127,255,0,0.25)]"
+                        className="w-11 h-11 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 cursor-pointer shadow-[0_0_16px_rgba(127,255,0,0.25)]"
+                        style={{ touchAction: 'manipulation', minWidth: 44, minHeight: 44 }}
                         aria-label={isPlaying ? 'Pause' : 'Play'}
                     >
                         {isPlaying ? (
