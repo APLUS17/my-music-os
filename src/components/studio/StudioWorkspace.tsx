@@ -7,7 +7,6 @@ import { LyricCard } from './LyricCard';
 import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
-import { RitualsView } from "./RitualsView";
 import { VaultView } from "./VaultView";
 import { NotesView } from "./NotesView";
 import { BeatUploader } from './BeatUploader';
@@ -104,7 +103,7 @@ const deleteAudioData = async (id: string) => {
     });
 };
 
-type ViewMode = 'collection' | 'studio' | 'rituals' | 'vault' | 'settings' | 'notes';
+type ViewMode = 'collection' | 'studio' | 'vault' | 'settings' | 'notes';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -1984,60 +1983,6 @@ const StudioWorkspace: React.FC = () => {
                     </div>
                 );
             }
-            case 'rituals':
-                return (
-                    <div className="h-full relative">
-                        <div className="absolute top-4 right-4 z-[60]">
-                            <BeatUploader
-                                audioSrc={uploadedBeat}
-                                audioRef={beatAudioRef}
-                                beatName={uploadedBeatName}
-                                isPlaying={isBeatPlaying}
-                                setIsPlaying={setIsBeatPlaying}
-                                volume={beatVolume}
-                                setVolume={setBeatVolume}
-                                loopStart={beatLoopStart}
-                                setLoopStart={setBeatLoopStart}
-                                loopEnd={beatLoopEnd}
-                                setLoopEnd={setBeatLoopEnd}
-                                onUpload={async (file) => {
-                                                const url = URL.createObjectURL(file);
-                                                setUploadedBeat(url);
-                                                const name = file.name.replace(/\\.w+$/, '');
-                                                setUploadedBeatName(name);
-                                                const base64 = await blobToBase64(file);
-                                                const id = randomId();
-                                                setUploadedBeatId(id);
-                                                const audio = new Audio(url);
-                                                audio.onloadedmetadata = () => {
-                                                    const dur = audio.duration;
-                                                    const mins = Math.floor(dur / 60);
-                                                    const secs = Math.floor(dur % 60);
-                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                    const newBeat: Beat = {
-                                                        id, name, duration: durationStr,
-                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
-                                                    };
-                                                    setBeats(prev => [newBeat, ...prev]);
-                                                };
-                                            }}
-                                onClear={() => {
-                                                setUploadedBeat(null);
-                                                setUploadedBeatName('');
-                                                setIsBeatPlaying(false);
-                                                setUploadedBeatId(null);
-                                            }}
-                                isLooping={isBeatLooping}
-                                setIsLooping={setIsBeatLooping}
-                            />
-                        </div>
-                        <RitualsView
-                            stats={ritualStats}
-                            onCompleteRitual={handleCompleteRitual}
-                            onOpenSidebar={() => setIsSidebarOpen(true)}
-                        />
-                    </div>
-                );
             case 'vault':
                 return (
                     <VaultView
@@ -2514,7 +2459,6 @@ const StudioWorkspace: React.FC = () => {
                                     { id: 'collection', label: 'Library', icon: House },
                                     { id: 'notes', label: 'Songs', icon: BookText },
                                     { id: 'studio', label: 'Studio', icon: Disc },
-                                    { id: 'rituals', label: 'Practice', icon: Sun },
                                     { id: 'settings', label: 'Settings', icon: Settings },
                                 ].map((item) => {
                                     const Icon = item.icon;
