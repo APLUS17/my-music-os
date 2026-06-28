@@ -8,19 +8,20 @@ import { useVisualViewport } from '../../hooks/useVisualViewport';
 
 interface NoteEditorViewProps {
     note: Note;
+    projectTitle?: string;
     onSave: (updated: Note) => void;
     onBack: () => void;
     onDelete: (id: string) => void;
     onPin: (id: string) => void;
 }
 
-export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEditorViewProps) {
+export function NoteEditorView({ note, projectTitle, onSave, onBack, onDelete, onPin }: NoteEditorViewProps) {
     const viewport = useVisualViewport();
     const [title, setTitle] = useState(note.title);
     const [body, setBody] = useState(note.body);
     const [showMenu, setShowMenu] = useState(false);
     const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const titleRef = useRef<HTMLTextAreaElement>(null);
+    const titleRef = useRef<HTMLInputElement>(null);
     const bodyRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
@@ -30,10 +31,6 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
 
     // Auto-resize textarea on mount
     useEffect(() => {
-        if (titleRef.current) {
-            titleRef.current.style.height = 'auto';
-            titleRef.current.style.height = titleRef.current.scrollHeight + 'px';
-        }
         if (bodyRef.current) {
             bodyRef.current.style.height = 'auto';
             bodyRef.current.style.height = bodyRef.current.scrollHeight + 'px';
@@ -47,12 +44,10 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
         }, 500);
     };
 
-    const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setTitle(val);
         scheduleSave(val, body);
-        e.target.style.height = 'auto';
-        e.target.style.height = e.target.scrollHeight + 'px';
     };
 
     const handleBodyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -63,7 +58,7 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
         e.target.style.height = e.target.scrollHeight + 'px';
     };
 
-    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
             e.preventDefault();
             bodyRef.current?.focus();
@@ -90,26 +85,41 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-            className="fixed left-0 right-0 z-[120] flex flex-col"
+            className="fixed left-0 right-0 z-[120] flex flex-col bg-black text-white"
             style={{
-                background: 'var(--bg-main)',
+                background: '#000000',
                 height: `${viewport.height}px`,
                 top: `${viewport.offsetTop}px`,
                 position: 'fixed'
             }}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-3 pt-4 pb-1 flex-shrink-0">
-                <button
-                    onClick={handleBack}
-                    className="flex items-center gap-0.5 text-[var(--accent)] py-2 pr-3 active:opacity-70"
-                >
-                    <ChevronLeft size={24} />
-                    <span className="text-base font-medium">Songs</span>
-                </button>
+            <div className="flex items-center justify-between px-4 pt-5 pb-3 flex-shrink-0 bg-black">
+                <div className="flex items-center flex-1 min-w-0">
+                    <button
+                        onClick={handleBack}
+                        className="w-10 h-10 flex items-center justify-center bg-[#1c1c1e] text-white rounded-xl active:opacity-70 flex-shrink-0"
+                    >
+                        <ChevronLeft size={22} className="text-white" />
+                    </button>
+                    <div className="flex-1 min-w-0 ml-3 flex flex-col justify-center">
+                        <input
+                            ref={titleRef}
+                            type="text"
+                            value={title}
+                            onChange={handleTitleChange}
+                            onKeyDown={handleTitleKeyDown}
+                            placeholder="Untitled Song"
+                            className="bg-transparent border-none outline-none text-white font-bold text-[17px] leading-tight placeholder:text-neutral-500 w-full p-0 m-0"
+                        />
+                        <span className="text-[13px] text-neutral-400 font-normal mt-0.5 truncate leading-none">
+                            {projectTitle || "ApLus"}
+                        </span>
+                    </div>
+                </div>
                 <button
                     onClick={() => setShowMenu(!showMenu)}
-                    className="p-2 text-[var(--accent)] rounded-full active:bg-white/10"
+                    className="p-2 text-neutral-400 hover:text-white rounded-full active:bg-white/10 flex-shrink-0 ml-2"
                 >
                     <MoreHorizontal size={22} />
                 </button>
@@ -122,7 +132,7 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
                         className="fixed inset-0 z-[130]"
                         onClick={() => setShowMenu(false)}
                     />
-                    <div className="absolute top-14 right-4 z-[140] glass rounded-2xl shadow-2xl border border-white/10 overflow-hidden min-w-[190px]">
+                    <div className="absolute top-16 right-4 z-[140] glass rounded-2xl shadow-2xl border border-white/10 overflow-hidden min-w-[190px]">
                         <button
                             onClick={() => { onPin(note.id); setShowMenu(false); }}
                             className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-main)] hover:bg-white/5 active:bg-white/10"
@@ -147,41 +157,17 @@ export function NoteEditorView({ note, onSave, onBack, onDelete, onPin }: NoteEd
             )}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-5 pb-32">
-                <p className="text-xs text-[var(--text-tertiary)] mb-4 mt-1 text-center">{formattedDate}</p>
-
-                <textarea
-                    ref={titleRef}
-                    value={title}
-                    onChange={handleTitleChange}
-                    onKeyDown={handleTitleKeyDown}
-                    placeholder="Title"
-                    className="w-full bg-transparent border-none outline-none resize-none text-[var(--text-main)] font-bold text-[26px] leading-tight mb-3 overflow-hidden placeholder:text-[var(--text-tertiary)]"
-                    rows={1}
-                    style={{ minHeight: '40px' }}
-                />
-
+            <div className="flex-1 overflow-y-auto px-5 pt-4 pb-32 bg-black">
                 <textarea
                     ref={bodyRef}
                     value={body}
                     onChange={handleBodyChange}
-                    placeholder="Start writing..."
-                    className="w-full bg-transparent border-none outline-none resize-none text-[var(--text-main)] text-[16px] leading-relaxed overflow-hidden placeholder:text-[var(--text-tertiary)]"
-                    rows={12}
-                    autoFocus={!note.title}
-                    style={{ minHeight: '200px' }}
+                    placeholder="Add notes..."
+                    className="w-full bg-transparent border-none outline-none resize-none text-white text-[16px] font-mono leading-relaxed placeholder:text-neutral-500"
+                    rows={20}
+                    autoFocus={true}
+                    style={{ minHeight: '300px' }}
                 />
-            </div>
-
-            {/* Bottom toolbar */}
-            <div className="flex-shrink-0 glass border-t border-white/10 px-4 py-2 pb-safe flex items-center justify-end"
-                style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}>
-                <button
-                    onClick={handleBack}
-                    className="text-[var(--accent)] text-sm font-medium px-2 py-1"
-                >
-                    Done
-                </button>
             </div>
         </motion.div>
     );

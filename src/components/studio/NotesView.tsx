@@ -204,9 +204,10 @@ interface NotesViewProps {
     onNotesChange: (notes: Note[]) => void;
     onOpenRecorder?: () => void;
     onOpenSidebar?: () => void;
+    projectTitle?: string;
 }
 
-export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder, onOpenSidebar }: NotesViewProps) {
+export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder, onOpenSidebar, projectTitle }: NotesViewProps) {
     const [viewStyle, setViewStyle] = useState<'list' | 'gallery'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('studio-pro-notes-prefs') as 'list' | 'gallery') || 'list';
@@ -559,6 +560,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                     <NoteEditorView
                         key={editingNote.id}
                         note={editingNote}
+                        projectTitle={projectTitle}
                         onSave={updateNote}
                         onBack={handleBack}
                         onDelete={deleteNote}

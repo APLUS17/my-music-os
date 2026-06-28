@@ -13,6 +13,7 @@ import { BeatUploader } from './BeatUploader';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
+import { MiniPlayer } from './MiniPlayer';
 import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
@@ -105,7 +106,7 @@ const deleteAudioData = async (id: string) => {
 
 type ViewMode = 'collection' | 'studio' | 'vault' | 'settings' | 'notes';
 type LibraryTab = 'songs' | 'beats';
-type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar';
+type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -360,7 +361,7 @@ const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
     const [theme, setTheme] = useState<Theme>('dark');
     const cycleTheme = () => {
-        const themes: Theme[] = ['dark', 'light', 'midnight', 'matrix', 'sonar'];
+        const themes: Theme[] = ['dark', 'light', 'midnight', 'matrix', 'sonar', 'moises'];
         const currentIndex = themes.indexOf(theme);
         const nextIndex = (currentIndex + 1) % themes.length;
         setTheme(themes[nextIndex]);
@@ -388,6 +389,7 @@ const StudioWorkspace: React.FC = () => {
     const [layerModeSessionId, setLayerModeSessionId] = useState<string | null>(null);
     const [showSearch, setShowSearch] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
+    const [showPlayerSheet, setShowPlayerSheet] = useState(false);
     const [showFXPanel, setShowFXPanel] = useState(false);
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
     const [searchQuery, setSearchQuery] = useState("");
@@ -434,7 +436,7 @@ const StudioWorkspace: React.FC = () => {
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'lyrics' | 'takes' | 'player'>('lyrics');
+    const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
     const [showSyllables, setShowSyllables] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('lyriq_show_syllables') === 'true';
@@ -1639,7 +1641,7 @@ const StudioWorkspace: React.FC = () => {
                             <section>
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Appearance</h2>
                                 <div className="grid grid-cols-1 gap-3">
-                                    {['dark', 'light', 'midnight', 'matrix', 'sonar'].map((t) => (
+                                    {['dark', 'light', 'midnight', 'matrix', 'sonar', 'moises'].map((t) => (
                                         <button
                                             key={t}
                                             onClick={() => setTheme(t as Theme)}
@@ -2007,6 +2009,7 @@ const StudioWorkspace: React.FC = () => {
                         sessions={sessions}
                         beats={beats}
                         onNotesChange={setNotes}
+                        projectTitle={projectTitle}
                         onOpenRecorder={() => {
                             setShowRecorder(true);
                             setRecorderMinimized(true);
@@ -2146,21 +2149,14 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Toggle For Tabs */}
-                            <div className="flex items-center justify-between border-b border-[var(--border-main)] sticky top-0 bg-[var(--bg-main)] z-10 px-6">
-                                <div className="flex items-center">
-                                    <button onClick={() => setActiveTab('lyrics')} className={`pb-3 pr-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'lyrics' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Lyrics</button>
-                                    {/* Archived/Hidden Takes Tab
-                                    <button onClick={() => setActiveTab('takes')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'takes' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Takes</button>
-                                    */}
-                                    <button onClick={() => setActiveTab('player')} className={`pb-3 px-6 pt-3 text-xs mono uppercase tracking-wider transition-all ${activeTab === 'player' ? 'text-[var(--text-main)] border-b border-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'}`}>Player</button>
-                                </div>
+                            {/* Tab bar — T syllable toggle only, no Player tab */}
+                            <div className="absolute top-2 right-4 z-20 flex items-center">
                                 <button
                                     onClick={() => setShowSyllables(!showSyllables)}
                                     className={cn(
                                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
-                                        showSyllables 
-                                            ? "text-[var(--accent)] font-bold" 
+                                        showSyllables
+                                            ? "text-[var(--accent)] font-bold"
                                             : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
                                     )}
                                     title="Toggle Syllables Editor"
@@ -2169,63 +2165,12 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* Player Tab — full height, no scroll padding */}
-                            {activeTab === 'player' && (
-                                <div className="absolute inset-0 mt-12 flex flex-col overflow-hidden bg-[var(--bg-main)]">
-                                    <PlayerTab
-                                        projectTitle={projectTitle || "Untitled Project"}
-                                        session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
-                                        onOpenFX={() => setShowFXPanel(true)}
-                                        sessions={sessions}
-                                        beat={beats.find(b => b.id === uploadedBeatId) ?? null}
-                                        beatSrc={uploadedBeat}
-                                        beatVolume={beatVolume}
-                                        beatMuted={beatMuted}
-                                        onVolumeChange={setBeatVolume}
-                                        onMuteChange={setBeatMuted}
-                                        isBeatLooping={isBeatLooping}
-                                        beatLoopStart={beatLoopStart}
-                                        beatLoopEnd={beatLoopEnd}
-                                        lyrics={categorySections['Lyrics'] || []}
-                                        isAnalyzingVocal={isAnalyzingVocal}
-                                        isAnalyzingBeat={isAnalyzingBeat}
-
-                                        // Shared Audio State
-                                        isPlaying={isPlaying}
-                                        currentTime={currentTime}
-                                        duration={duration}
-                                        onTogglePlay={togglePlayback}
-                                        onSeek={seekTo}
-                                        onSelectSession={setActiveSessionId}
-
-                                        onBeatPlaybackChange={(isP) => {
-                                            if (isP && isBeatPlaying && beatAudioRef.current) {
-                                                beatAudioRef.current.pause();
-                                                beatAudioCtxRef.current?.suspend();
-                                                setIsBeatPlaying(false);
-                                            }
-                                        }}
-                                        onSetLoopRegion={(startTime, endTime) => {
-                                            setBeatLoopStart(startTime);
-                                            setBeatLoopEnd(endTime);
-                                            setIsBeatLooping(true);
-                                        }}
-                                        onClearLoop={() => {
-                                            setIsBeatLooping(false);
-                                            setBeatLoopStart(null);
-                                            setBeatLoopEnd(null);
-                                        }}
-                                    />
-                                </div>
-                            )}
-
-                            {/* Lyrics & Takes tabs — scrollable content */}
-                            {activeTab !== 'player' && (
-                                <div className="absolute inset-0 mt-12 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                            {/* Lyrics — always visible, scrollable */}
+                            {(
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
-                                        {activeTab === 'lyrics' ? (
-                                            <>
-                                                <AnimatePresence mode="wait">
+                                        <>
+                                            <AnimatePresence mode="wait">
                                                      {sections.length === 0 && showTour ? (
                                                             <motion.div 
                                                                 key="flow-canvas"
@@ -2330,24 +2275,93 @@ const StudioWorkspace: React.FC = () => {
                                                         </motion.div>
                                                     )}
                                                 </AnimatePresence>
-                                            </>
-                                        ) : /* Archived/Hidden Takes View
-                                        activeTab === 'takes' ? (
-                                            <RecordingThread
-                                                sessions={displaySessions}
-                                                activeSessionId={activeSessionId}
-                                                onSelectSession={handleSelectSession}
-                                                onPlaySession={handleSelectSessionAndPlay}
-                                                onUpdateSession={(id, updates) => setSessions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s))}
-                                                onUpdateSection={(sessionId, sectionId, updates) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, sections: s.sections?.map(sec => sec.id === sectionId ? { ...sec, ...updates } : sec) } : s))}
-                                                onOpenSplitEditor={(id) => {
-                                                    setRecordingToSplit(id);
-                                                    setSplitEditorOpen(true);
-                                                }}
+                                        </>
+                                    </div>
+                                </div>
+                            )}
 
-                                                onDeleteSession={handleDeleteSession}
+                            {/* MiniPlayer pill — floats above lyrics, visible when beat or vocal loaded */}
+                            <AnimatePresence>
+                                {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && (
+                                    <MiniPlayer
+                                        trackName={
+                                            sessions.find(s => s.id === activeSessionId)?.name
+                                            ?? sessions[0]?.name
+                                            ?? uploadedBeatName
+                                            ?? 'Now Playing'
+                                        }
+                                        isPlaying={isPlaying}
+                                        currentTime={currentTime}
+                                        duration={duration}
+                                        onTogglePlay={() => togglePlayback()}
+                                        onExpand={() => setShowPlayerSheet(true)}
+                                        hasContent={!!(uploadedBeat || sessions.length > 0)}
+                                    />
+                                )}
+                            </AnimatePresence>
+
+                            {/* PlayerTab bottom sheet */}
+                            <AnimatePresence>
+                                {showPlayerSheet && (
+                                    <>
+                                        {/* Backdrop */}
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.25 }}
+                                            onClick={() => setShowPlayerSheet(false)}
+                                            className="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"
+                                        />
+                                        {/* Sheet */}
+                                        <motion.div
+                                            initial={{ y: '100%' }}
+                                            animate={{ y: 0 }}
+                                            exit={{ y: '100%' }}
+                                            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                                            drag="y"
+                                            dragConstraints={{ top: 0 }}
+                                            dragElastic={{ top: 0, bottom: 0.3 }}
+                                            onDragEnd={(_, info) => {
+                                                if (info.offset.y > 80) setShowPlayerSheet(false);
+                                            }}
+                                            className="absolute bottom-0 left-0 right-0 z-50 rounded-t-[28px] overflow-hidden"
+                                            style={{
+                                                background: 'rgba(10,10,10,0.92)',
+                                                backdropFilter: 'blur(32px)',
+                                                WebkitBackdropFilter: 'blur(32px)',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                borderBottom: 'none',
+                                                maxHeight: '88vh',
+                                            }}
+                                        >
+                                            {/* Drag handle */}
+                                            <div className="flex justify-center pt-3 pb-1">
+                                                <div className="w-9 h-1 rounded-full bg-white/20" />
+                                            </div>
+                                            <PlayerTab
+                                                projectTitle={projectTitle || "Untitled Project"}
+                                                session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                                onOpenFX={() => setShowFXPanel(true)}
+                                                sessions={sessions}
+                                                beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                                 beatSrc={uploadedBeat}
                                                 beatVolume={beatVolume}
+                                                beatMuted={beatMuted}
+                                                onVolumeChange={setBeatVolume}
+                                                onMuteChange={setBeatMuted}
+                                                isBeatLooping={isBeatLooping}
+                                                beatLoopStart={beatLoopStart}
+                                                beatLoopEnd={beatLoopEnd}
+                                                lyrics={categorySections['Lyrics'] || []}
+                                                isAnalyzingVocal={isAnalyzingVocal}
+                                                isAnalyzingBeat={isAnalyzingBeat}
+                                                isPlaying={isPlaying}
+                                                currentTime={currentTime}
+                                                duration={duration}
+                                                onTogglePlay={togglePlayback}
+                                                onSeek={seekTo}
+                                                onSelectSession={setActiveSessionId}
                                                 onBeatPlaybackChange={(isP) => {
                                                     if (isP && isBeatPlaying && beatAudioRef.current) {
                                                         beatAudioRef.current.pause();
@@ -2355,17 +2369,21 @@ const StudioWorkspace: React.FC = () => {
                                                         setIsBeatPlaying(false);
                                                     }
                                                 }}
-
-                                                // Shared Audio State
-                                                isPlaying={isPlaying}
-                                                currentTime={currentTime}
-                                                onTogglePlay={togglePlayback}
-                                                onSeek={seekTo}
+                                                onSetLoopRegion={(startTime, endTime) => {
+                                                    setBeatLoopStart(startTime);
+                                                    setBeatLoopEnd(endTime);
+                                                    setIsBeatLooping(true);
+                                                }}
+                                                onClearLoop={() => {
+                                                    setIsBeatLooping(false);
+                                                    setBeatLoopStart(null);
+                                                    setBeatLoopEnd(null);
+                                                }}
                                             />
-                                        ) : */ null}
-                                    </div>
-                                </div>
-                            )}
+                                        </motion.div>
+                                    </>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 );
