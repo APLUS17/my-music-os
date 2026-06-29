@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Play, Pause, Music2, Mic, KeyboardOff } from 'lucide-react';
+import { Music2, Mic, KeyboardOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface MiniPlayerProps {
@@ -40,71 +40,89 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     return (
         <AnimatePresence mode="wait">
             {isKeyboardOpen ? (
-                /* ── State 2: bar above keyboard ── */
+                /* ── State 2: compact bar above keyboard ── */
                 <motion.div
                     key="keyboard-bar"
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    transition={{ type: 'spring', damping: 26, stiffness: 340 }}
-                    className="absolute left-0 right-0 z-40 flex flex-col"
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={{ type: 'spring', damping: 28, stiffness: 360 }}
+                    className="absolute left-0 right-0 z-40"
                     style={{ bottom: keyboardHeight }}
                 >
-                    {/* Bar row */}
                     <div
-                        className="flex items-center justify-between px-3 py-2"
+                        className="flex items-center gap-3 px-3"
                         style={{
-                            background: 'rgba(10,10,10,0.88)',
+                            height: 52,
+                            background: 'rgba(8,8,8,0.92)',
                             backdropFilter: 'blur(20px)',
                             WebkitBackdropFilter: 'blur(20px)',
-                            borderTop: '1px solid rgba(255,255,255,0.07)',
+                            borderTop: '1px solid rgba(255,255,255,0.06)',
                         }}
                     >
-                        {/* Left: disc + tap to play/pause */}
-                        <motion.button
+                        {/* Spinning disc — rotates when playing, freezes when paused */}
+                        <button
                             onClick={onTogglePlay}
-                            whileTap={{ scale: 0.88 }}
                             aria-label={isPlaying ? 'Pause' : 'Play'}
-                            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 relative cursor-pointer"
+                            className="shrink-0 rounded-full flex items-center justify-center cursor-pointer relative"
                             style={{
-                                background: 'var(--accent)',
-                                boxShadow: isPlaying ? '0 0 18px rgba(127,255,0,0.4)' : 'none',
-                                touchAction: 'manipulation',
+                                width: 38,
+                                height: 38,
                                 minWidth: 44,
                                 minHeight: 44,
+                                background: 'var(--accent)',
+                                boxShadow: isPlaying ? '0 0 14px rgba(127,255,0,0.45)' : '0 0 0 rgba(0,0,0,0)',
+                                touchAction: 'manipulation',
+                                /* CSS animation so play-state preserves rotation angle when paused */
+                                animationName: 'spin',
+                                animationDuration: '2.4s',
+                                animationTimingFunction: 'linear',
+                                animationIterationCount: 'infinite',
+                                animationPlayState: isPlaying ? 'running' : 'paused',
+                                transition: 'box-shadow 0.3s ease',
                             }}
                         >
                             {isVocal ? (
-                                <Mic size={18} color="black" />
+                                <Mic size={16} color="black" />
                             ) : (
-                                <Music2 size={18} color="black" />
+                                <Music2 size={16} color="black" />
                             )}
-                        </motion.button>
+                        </button>
 
-                        {/* Right: keyboard dismiss */}
-                        <motion.button
+                        {/* Timeline scrubber — fills space between disc and keyboard button */}
+                        <div className="flex-1 flex flex-col gap-1 justify-center">
+                            <div
+                                className="w-full rounded-full overflow-hidden cursor-pointer"
+                                style={{ height: 3, background: 'rgba(255,255,255,0.08)' }}
+                                onClick={(e) => {
+                                    // future: seekTo on tap
+                                    e.stopPropagation();
+                                }}
+                            >
+                                <motion.div
+                                    className="h-full rounded-full bg-[var(--accent)]"
+                                    animate={{ width: `${progress}%` }}
+                                    transition={{ duration: 0.4, ease: 'linear' }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Keyboard dismiss */}
+                        <button
                             onClick={dismissKeyboard}
-                            whileTap={{ scale: 0.88 }}
                             aria-label="Close keyboard"
-                            className="w-11 h-11 rounded-xl flex items-center justify-center cursor-pointer"
+                            className="shrink-0 flex items-center justify-center rounded-lg cursor-pointer"
                             style={{
-                                background: 'rgba(255,255,255,0.06)',
-                                touchAction: 'manipulation',
+                                width: 36,
+                                height: 36,
                                 minWidth: 44,
                                 minHeight: 44,
+                                background: 'rgba(255,255,255,0.05)',
+                                touchAction: 'manipulation',
                             }}
                         >
-                            <KeyboardOff size={18} className="text-[var(--text-secondary)]" />
-                        </motion.button>
-                    </div>
-
-                    {/* Lime progress line at bottom edge */}
-                    <div className="h-[3px] bg-white/5 w-full">
-                        <motion.div
-                            className="h-full bg-[var(--accent)] rounded-full"
-                            animate={{ width: `${progress}%` }}
-                            transition={{ duration: 0.4, ease: 'linear' }}
-                        />
+                            <KeyboardOff size={16} className="text-[var(--text-secondary)]" />
+                        </button>
                     </div>
                 </motion.div>
             ) : (
@@ -164,9 +182,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                                 aria-label={isPlaying ? 'Pause' : 'Play'}
                             >
                                 {isPlaying ? (
-                                    <Pause size={16} fill="black" stroke="none" />
+                                    <motion.svg width="16" height="16" viewBox="0 0 16 16" fill="black">
+                                        <rect x="3" y="2" width="4" height="12" rx="1" />
+                                        <rect x="9" y="2" width="4" height="12" rx="1" />
+                                    </motion.svg>
                                 ) : (
-                                    <Play size={16} fill="black" stroke="none" className="translate-x-px" />
+                                    <motion.svg width="16" height="16" viewBox="0 0 16 16" fill="black">
+                                        <path d="M4 2.5L13 8L4 13.5V2.5Z" />
+                                    </motion.svg>
                                 )}
                             </motion.button>
                         </div>
