@@ -63,6 +63,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                         {/* Spinning disc — rotates when playing, freezes when paused */}
                         <button
                             onClick={onTogglePlay}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onTouchStart={(e) => e.preventDefault()}
                             aria-label={isPlaying ? 'Pause' : 'Play'}
                             className="shrink-0 rounded-full flex items-center justify-center cursor-pointer relative"
                             style={{
