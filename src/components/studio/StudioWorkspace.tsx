@@ -16,6 +16,7 @@ import { PlayerTab } from './PlayerTab';
 import { MiniPlayer } from './MiniPlayer';
 import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
+import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio } from '@/lib/audio/audioIntelligence';
 import { analyzeAudioStructure } from '@/app/actions';
@@ -500,6 +501,11 @@ const StudioWorkspace: React.FC = () => {
 
     // Vocal FX - only initialize when panel is open
     useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime);
+
+    const viewport = useVisualViewport();
+    const keyboardHeight = viewport.isKeyboardOpen
+        ? Math.max(0, (typeof window !== 'undefined' ? window.innerHeight : 0) - viewport.height)
+        : 0;
     const [duration, setDuration] = useState(0);
 
     const displaySessions = useMemo(() =>
@@ -2296,6 +2302,7 @@ const StudioWorkspace: React.FC = () => {
                                         onTogglePlay={() => togglePlayback()}
                                         onExpand={() => setShowPlayerSheet(true)}
                                         hasContent={!!(uploadedBeat || sessions.length > 0)}
+                                        keyboardHeight={keyboardHeight}
                                     />
                                 )}
                             </AnimatePresence>
