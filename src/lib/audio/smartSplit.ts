@@ -34,7 +34,7 @@ export const analyzeAudioAndSplit = async (
     const sampleRate = audioBuffer.sampleRate;
 
     // Helper to classify a chunk of audio
-    const classifySection = (start: number, end: number): 'vocal' | 'instrumental' | 'speech' => {
+    const classifySection = (start: number, end: number): AutoSection['type'] => {
         const startIdx = Math.max(0, Math.floor(start * sampleRate));
         const endIdx = Math.min(channelData.length, Math.floor(end * sampleRate));
         const data = channelData.slice(startIdx, endIdx);
@@ -71,16 +71,21 @@ export const analyzeAudioAndSplit = async (
         const meanEnergy = sum / energies.length;
         const energyVar = (sumSq / energies.length) - (meanEnergy * meanEnergy);
 
-        // Refined thresholds to avoid aggressive 'instrumental' classification
-        if (zcr > 0.18) return 'speech';
-        if (energyVar > 0.03) return 'speech'; // Transients
+        // --- Refined Heuristics for New Types ---
 
-        // Only classify as instrumental if it's very consistent AND low zero-crossing
-        // (suggesting a steady synth or bass rather than vocal texture)
-        // We also check meanEnergy to ensure it's not just silence (which defaults to vocal)
-        if (meanEnergy > 0.005 && zcr < 0.03 && energyVar < 0.005) return 'instrumental';
+        // Speech/Noise: Very high ZCR or extreme variance (explosive consonants/non-musical noise)
+        if (zcr > 0.35 || energyVar > 0.08) return 'speech';
 
-        return 'vocal'; // Default to vocal (singing) for music app
+        // Instrumental: Low ZCR, extremely low variance (suggests synthesized or sustained notes)
+        if (meanEnergy > 0.005 && zcr < 0.03 && energyVar < 0.001) return 'instrumental';
+
+        // Melody: Humming/Whistling typically has lower ZCR than speech/singing and lower variance
+        if (zcr < 0.11 && energyVar < 0.02) return 'melody';
+
+        // Freestyle/Rap: Higher word density leads to higher ZCR and variance than melodic singing
+        if (zcr > 0.16 || energyVar > 0.025) return 'freestyle';
+
+        return 'vocal'; // Default to vocal (singing)
     };
 
     // LOOP MODE: Level 2 Split

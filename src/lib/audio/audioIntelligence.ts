@@ -2,7 +2,7 @@ export interface AudioAnalysisResult {
     sections: {
         startTime: number;
         endTime: number;
-        type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+        type: 'vocal' | 'instrumental' | 'speech' | 'silence' | 'melody' | 'freestyle';
         label?: string;
         emojiTag?: string;
     }[];

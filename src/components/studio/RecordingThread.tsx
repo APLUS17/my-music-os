@@ -27,7 +27,7 @@ interface RecordingThreadProps {
 interface ThreadItem {
     id: string;
     sessionId: string;
-    type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+    type: 'vocal' | 'instrumental' | 'speech' | 'silence' | 'melody' | 'freestyle';
     time: string;
     label: string;
     status: 'main' | 'variant' | 'note';
@@ -46,40 +46,17 @@ const transformSessionsToThreadItems = (sessions: RecordingSession[]): ThreadIte
     for (const session of sortedSessions) {
         if (!session.sections || session.sections.length === 0) continue;
 
-        // Group sections by type for hierarchical display
-        const groupedByType: Record<string, AutoSection[]> = {};
+        // Display each section as its own lane/thread item
         for (const section of session.sections) {
-            if (!groupedByType[section.type]) {
-                groupedByType[section.type] = [];
-            }
-            groupedByType[section.type].push(section);
-        }
-
-        // Create parent items with children (variants)
-        for (const [type, sections] of Object.entries(groupedByType)) {
-            if (sections.length === 0) continue;
-
-            const mainSection = sections[0]; // First is main
-            const variantSections = sections.slice(1); // Rest are variants
-
             const parent: ThreadItem = {
-                id: mainSection.id,
+                id: section.id,
                 sessionId: session.id,
-                type: mainSection.type as any,
-                time: `${mainSection.startTime.toFixed(2)}-${mainSection.endTime.toFixed(2)}`,
-                label: session.name || 'Untitled Recording',
+                type: section.type as any,
+                time: `${section.startTime.toFixed(2)}-${section.endTime.toFixed(2)}`,
+                label: section.label || session.name || 'Untitled Section',
                 status: 'main',
-                section: mainSection,
-                children: variantSections.map((sec, idx) => ({
-                    id: sec.id,
-                    sessionId: session.id,
-                    type: sec.type as any,
-                    time: `${sec.startTime.toFixed(2)}-${sec.endTime.toFixed(2)}`,
-                    label: `Variant ${idx + 1}`,
-                    status: 'variant' as const,
-                    section: sec,
-                    children: []
-                }))
+                section: section,
+                children: [] // In this view, we'll keep it linear per session sections
             };
 
             items.push(parent);
@@ -93,6 +70,8 @@ const getEmojiForType = (type: string): string => {
     switch (type) {
         case 'vocal': return '🎤';
         case 'speech': return '💬';
+        case 'melody': return '✨';
+        case 'freestyle': return '🔥';
         case 'instrumental': return '🎸';
         case 'silence': return '🔇';
         default: return '🎵';
@@ -103,6 +82,8 @@ const getIconForType = (type: string) => {
     switch (type) {
         case 'vocal': return <Mic size={14} />;
         case 'speech': return <MessageSquare size={14} />;
+        case 'melody': return <Mic size={14} className="text-purple-400" />;
+        case 'freestyle': return <Mic size={14} className="text-orange-400" />;
         case 'instrumental': return <Music size={14} />;
         default: return <Music size={14} />;
     }
@@ -143,15 +124,18 @@ const ThreadItemComponent = memo<{
         >
             <div className="relative pl-6 border-l border-white/8">
                 {/* Timeline dot */}
-                <div className="absolute -left-[7px] top-5 w-3 h-3 rounded-full bg-white/40" />
+                <div className={cn(
+                    "absolute -left-[7px] top-5 w-3 h-3 rounded-full transition-all duration-300",
+                    isPlaying_this ? "bg-[var(--accent)] scale-125 shadow-[0_0_8px_var(--accent)]" : "bg-white/20"
+                )} />
 
                 {/* Main item card */}
                 <div
                     onClick={() => onSelectSession(item.sessionId)}
                     className={cn(
-                        "p-4 rounded-xl cursor-pointer transition-all border",
+                        "p-4 rounded-xl cursor-pointer transition-all border group/card",
                         isPlaying_this
-                            ? "bg-emerald-500/5 border-emerald-500/40"
+                            ? "bg-[var(--accent)]/5 border-[var(--accent)]/40 shadow-[0_0_20px_rgba(165,139,255,0.05)]"
                             : "bg-slate-900/40 hover:bg-slate-900/60 border-white/8 hover:border-white/12"
                     )}
                 >
@@ -174,8 +158,10 @@ const ThreadItemComponent = memo<{
                                 </button>
                             )}
                             {!item.children.length && <div className="w-[14px]" />}
-                            <span className="text-xs uppercase opacity-70 flex items-center gap-1">
-                                {getIconForType(item.type)} {item.type}
+                            <span className="text-[10px] mono uppercase tracking-wider opacity-60 flex items-center gap-1.5">
+                                {getIconForType(item.type)}
+                                {(item.section.emojiTag || item.section.emoji) && <span className="text-xs">{item.section.emojiTag || item.section.emoji}</span>}
+                                {item.type}
                             </span>
                         </div>
                         {item.status === 'main' && (
@@ -184,16 +170,28 @@ const ThreadItemComponent = memo<{
                     </div>
 
                     {/* Content row */}
-                    <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm truncate">{item.label}</span>
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                            <span className="font-medium text-sm block truncate mb-0.5">{item.label}</span>
+                            {item.section.summary && (
+                                <p className="text-[10px] text-white/40 line-clamp-1 italic">
+                                    {item.section.summary}
+                                </p>
+                            )}
+                        </div>
                         <button
                             onClick={(e) => onPlaySection(item.section, e)}
-                            className="bg-white/8 p-2 rounded-full hover:bg-white/12 transition-all active:scale-95"
+                            className={cn(
+                                "p-2 rounded-full transition-all active:scale-95 shrink-0",
+                                isPlaying_this
+                                    ? "bg-[var(--accent)] text-black"
+                                    : "bg-white/8 hover:bg-white/12 text-white"
+                            )}
                         >
                             {isPlaying_this ? (
-                                <Pause size={16} className="text-white" />
+                                <Pause size={16} fill="currentColor" />
                             ) : (
-                                <Play size={16} className="text-white ml-0.5" />
+                                <Play size={16} fill="currentColor" className="ml-0.5" />
                             )}
                         </button>
                     </div>

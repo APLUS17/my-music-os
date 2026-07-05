@@ -129,7 +129,7 @@ export interface GeminiSection {
     startTime: number;
     endTime: number;
     label: string;
-    type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+    type: 'vocal' | 'instrumental' | 'speech' | 'silence' | 'melody' | 'freestyle';
     emoji: string;
     summary?: string;
 }
@@ -149,13 +149,20 @@ export async function analyzeAudioStructure(audioBase64: string, lyricsContext?:
         const prompt = `Analyze this audio recording. It is a songwriting take.
 Identify the logical sections of the song (e.g., Intro, Verse, Chorus, Bridge, Outro, or just "Idea" if it's informal).
 Provide the start and end timestamps in seconds for each section.
-Also classify each section as either 'vocal', 'instrumental', 'speech', or 'silence'.
+Also classify each section as one of the following types:
+- 'vocal': Singing with lyrics.
+- 'melody': Non-lyrical vocal content (humming, "da-da-da", whistling).
+- 'freestyle': Rapid-fire lyrical content, rapping, or continuous stream-of-consciousness writing.
+- 'instrumental': Purely musical sections with no voice.
+- 'speech': Spoken word, feedback, or conversations.
+- 'silence': Significant gaps in audio.
+
 Suggest a descriptive label and a relevant emoji for each section.
 
 ${lyricsContext ? `Contextual Lyrics for reference:\n${lyricsContext}` : ''}
 
 Return the results ONLY as a JSON array of objects with this structure:
-[{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
+[{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "melody" | "freestyle" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
 
         const result = await ai.models.generateContent({
             model: 'gemini-2.0-flash',
