@@ -61,16 +61,16 @@ describe('RecordingThread Stress Test', () => {
         expect(renderTime).toBeLessThan(2000);
 
         // Verify elements rendered
-        const massiveSessions = screen.getAllByDisplayValue(/Massive Session/);
+        const massiveSessions = screen.getAllByText(/Massive Session/);
         expect(massiveSessions.length).toBeGreaterThan(0);
 
         // Test an interaction — clicking a session card calls onSelectSession.
-        // Find cards by their name inputs then walk up to the clickable card div.
-        const nameInputs = screen.getAllByDisplayValue(/Massive Session/);
-        expect(nameInputs.length).toBeGreaterThan(0);
+        // Find cards by their name text then walk up to the clickable card div.
+        const nameSpans = screen.getAllByText(/Massive Session/);
+        expect(nameSpans.length).toBeGreaterThan(0);
         // Walk up the DOM to find the card container (has onClick=onSelect)
-        let cardEl: HTMLElement | null = nameInputs[0].parentElement;
-        while (cardEl && !cardEl.className.includes('rounded-2xl')) {
+        let cardEl: HTMLElement | null = nameSpans[0].parentElement;
+        while (cardEl && !cardEl.className.includes('rounded-xl')) {
             cardEl = cardEl.parentElement;
         }
         expect(cardEl).toBeTruthy();

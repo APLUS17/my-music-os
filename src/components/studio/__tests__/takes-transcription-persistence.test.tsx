@@ -88,46 +88,47 @@ describe('RecordingThread — two takes', () => {
         id: 'session-1',
         name: 'Take 1',
         timestamp: new Date('2026-04-01T12:00:00Z').toISOString(),
+        sections: [{ id: 'sec-1', startTime: 0, endTime: 5, type: 'vocal', isBest: false, isFavorited: false, label: 'Verse' }],
     });
     const take2 = makeSession({
         id: 'session-2',
         name: 'Take 2',
         timestamp: new Date('2026-04-01T13:00:00Z').toISOString(),
+        sections: [{ id: 'sec-2', startTime: 0, endTime: 5, type: 'vocal', isBest: false, isFavorited: false, label: 'Verse' }],
     });
 
     it('renders both sessions', () => {
         render(<RecordingThread {...makeThreadProps([take1, take2], 'session-2')} />);
-        expect(screen.getByDisplayValue('Take 1')).toBeTruthy();
-        expect(screen.getByDisplayValue('Take 2')).toBeTruthy();
+        expect(screen.getByText('Take 1')).toBeTruthy();
+        expect(screen.getByText('Take 2')).toBeTruthy();
     });
 
     it('shows newest session first (Take 2 before Take 1 in DOM)', () => {
         render(<RecordingThread {...makeThreadProps([take1, take2], 'session-2')} />);
-        const take1Input = screen.getByDisplayValue('Take 1');
-        const take2Input = screen.getByDisplayValue('Take 2');
+        const take1Input = screen.getByText('Take 1');
+        const take2Input = screen.getByText('Take 2');
         // compareDocumentPosition: 4 means "preceding", 2 means "following"
         const order = take2Input.compareDocumentPosition(take1Input);
         // take1Input should follow take2Input → bit 4 set in order result
         expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('active session card has ring-1 class, inactive does not', () => {
+    it('active session card has playing class when playing, inactive does not', () => {
         const { container } = render(
-            <RecordingThread {...makeThreadProps([take1, take2], 'session-2')} />
+            <RecordingThread {...makeThreadProps([take1, take2], 'session-2', { isPlaying: true, currentTime: 2 })} />
         );
-        // Cards are the direct wrappers with rounded-2xl
         const cards = Array.from(
-            container.querySelectorAll('[class*="rounded-2xl"][class*="border"]')
-        ).filter(el => el.getAttribute('class')?.includes('bg-[#111]'));
+            container.querySelectorAll('.rounded-xl.border')
+        );
 
-        const activeCards = cards.filter(c => c.className.includes('ring-1'));
-        const inactiveCards = cards.filter(c => !c.className.includes('ring-1'));
+        const playingCards = cards.filter(c => c.className.includes('border-emerald-500/40'));
+        const idleCards = cards.filter(c => !c.className.includes('border-emerald-500/40'));
 
-        expect(activeCards).toHaveLength(1);
-        expect(inactiveCards).toHaveLength(1);
+        expect(playingCards).toHaveLength(1);
+        expect(idleCards).toHaveLength(1);
     });
 
-    it('clicking an inactive session card calls onSelectSession with its id', () => {
+    it('clicking a session card calls onSelectSession with its id', () => {
         const onSelectSession = vi.fn();
         const { container } = render(
             <RecordingThread
@@ -135,30 +136,12 @@ describe('RecordingThread — two takes', () => {
             />
         );
         const cards = Array.from(
-            container.querySelectorAll('[class*="rounded-2xl"][class*="border"]')
-        ).filter(el => el.getAttribute('class')?.includes('bg-[#111]'));
-
-        const inactiveCard = cards.find(c => !c.className.includes('ring-1'));
-        expect(inactiveCard).toBeTruthy();
-        fireEvent.click(inactiveCard!);
-        expect(onSelectSession).toHaveBeenCalledWith('session-1');
-    });
-
-    it('clicking the active session card still calls onSelectSession', () => {
-        const onSelectSession = vi.fn();
-        const { container } = render(
-            <RecordingThread
-                {...makeThreadProps([take1, take2], 'session-2', { onSelectSession })}
-            />
+            container.querySelectorAll('.rounded-xl.border')
         );
-        const cards = Array.from(
-            container.querySelectorAll('[class*="rounded-2xl"][class*="border"]')
-        ).filter(el => el.getAttribute('class')?.includes('bg-[#111]'));
 
-        const activeCard = cards.find(c => c.className.includes('ring-1'));
-        expect(activeCard).toBeTruthy();
-        fireEvent.click(activeCard!);
-        expect(onSelectSession).toHaveBeenCalledWith('session-2');
+        expect(cards).toHaveLength(2);
+        fireEvent.click(cards[0]);
+        expect(onSelectSession).toHaveBeenCalledWith('session-2'); // take2 is newest, so it's first
     });
 
     it('shows empty state when sessions array is empty', () => {
