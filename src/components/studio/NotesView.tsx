@@ -8,9 +8,7 @@ import {
     Check, Pin, Trash2, X, Menu
 } from 'lucide-react';
 import { Note, RecordingSession, Beat } from '../../types';
-import { NoteEditorView } from './NoteEditorView';
 import { NoteAttachmentsView } from './NoteAttachmentsView';
-import { randomId } from '@/lib/utils/id';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -63,12 +61,11 @@ interface SwipeableNoteRowProps {
     selectMode: boolean;
     isSelected: boolean;
     onSelect: () => void;
-    onOpen: () => void;
     onDelete: () => void;
     onPin: () => void;
 }
 
-function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onOpen, onDelete, onPin }: SwipeableNoteRowProps) {
+function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onDelete, onPin }: SwipeableNoteRowProps) {
     const [offsetX, setOffsetX] = useState(0);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const startX = useRef<number | null>(null);
@@ -96,7 +93,7 @@ function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onO
     const handleClick = (e: React.MouseEvent) => {
         if (hasMoved.current) { e.stopPropagation(); return; }
         if (offsetX < -10) { setOffsetX(0); setConfirmDelete(false); e.stopPropagation(); return; }
-        selectMode ? onSelect() : onOpen();
+        if (selectMode) onSelect();
     };
 
     return (
@@ -141,7 +138,7 @@ function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onO
                     <div className="flex items-center gap-1.5 mb-0.5">
                         {note.isPinned && <Pin size={11} className="flex-shrink-0" style={{ color: 'var(--accent)' }} fill="currentColor" />}
                         <p className="text-[15px] font-semibold text-[var(--text-main)] truncate">
-                            {note.title || 'New Song'}
+                            {note.title || 'New Note'}
                         </p>
                     </div>
                     <p className="text-[13px] text-[var(--text-secondary)] truncate">
@@ -159,17 +156,16 @@ function SwipeableNoteRow({ note, isFirst, selectMode, isSelected, onSelect, onO
 
 // ── Gallery Card ─────────────────────────────────────────────────────────────
 
-function GalleryCard({ note, selectMode, isSelected, onToggle, onOpen }: {
+function GalleryCard({ note, selectMode, isSelected, onToggle }: {
     note: Note;
     selectMode: boolean;
     isSelected: boolean;
     onToggle: () => void;
-    onOpen: () => void;
 }) {
     return (
         <div
-            className="flex flex-col cursor-pointer active:opacity-70 transition-opacity"
-            onClick={selectMode ? onToggle : onOpen}
+            className={`flex flex-col ${selectMode ? 'cursor-pointer active:opacity-70 transition-opacity' : ''}`}
+            onClick={selectMode ? onToggle : undefined}
         >
             <div className="rounded-2xl p-3 overflow-hidden relative" style={{ background: '#1a1a1a', height: 140 }}>
                 {selectMode && (
@@ -188,7 +184,7 @@ function GalleryCard({ note, selectMode, isSelected, onToggle, onOpen }: {
                 </p>
             </div>
             <div className="mt-1.5 px-0.5">
-                <p className="text-[11px] font-semibold text-[var(--text-main)] truncate">{note.title || 'New Song'}</p>
+                <p className="text-[11px] font-semibold text-[var(--text-main)] truncate">{note.title || 'New Note'}</p>
                 <p className="text-[10px] text-[var(--text-secondary)]">{formatNoteDate(note.modifiedAt)}</p>
             </div>
         </div>
@@ -205,9 +201,10 @@ interface NotesViewProps {
     onOpenRecorder?: () => void;
     onOpenSidebar?: () => void;
     projectTitle?: string;
+    onOpenStudio?: () => void;
 }
 
-export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder, onOpenSidebar, projectTitle }: NotesViewProps) {
+export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorder, onOpenSidebar, projectTitle, onOpenStudio }: NotesViewProps) {
     const [viewStyle, setViewStyle] = useState<'list' | 'gallery'>(() => {
         if (typeof window !== 'undefined') {
             return (localStorage.getItem('studio-pro-notes-prefs') as 'list' | 'gallery') || 'list';
@@ -216,7 +213,6 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
     });
     const [showMenu, setShowMenu] = useState(false);
     const [showAttachments, setShowAttachments] = useState(false);
-    const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearch, setShowSearch] = useState(false);
     const [selectMode, setSelectMode] = useState(false);
@@ -245,18 +241,6 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
 
     const groups = useMemo(() => groupNotesByTime(sortedNotes), [sortedNotes]);
 
-    const createNote = useCallback(() => {
-        const id = randomId();
-        const now = new Date().toISOString();
-        const newNote: Note = { id, title: '', body: '', createdAt: now, modifiedAt: now };
-        onNotesChange([newNote, ...notes]);
-        setEditingNoteId(id);
-    }, [notes, onNotesChange]);
-
-    const updateNote = useCallback((updated: Note) => {
-        onNotesChange(notes.map(n => n.id === updated.id ? updated : n));
-    }, [notes, onNotesChange]);
-
     const deleteNote = useCallback((id: string) => {
         onNotesChange(notes.filter(n => n.id !== id));
     }, [notes, onNotesChange]);
@@ -276,17 +260,8 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
             return next;
-        });
-    };
-
-    const editingNote = editingNoteId ? notes.find(n => n.id === editingNoteId) ?? null : null;
-
-    const handleBack = () => {
-        if (editingNote && !editingNote.title && !editingNote.body) {
-            deleteNote(editingNote.id);
-        }
-        setEditingNoteId(null);
-    };
+            });
+        };
 
     return (
         <div className="relative h-full flex flex-col overflow-hidden" style={{ background: 'var(--bg-main)' }}>
@@ -307,9 +282,9 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                 </button>
                             )}
                             <div>
-                                <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Songs</h1>
+                                <h1 className="text-[38px] font-bold leading-tight" style={{ color: 'var(--text-main)' }}>Notes</h1>
                                 <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                                    {notes.length} {notes.length === 1 ? 'Song' : 'Songs'}
+                                    {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
                                 </p>
                             </div>
                         </div>
@@ -370,7 +345,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                     {notes.length === 0 ? (
                         <div className="flex flex-col items-center justify-center pt-24 pb-12 text-center">
                             <PenSquare size={60} className="mb-5 opacity-20" style={{ color: 'var(--text-secondary)' }} />
-                            <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>No Songs</p>
+                            <p className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>No Notes</p>
                             <p className="text-sm mt-1" style={{ color: 'var(--text-tertiary)' }}>
                                 Tap the compose button to get started
                             </p>
@@ -382,7 +357,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                         </div>
                     ) : viewStyle === 'list' ? (
                         groups.map(group => (
-                            <div key={group.label}>
+                             <div key={group.label}>
                                 <h2 className="text-[19px] font-bold mt-6 mb-2" style={{ color: 'var(--text-main)' }}>
                                     {group.label}
                                 </h2>
@@ -395,7 +370,6 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                             selectMode={selectMode}
                                             isSelected={selectedIds.has(note.id)}
                                             onSelect={() => toggleSelect(note.id)}
-                                            onOpen={() => setEditingNoteId(note.id)}
                                             onDelete={() => deleteNote(note.id)}
                                             onPin={() => pinNote(note.id)}
                                         />
@@ -417,7 +391,6 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                             selectMode={selectMode}
                                             isSelected={selectedIds.has(note.id)}
                                             onToggle={() => toggleSelect(note.id)}
-                                            onOpen={() => setEditingNoteId(note.id)}
                                         />
                                     ))}
                                 </div>
@@ -441,7 +414,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                             className="flex items-center gap-2 bg-red-500 text-white rounded-full px-6 py-3 font-semibold text-sm shadow-2xl active:scale-95 transition-transform"
                         >
                             <Trash2 size={16} />
-                            Delete {selectedIds.size} {selectedIds.size === 1 ? 'Song' : 'Songs'}
+                            Delete {selectedIds.size} {selectedIds.size === 1 ? 'Note' : 'Notes'}
                         </button>
                     </motion.div>
                 )}
@@ -481,7 +454,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
 
                 {/* Compose */}
                 <button
-                    onClick={createNote}
+                    onClick={onOpenStudio}
                     className="w-11 h-11 flex items-center justify-center rounded-full active:scale-95 transition-transform"
                     style={{ background: 'var(--accent)' }}
                     title="New note"
@@ -539,7 +512,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                 className="w-full flex items-center gap-3 px-4 py-3.5 text-[var(--text-main)] hover:bg-white/5 active:bg-white/10"
                             >
                                 <CheckCircle2 size={17} />
-                                <span className="text-sm">Select Songs</span>
+                                <span className="text-sm">Select Notes</span>
                             </button>
                             <div className="h-px bg-white/10" />
                             <button
@@ -551,21 +524,6 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                             </button>
                         </motion.div>
                     </>
-                )}
-            </AnimatePresence>
-
-            {/* ── Note Editor overlay ── */}
-            <AnimatePresence>
-                {editingNote && (
-                    <NoteEditorView
-                        key={editingNote.id}
-                        note={editingNote}
-                        projectTitle={projectTitle}
-                        onSave={updateNote}
-                        onBack={handleBack}
-                        onDelete={deleteNote}
-                        onPin={pinNote}
-                    />
                 )}
             </AnimatePresence>
 

@@ -11,7 +11,7 @@ interface Step {
 
 interface OnboardingTourProps {
     onComplete: () => void;
-    setViewMode: (v: 'collection' | 'studio' | 'vault' | 'settings') => void;
+    setViewMode: (v: 'home' | 'studio' | 'vault' | 'settings' | 'notebook') => void;
     setShowRecorder: (b: boolean) => void;
     setRecorderMinimized: (b: boolean) => void;
     viewMode: string;
@@ -36,10 +36,10 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-nav-library',
-            title: 'Library',
-            content: 'Your vault. All your songs and beats live here. Start here to find your sound or create something new.',
+            title: 'Home',
+            content: 'Your home dashboard. All your songs and beats live here. Start here to find your sound or create something new.',
             position: 'top',
-            action: () => setViewMode('collection')
+            action: () => setViewMode('home')
         },
         {
             targetId: 'tour-nav-studio',
@@ -72,9 +72,9 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
     const params = STEPS[currentStep];
 
-    // Navigate to library when tour starts
+    // Navigate to home when tour starts
     useEffect(() => {
-        setViewMode('collection');
+        setViewMode('home');
     }, []);
 
     useEffect(() => {

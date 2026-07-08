@@ -38,6 +38,7 @@ import {
     MessageSquare,
     House,
     ListMusic,
+    Mic,
     Library,
     Disc,
     History,
@@ -105,7 +106,7 @@ const deleteAudioData = async (id: string) => {
     });
 };
 
-type ViewMode = 'collection' | 'studio' | 'vault' | 'settings' | 'notes';
+type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -367,9 +368,9 @@ const StudioWorkspace: React.FC = () => {
         const nextIndex = (currentIndex + 1) % themes.length;
         setTheme(themes[nextIndex]);
     };
-    const [viewMode, setViewMode] = useState<ViewMode>('collection');
+    const [viewMode, setViewMode] = useState<ViewMode>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [previousViewMode, setPreviousViewMode] = useState<ViewMode>('collection');
+    const [previousViewMode, setPreviousViewMode] = useState<ViewMode>('home');
 
     useEffect(() => {
         if (viewMode !== 'studio' && viewMode !== 'settings') {
@@ -1002,7 +1003,7 @@ const StudioWorkspace: React.FC = () => {
             });
         } else {
             // Create new session (original behavior)
-        const isStandalone = viewMode === 'collection' || viewMode === 'vault';
+        const isStandalone = viewMode === 'home' || viewMode === 'vault';
             const newSession: RecordingSession = {
             id,
             name: isStandalone ? `New Recording ${recordingCounter}` : `Recording ${sessions.length + 1}`,
@@ -1035,7 +1036,7 @@ const StudioWorkspace: React.FC = () => {
                                 setSessions(prev => prev.map(s => s.id === id ? { ...s, projectId: activeProjectId } : s));
                                 toast.success('Added to current project');
                             } else {
-                                setViewMode('collection');
+                                setViewMode('home');
                                 toast('Select a project to add this recording to');
                             }
                         }
@@ -1692,7 +1693,7 @@ const StudioWorkspace: React.FC = () => {
                                         onClick={() => {
                                             localStorage.removeItem('lyriq-tour-completed');
                                             setShowTour(true);
-                                            setViewMode('collection');
+                                            setViewMode('home');
                                         }}
                                         className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
                                     >
@@ -1704,7 +1705,7 @@ const StudioWorkspace: React.FC = () => {
                         </div>
                     </div>
                 );
-            case 'collection': {
+            case 'home': {
                 const isEmpty = savedProjects.length === 0 && beats.length === 0;
 
                 return (
@@ -1719,7 +1720,7 @@ const StudioWorkspace: React.FC = () => {
                                 >
                                     <Menu size={20} />
                                 </button>
-                                <span className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
+                                <span id="tour-nav-library" className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
                             </div>
                             <button
                                 onClick={cycleTheme}
@@ -1771,10 +1772,20 @@ const StudioWorkspace: React.FC = () => {
                                                     handleNewProject();
                                                     setShowPillOptions(false);
                                                 }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
                                             >
                                                 <FilePlus size={16} />
-                                                <span>Create</span>
+                                                <span>New Song</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    handleRecordStart();
+                                                    setShowPillOptions(false);
+                                                }}
+                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                            >
+                                                <Mic size={16} />
+                                                <span>Record</span>
                                             </button>
                                         </motion.div>
                                     )}
@@ -1791,7 +1802,7 @@ const StudioWorkspace: React.FC = () => {
                                             onClick={() => setLibraryTab('songs')}
                                             className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                                         >
-                                            Songs
+                                            Projects
                                         </button>
                                         <button
                                             onClick={() => setLibraryTab('beats')}
@@ -1951,7 +1962,7 @@ const StudioWorkspace: React.FC = () => {
                                                         className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
                                                         <Music size={16} />
-                                                        <span>Upload files</span>
+                                                        <span>Import</span>
                                                     </button>
                                                     <button
                                                         onClick={() => {
@@ -1961,17 +1972,17 @@ const StudioWorkspace: React.FC = () => {
                                                         className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
                                                         <FilePlus size={16} />
-                                                        <span>Create pack</span>
+                                                        <span>New Song</span>
                                                     </button>
                                                     <button
                                                         onClick={() => {
-                                                            setViewMode('studio');
+                                                            handleRecordStart();
                                                             setFabOpen(false);
                                                         }}
                                                         className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
-                                                        <Disc size={16} />
-                                                        <span>Open studio</span>
+                                                        <Mic size={16} />
+                                                        <span>Record</span>
                                                     </button>
                                                 </motion.div>
                                             )}
@@ -2008,7 +2019,7 @@ const StudioWorkspace: React.FC = () => {
                         ritualStats={ritualStats}
                     />
                 );
-            case 'notes':
+            case 'notebook':
                 return (
                     <NotesView
                         notes={notes}
@@ -2022,12 +2033,13 @@ const StudioWorkspace: React.FC = () => {
                             setRecorderAutoStart(true);
                         }}
                         onOpenSidebar={() => setIsSidebarOpen(true)}
+                        onOpenStudio={() => setViewMode('studio')}
                     />
                 );
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
+                        <div id="tour-nav-studio" className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -2180,6 +2192,7 @@ const StudioWorkspace: React.FC = () => {
                                                      {sections.length === 0 && showTour ? (
                                                             <motion.div 
                                                                 key="flow-canvas"
+                                                                id="tour-lyric-card"
                                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                                 animate={{ opacity: 1, scale: 1 }}
                                                                 exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
@@ -2377,6 +2390,20 @@ const StudioWorkspace: React.FC = () => {
                                 )}
                             </AnimatePresence>
                         </div>
+
+                        {/* Floating Record Button for Studio view */}
+                        {!showRecorder && (
+                            <div className="absolute bottom-[92px] right-6 z-40 animate-in fade-in zoom-in duration-200">
+                                <button
+                                    id="tour-nav-record"
+                                    onClick={() => handleRecordStart()}
+                                    className="w-12 h-12 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer border border-red-500/20"
+                                    title="Record Vocal Take"
+                                >
+                                    <Mic size={20} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
             default: return null;
@@ -2451,9 +2478,16 @@ const StudioWorkspace: React.FC = () => {
                         >
                             <div className="flex items-center justify-between pb-6 border-b border-[var(--border-main)]">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center font-black text-lg">
+                                    <button
+                                        onClick={() => {
+                                            setViewMode('settings');
+                                            setIsSidebarOpen(false);
+                                        }}
+                                        className="w-8 h-8 rounded-lg bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center font-black text-lg hover:opacity-90 active:scale-95 transition-all cursor-pointer border-none"
+                                        title="Settings"
+                                    >
                                         L
-                                    </div>
+                                    </button>
                                     <span className="text-xl font-bold tracking-wider">LYRIQ</span>
                                 </div>
                                 <button
@@ -2466,10 +2500,8 @@ const StudioWorkspace: React.FC = () => {
 
                             <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
                                 {[
-                                    { id: 'collection', label: 'Library', icon: House },
-                                    { id: 'notes', label: 'Songs', icon: BookText },
-                                    { id: 'studio', label: 'Studio', icon: Disc },
-                                    { id: 'settings', label: 'Settings', icon: Settings },
+                                    { id: 'home', label: 'Home', icon: House },
+                                    { id: 'notebook', label: 'Notebook', icon: BookText },
                                 ].map((item) => {
                                     const Icon = item.icon;
                                     const isActive = viewMode === item.id;
