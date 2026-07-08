@@ -1815,6 +1815,57 @@ const StudioWorkspace: React.FC = () => {
 
                                 <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
                                     {libraryTab === 'songs' ? (
+                                        savedProjects.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                                                <AnimatePresence mode="wait">
+                                                    {!showPillOptions ? (
+                                                        <motion.div
+                                                            key="tab-songs-start"
+                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.95 }}
+                                                            className="flex flex-col items-center gap-4 cursor-pointer"
+                                                            onClick={() => setShowPillOptions(true)}
+                                                        >
+                                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                                                                <Plus size={36} className="text-white" />
+                                                            </div>
+                                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
+                                                        </motion.div>
+                                                    ) : (
+                                                        <motion.div
+                                                            key="tab-songs-options"
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 10 }}
+                                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
+                                                        >
+                                                            <button
+                                                                onClick={() => { fabInputRef.current?.click(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <Music size={16} />
+                                                                <span>Import</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleNewProject(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <FilePlus size={16} />
+                                                                <span>New Song</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleRecordStart(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <Mic size={16} />
+                                                                <span>Record</span>
+                                                            </button>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        ) : (
                                         <div className="columns-2 gap-4 space-y-4 [column-fill:_balance] w-full">
                                             {savedProjects.map((p, index) => {
                                                 const lyricPreview = p.sections
@@ -1871,7 +1922,59 @@ const StudioWorkspace: React.FC = () => {
                                                 );
                                             })}
                                         </div>
+                                        )
                                     ) : (
+                                        beats.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+                                                <AnimatePresence mode="wait">
+                                                    {!showPillOptions ? (
+                                                        <motion.div
+                                                            key="tab-beats-start"
+                                                            initial={{ opacity: 0, scale: 0.95 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.95 }}
+                                                            className="flex flex-col items-center gap-4 cursor-pointer"
+                                                            onClick={() => setShowPillOptions(true)}
+                                                        >
+                                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
+                                                                <Plus size={36} className="text-white" />
+                                                            </div>
+                                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
+                                                        </motion.div>
+                                                    ) : (
+                                                        <motion.div
+                                                            key="tab-beats-options"
+                                                            initial={{ opacity: 0, y: 10 }}
+                                                            animate={{ opacity: 1, y: 0 }}
+                                                            exit={{ opacity: 0, y: 10 }}
+                                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
+                                                        >
+                                                            <button
+                                                                onClick={() => { fabInputRef.current?.click(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <Music size={16} />
+                                                                <span>Import</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleNewProject(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <FilePlus size={16} />
+                                                                <span>New Song</span>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { handleRecordStart(); setShowPillOptions(false); }}
+                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                                            >
+                                                                <Mic size={16} />
+                                                                <span>Record</span>
+                                                            </button>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </div>
+                                        ) : (
                                         <div className="grid grid-cols-2 gap-4">
                                             {beats.map((beat, index) => {
                                                 const gradients = [
@@ -1940,6 +2043,7 @@ const StudioWorkspace: React.FC = () => {
                                                 );
                                             })}
                                         </div>
+                                        )
                                     )}
                                 </div>
 
