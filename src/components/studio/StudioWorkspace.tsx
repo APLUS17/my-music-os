@@ -2154,7 +2154,7 @@ const StudioWorkspace: React.FC = () => {
             case 'studio':
                 return (
                     <div ref={studioContainerRef} className="h-full flex flex-col relative">
-                        <div id="tour-nav-studio" className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
+                        <div id="tour-nav-studio" className="z-50 sticky top-0 bg-[var(--bg-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
