@@ -41,7 +41,9 @@ const AutoResizeTextarea = ({
 
   useEffect(() => {
     if (autoFocus && textareaRef.current) {
-      textareaRef.current.focus();
+      const el = textareaRef.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
     }
   }, [autoFocus]);
 
@@ -90,6 +92,14 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   }
 
   const handleLineChange = (lineId: string, newText: string) => {
+    // No sections exist yet — typing into the placeholder line creates the first one
+    if (sections.length === 0) {
+      const newSection: LyricSection = { id: randomId(), type: 'verse', repeats: 1, text: newText };
+      onUpdateSections([newSection]);
+      setTimeout(() => setFocusedLineId(`${newSection.id}-line-0`), 0);
+      return;
+    }
+
     const lineIndex = lines.findIndex(l => l.id === lineId);
     if (lineIndex === -1) return;
 
