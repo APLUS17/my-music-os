@@ -454,16 +454,12 @@ const StudioWorkspace: React.FC = () => {
     const recordDragDistanceRef = useRef(0);
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
-    const [showSyllables, setShowSyllables] = useState<boolean>(() => {
+    const [showSyllables] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('lyriq_show_syllables') === 'true';
         }
         return false;
     });
-
-    useEffect(() => {
-        localStorage.setItem('lyriq_show_syllables', String(showSyllables));
-    }, [showSyllables]);
 
     // Sync sections edits to categorySections
     useEffect(() => {
@@ -2304,21 +2300,6 @@ const StudioWorkspace: React.FC = () => {
                                         </button>
                                     ))}
                                 </div>
-
-                                {studioMode === 'write' && (
-                                    <button
-                                        onClick={() => setShowSyllables(!showSyllables)}
-                                        className={cn(
-                                            "absolute right-6 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:brightness-110 active:scale-95",
-                                            showSyllables
-                                                ? "text-[var(--accent)] font-bold"
-                                                : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                        )}
-                                        title="Toggle Syllables Editor"
-                                    >
-                                        T
-                                    </button>
-                                )}
                             </div>
 
                             {studioMode === 'flow' ? (
