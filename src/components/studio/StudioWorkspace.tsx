@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat, Note } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
+import { SandboxView } from './SandboxView';
 import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
@@ -437,18 +438,28 @@ const StudioWorkspace: React.FC = () => {
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
+    const [recordButtonPos, setRecordButtonPos] = useState<{ x: number; y: number }>(() => {
+        if (typeof window === 'undefined') return { x: 0, y: 0 };
+        try {
+            const saved = localStorage.getItem('lyriq_record_btn_pos');
+            return saved ? JSON.parse(saved) : { x: 0, y: 0 };
+        } catch {
+            return { x: 0, y: 0 };
+        }
+    });
+    useEffect(() => {
+        localStorage.setItem('lyriq_record_btn_pos', JSON.stringify(recordButtonPos));
+    }, [recordButtonPos]);
+    const studioContainerRef = useRef<HTMLDivElement>(null);
+    const recordDragDistanceRef = useRef(0);
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
-    const [showSyllables, setShowSyllables] = useState<boolean>(() => {
+    const [showSyllables] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('lyriq_show_syllables') === 'true';
         }
         return false;
     });
-
-    useEffect(() => {
-        localStorage.setItem('lyriq_show_syllables', String(showSyllables));
-    }, [showSyllables]);
 
     // Sync sections edits to categorySections
     useEffect(() => {
@@ -2142,8 +2153,8 @@ const StudioWorkspace: React.FC = () => {
                 );
             case 'studio':
                 return (
-                    <div className="h-full flex flex-col relative">
-                        <div id="tour-nav-studio" className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
+                    <div ref={studioContainerRef} className="h-full flex flex-col relative">
+                        <div id="tour-nav-studio" className="z-50 sticky top-0 bg-[var(--bg-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -2216,79 +2227,42 @@ const StudioWorkspace: React.FC = () => {
 
                                     </div>
 
-                                    {/* Right: Audio Controls */}
-                                    <div id="tour-audio-controls" className="flex items-center gap-2">
-                                        <BeatUploader
-                                            audioSrc={uploadedBeat}
-                                            audioRef={beatAudioRef}
-                                            beatName={uploadedBeatName}
-                                            // Lifted Props
-                                            isPlaying={isBeatPlaying}
-                                            setIsPlaying={setIsBeatPlaying}
-                                            volume={beatVolume}
-                                            setVolume={setBeatVolume}
-                                            loopStart={beatLoopStart}
-                                            setLoopStart={setBeatLoopStart}
-                                            loopEnd={beatLoopEnd}
-                                            setLoopEnd={setBeatLoopEnd}
-                                            isLooping={isBeatLooping}
-                                            setIsLooping={setIsBeatLooping}
-                                            onSeek={handleBeatSeek}
-                                            onUpload={async (file) => {
-                                                const url = URL.createObjectURL(file);
-                                                setUploadedBeat(url);
-                                                const name = file.name.replace(/\.\w+$/, '');
-                                                setUploadedBeatName(name);
-
-                                                // Also add to Library beats
-                                                const base64 = await blobToBase64(file);
-                                                const id = randomId();
-                                                setUploadedBeatId(id);
-                                                const audio = new Audio(url);
-                                                audio.onloadedmetadata = () => {
-                                                    const dur = audio.duration;
-                                                    const mins = Math.floor(dur / 60);
-                                                    const secs = Math.floor(dur % 60);
-                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                    const newBeat: Beat = {
-                                                        id, name, duration: durationStr,
-                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
-                                                    };
-                                                    setBeats(prev => {
-                                                        // Replace existing beat with same name so sections update correctly
-                                                        const filtered = prev.filter(b => b.name !== name);
-                                                        return [newBeat, ...filtered];
-                                                    });
-
-                                                    // Beat structure detection disabled — interferes with transcription flow
-                                                };
-                                            }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
-                                        />
+                                    {/* Right: Mode toggle — Flow / Write only */}
+                                    <div className="flex items-center gap-1 bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
+                                        {(['flow', 'write'] as const).map((mode) => (
+                                            <button
+                                                key={mode}
+                                                onClick={() => setStudioMode(mode)}
+                                                className={cn(
+                                                    "px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wide font-medium transition-all active:scale-95",
+                                                    studioMode === mode
+                                                        ? "bg-[var(--text-main)] text-[var(--bg-main)]"
+                                                        : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                                                )}
+                                            >
+                                                {mode}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Tab bar — T syllable toggle only, no Player tab */}
-                            <div className="absolute top-2 right-4 z-20 flex items-center">
-                                <button
-                                    onClick={() => setShowSyllables(!showSyllables)}
-                                    className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
-                                        showSyllables
-                                            ? "text-[var(--accent)] font-bold"
-                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                    )}
-                                    title="Toggle Syllables Editor"
-                                >
-                                    T
-                                </button>
-                            </div>
-
-                            {/* Lyrics — always visible, scrollable */}
-                            {(
+                            {studioMode === 'flow' ? (
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                    <div className="max-w-2xl mx-auto">
+                                        <SandboxView
+                                            sections={sections}
+                                            sessions={sessions}
+                                            onUpdateSections={setSections}
+                                            onRecordStart={(lineId) => handleRecordStart(lineId)}
+                                            onPlaySession={(id) => handleSelectSessionAndPlay(id)}
+                                            currentlyPlayingSessionId={activeSessionId}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
                                 <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
                                         <>
@@ -2495,19 +2469,88 @@ const StudioWorkspace: React.FC = () => {
                             </AnimatePresence>
                         </div>
 
-                        {/* Floating Record Button for Studio view */}
+                        {/* Floating Record Button for Studio view — draggable, repositions anywhere on screen */}
                         {!showRecorder && (
-                            <div className="absolute bottom-[92px] right-6 z-40 animate-in fade-in zoom-in duration-200">
-                                <button
-                                    id="tour-nav-record"
-                                    onClick={() => handleRecordStart()}
-                                    className="w-12 h-12 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer border border-red-500/20"
-                                    title="Record Vocal Take"
-                                >
-                                    <Mic size={20} />
-                                </button>
-                            </div>
+                            <motion.button
+                                id="tour-nav-record"
+                                drag
+                                dragMomentum={false}
+                                dragElastic={0.1}
+                                dragConstraints={studioContainerRef}
+                                onDragStart={() => {
+                                    recordDragDistanceRef.current = 0;
+                                }}
+                                onDrag={(_, info) => {
+                                    recordDragDistanceRef.current = Math.hypot(info.offset.x, info.offset.y);
+                                }}
+                                onDragEnd={(_, info) => {
+                                    setRecordButtonPos(prev => ({
+                                        x: prev.x + info.offset.x,
+                                        y: prev.y + info.offset.y,
+                                    }));
+                                }}
+                                onTap={() => {
+                                    if (recordDragDistanceRef.current > 5) return;
+                                    handleRecordStart();
+                                }}
+                                style={{ x: recordButtonPos.x, y: recordButtonPos.y, touchAction: 'none' }}
+                                className="absolute bottom-6 left-6 z-40 w-12 h-12 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing"
+                                title="Record Vocal Take — tap to record, drag to move"
+                            >
+                                <span className="w-5 h-5 rounded-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] pointer-events-none" />
+                            </motion.button>
                         )}
+
+                        {/* Floating Beat Loader — bottom-right, mirrors the record button */}
+                        <div id="tour-audio-controls" className="absolute bottom-6 right-6 z-40">
+                            <BeatUploader
+                                audioSrc={uploadedBeat}
+                                audioRef={beatAudioRef}
+                                beatName={uploadedBeatName}
+                                // Lifted Props
+                                isPlaying={isBeatPlaying}
+                                setIsPlaying={setIsBeatPlaying}
+                                volume={beatVolume}
+                                setVolume={setBeatVolume}
+                                loopStart={beatLoopStart}
+                                setLoopStart={setBeatLoopStart}
+                                loopEnd={beatLoopEnd}
+                                setLoopEnd={setBeatLoopEnd}
+                                isLooping={isBeatLooping}
+                                setIsLooping={setIsBeatLooping}
+                                onSeek={handleBeatSeek}
+                                onUpload={async (file) => {
+                                    const url = URL.createObjectURL(file);
+                                    setUploadedBeat(url);
+                                    const name = file.name.replace(/\.\w+$/, '');
+                                    setUploadedBeatName(name);
+
+                                    // Also add to Library beats
+                                    const base64 = await blobToBase64(file);
+                                    const id = randomId();
+                                    setUploadedBeatId(id);
+                                    const audio = new Audio(url);
+                                    audio.onloadedmetadata = () => {
+                                        const dur = audio.duration;
+                                        const mins = Math.floor(dur / 60);
+                                        const secs = Math.floor(dur % 60);
+                                        const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                        const newBeat: Beat = {
+                                            id, name, duration: durationStr,
+                                            audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                        };
+                                        setBeats(prev => {
+                                            // Replace existing beat with same name so sections update correctly
+                                            const filtered = prev.filter(b => b.name !== name);
+                                            return [newBeat, ...filtered];
+                                        });
+
+                                        // Beat structure detection disabled — interferes with transcription flow
+                                    };
+                                }}
+                                onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                            />
+                        </div>
                     </div>
                 );
             default: return null;
