@@ -2227,83 +2227,30 @@ const StudioWorkspace: React.FC = () => {
 
                                     </div>
 
-                                    {/* Right: Audio Controls */}
-                                    <div id="tour-audio-controls" className="flex items-center gap-2">
-                                        <BeatUploader
-                                            audioSrc={uploadedBeat}
-                                            audioRef={beatAudioRef}
-                                            beatName={uploadedBeatName}
-                                            // Lifted Props
-                                            isPlaying={isBeatPlaying}
-                                            setIsPlaying={setIsBeatPlaying}
-                                            volume={beatVolume}
-                                            setVolume={setBeatVolume}
-                                            loopStart={beatLoopStart}
-                                            setLoopStart={setBeatLoopStart}
-                                            loopEnd={beatLoopEnd}
-                                            setLoopEnd={setBeatLoopEnd}
-                                            isLooping={isBeatLooping}
-                                            setIsLooping={setIsBeatLooping}
-                                            onSeek={handleBeatSeek}
-                                            onUpload={async (file) => {
-                                                const url = URL.createObjectURL(file);
-                                                setUploadedBeat(url);
-                                                const name = file.name.replace(/\.\w+$/, '');
-                                                setUploadedBeatName(name);
-
-                                                // Also add to Library beats
-                                                const base64 = await blobToBase64(file);
-                                                const id = randomId();
-                                                setUploadedBeatId(id);
-                                                const audio = new Audio(url);
-                                                audio.onloadedmetadata = () => {
-                                                    const dur = audio.duration;
-                                                    const mins = Math.floor(dur / 60);
-                                                    const secs = Math.floor(dur % 60);
-                                                    const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
-                                                    const newBeat: Beat = {
-                                                        id, name, duration: durationStr,
-                                                        audioUrl: url, base64, date: new Date().toLocaleDateString()
-                                                    };
-                                                    setBeats(prev => {
-                                                        // Replace existing beat with same name so sections update correctly
-                                                        const filtered = prev.filter(b => b.name !== name);
-                                                        return [newBeat, ...filtered];
-                                                    });
-
-                                                    // Beat structure detection disabled — interferes with transcription flow
-                                                };
-                                            }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
-                                        />
+                                    {/* Right: Mode toggle — Flow / Write only */}
+                                    <div className="flex items-center gap-1 bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
+                                        {(['flow', 'write'] as const).map((mode) => (
+                                            <button
+                                                key={mode}
+                                                onClick={() => setStudioMode(mode)}
+                                                className={cn(
+                                                    "px-4 py-1.5 rounded-full text-xs mono uppercase tracking-wide font-medium transition-all active:scale-95",
+                                                    studioMode === mode
+                                                        ? "bg-[var(--text-main)] text-[var(--bg-main)]"
+                                                        : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                                                )}
+                                            >
+                                                {mode}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Mode toggle — Flow / Write only */}
-                            <div className="flex items-center justify-center relative px-6 pt-3 pb-2">
-                                <div className="flex items-center gap-1 bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
-                                    {(['flow', 'write'] as const).map((mode) => (
-                                        <button
-                                            key={mode}
-                                            onClick={() => setStudioMode(mode)}
-                                            className={cn(
-                                                "px-5 py-1.5 rounded-full text-xs mono uppercase tracking-wide font-medium transition-all active:scale-95",
-                                                studioMode === mode
-                                                    ? "bg-[var(--text-main)] text-[var(--bg-main)]"
-                                                    : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                            )}
-                                        >
-                                            {mode}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
                             {studioMode === 'flow' ? (
-                                <div className="absolute inset-0 top-[52px] overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto">
                                         <SandboxView
                                             sections={sections}
@@ -2316,7 +2263,7 @@ const StudioWorkspace: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="absolute inset-0 top-[52px] overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-2xl mx-auto space-y-12">
                                         <>
                                             <AnimatePresence mode="wait">
@@ -2553,6 +2500,57 @@ const StudioWorkspace: React.FC = () => {
                                 <span className="w-5 h-5 rounded-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] pointer-events-none" />
                             </motion.button>
                         )}
+
+                        {/* Floating Beat Loader — bottom-right, mirrors the record button */}
+                        <div id="tour-audio-controls" className="absolute bottom-6 right-6 z-40">
+                            <BeatUploader
+                                audioSrc={uploadedBeat}
+                                audioRef={beatAudioRef}
+                                beatName={uploadedBeatName}
+                                // Lifted Props
+                                isPlaying={isBeatPlaying}
+                                setIsPlaying={setIsBeatPlaying}
+                                volume={beatVolume}
+                                setVolume={setBeatVolume}
+                                loopStart={beatLoopStart}
+                                setLoopStart={setBeatLoopStart}
+                                loopEnd={beatLoopEnd}
+                                setLoopEnd={setBeatLoopEnd}
+                                isLooping={isBeatLooping}
+                                setIsLooping={setIsBeatLooping}
+                                onSeek={handleBeatSeek}
+                                onUpload={async (file) => {
+                                    const url = URL.createObjectURL(file);
+                                    setUploadedBeat(url);
+                                    const name = file.name.replace(/\.\w+$/, '');
+                                    setUploadedBeatName(name);
+
+                                    // Also add to Library beats
+                                    const base64 = await blobToBase64(file);
+                                    const id = randomId();
+                                    setUploadedBeatId(id);
+                                    const audio = new Audio(url);
+                                    audio.onloadedmetadata = () => {
+                                        const dur = audio.duration;
+                                        const mins = Math.floor(dur / 60);
+                                        const secs = Math.floor(dur % 60);
+                                        const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                                        const newBeat: Beat = {
+                                            id, name, duration: durationStr,
+                                            audioUrl: url, base64, date: new Date().toLocaleDateString()
+                                        };
+                                        setBeats(prev => {
+                                            // Replace existing beat with same name so sections update correctly
+                                            const filtered = prev.filter(b => b.name !== name);
+                                            return [newBeat, ...filtered];
+                                        });
+
+                                        // Beat structure detection disabled — interferes with transcription flow
+                                    };
+                                }}
+                                onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                            />
+                        </div>
                     </div>
                 );
             default: return null;
