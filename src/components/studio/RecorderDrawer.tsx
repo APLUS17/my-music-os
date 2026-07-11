@@ -217,25 +217,38 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         ctx.fill();
 
       } else if (isRecordingRef.current && analyserRef.current && dataArrayRef.current) {
-        // Live waveform during recording
+        // Live waveform during recording — centered & mirrored symmetrically from the center
         analyserRef.current.getByteFrequencyData(dataArrayRef.current);
         const binCount = analyserRef.current.frequencyBinCount;
         const barWidth = 3;
         const gap = 1;
         const totalBars = Math.floor(width / (barWidth + gap));
-        const step = Math.ceil(binCount / totalBars);
+        
+        // Symmetrical layout: draw from center outwards to the left and right
+        const halfBars = Math.max(1, Math.floor(totalBars / 2));
+        const step = Math.ceil(binCount / halfBars);
+        const centerX = width / 2;
 
         ctx.fillStyle = recordingColor;
-        for (let i = 0; i < totalBars; i++) {
+        for (let i = 0; i < halfBars; i++) {
           let val = 0;
+          // Map frequency bins starting from low frequencies at index 0 (middle of the screen)
           for (let j = 0; j < step && (i * step + j) < binCount; j++) {
             val = Math.max(val, dataArrayRef.current[i * step + j]);
           }
           const normalized = val / 255;
           const barHeight = Math.max(3, normalized * height * 1.4);
-          const x = i * (barWidth + gap);
+          
+          // Calculate symmetrical X coordinates
+          const xRight = centerX + i * (barWidth + gap);
+          const xLeft = centerX - (i + 1) * (barWidth + gap) + gap;
+          
           ctx.globalAlpha = 0.6 + normalized * 0.4;
-          ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
+          
+          // Draw the right side bar
+          ctx.fillRect(xRight, centerY - barHeight / 2, barWidth, barHeight);
+          // Draw the left side bar (mirrored copy)
+          ctx.fillRect(xLeft, centerY - barHeight / 2, barWidth, barHeight);
         }
         ctx.globalAlpha = 1.0;
 

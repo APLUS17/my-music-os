@@ -44,7 +44,8 @@ import {
     History,
     Sun,
     Moon,
-    BookText
+    BookText,
+    Archive
 } from 'lucide-react';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -2141,7 +2142,6 @@ const StudioWorkspace: React.FC = () => {
                         sessions={sessions}
                         scraps={scraps}
                         beats={beats}
-
                         projectTitle={projectTitle}
                         onPlaySession={handleSelectSessionAndPlay}
                         playingSessionId={activeSessionId}
@@ -2150,6 +2150,7 @@ const StudioWorkspace: React.FC = () => {
                         currentTime={currentTime}
                         duration={duration}
                         ritualStats={ritualStats}
+                        onOpenSidebar={() => setIsSidebarOpen(true)}
                     />
                 );
             case 'notebook':
@@ -2652,6 +2653,7 @@ const StudioWorkspace: React.FC = () => {
                             <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
                                 {[
                                     { id: 'home', label: 'Home', icon: House },
+                                    { id: 'vault', label: 'Vault', icon: Archive },
                                     { id: 'notebook', label: 'Notebook', icon: BookText },
                                 ].map((item) => {
                                     const Icon = item.icon;
