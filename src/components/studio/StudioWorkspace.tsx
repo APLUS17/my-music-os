@@ -747,7 +747,7 @@ const StudioWorkspace: React.FC = () => {
         if (sessions.length > 0) {
             const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
             if (activeSession) {
-                setDuration(activeSession.duration);
+                setDuration(activeSession.duration ?? 0);
             }
         } else if (uploadedBeat && beatAudioRef.current) {
             const beatDur = beatAudioRef.current.duration;
