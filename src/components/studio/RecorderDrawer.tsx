@@ -99,14 +99,22 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const animationFrameRef = useRef<number | null>(null);
   const peaksRef = useRef<number[]>([]);
   const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartPercentRef = useRef(0);
   const timelineRef = useRef<HTMLDivElement>(null);
   const transcriptBottomRef = useRef<HTMLDivElement>(null);
+
+  // Timeline-style live waveform history — each entry is a single peak snapshot
+  const liveWaveHistoryRef = useRef<number[]>([]);
+  const lastSampleTimeRef = useRef(0);
 
   // Ref to track state inside animation loop without stale closures
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
   const isRecordingRef = useRef(false);
   isRecordingRef.current = isRecording;
+  // Pass live time into canvas without stale closure
+  const displayTimeRef = useRef(0);
 
   const stopMicStream = () => {
     if (streamRef.current) {
@@ -144,7 +152,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } else {
       initializeMic().catch(console.error);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
 
   // Auto-scroll transcription to bottom
@@ -179,78 +187,162 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
       if (recordedBlob) {
         const peaks = peaksRef.current;
-        const barWidth = 3;
+        const barWidth = 2;
         const gap = 1;
-        const totalBars = Math.floor(width / (barWidth + gap));
-        const step = Math.ceil(peaks.length / totalBars);
+        const barStep = barWidth + gap;
+        const playheadX = Math.floor(width / 2);
+        const playheadOffset = currentProgress * peaks.length * barStep;
 
         ctx.fillStyle = accentColor;
 
-        for (let i = 0; i < totalBars; i++) {
-          const peakIndex = i * step;
-          if (peakIndex >= peaks.length) break;
+        for (let i = 0; i < peaks.length; i++) {
+          const val = peaks[i];
+          const x = playheadX - playheadOffset + i * barStep;
 
-          let val = 0;
-          for (let j = 0; j < step && (peakIndex + j) < peaks.length; j++) {
-            val = Math.max(val, peaks[peakIndex + j]);
-          }
+          // Skip drawing if off-screen
+          if (x + barWidth < 0 || x > width) continue;
 
-          const barHeight = Math.max(2, val * height * 1.5);
-          const x = i * (barWidth + gap);
-          const progressX = currentProgress * width;
+          const barHeight = Math.max(2, val * height * 0.8);
 
-          ctx.globalAlpha = x < progressX ? 1.0 : 0.3;
+          // Symmetrical look with opacity (already played = 1.0, upcoming = 0.3)
+          ctx.globalAlpha = i < currentProgress * peaks.length ? 1.0 : 0.3;
           ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
         }
         ctx.globalAlpha = 1.0;
 
-        const px = currentProgress * width;
+        // Draw vertical playhead line — shorter, centered on waveform (matching active recording)
+        const lineSpan = height * 0.35; // extends 35% of canvas height up and down from center
         ctx.beginPath();
-        ctx.strokeStyle = textColor;
-        ctx.moveTo(px, 0);
-        ctx.lineTo(px, height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(playheadX, centerY - lineSpan);
+        ctx.lineTo(playheadX, centerY + lineSpan);
         ctx.stroke();
 
-        ctx.fillStyle = textColor;
+        // Draw time pill above the playhead line (matching active recording)
+        const timeStr = (() => {
+          const t = displayTimeRef.current;
+          const mins = Math.floor(t / 60);
+          const secs = Math.floor(t % 60);
+          const ms   = Math.floor((t % 1) * 100);
+          return `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}.${String(ms).padStart(2,'0')}`;
+        })();
+
+        const pillPad = { x: 10, y: 5 };
+        const pillFont = '11px -apple-system, BlinkMacSystemFont, monospace';
+        ctx.font = pillFont;
+        const textW = ctx.measureText(timeStr).width;
+        const pillW = textW + pillPad.x * 2;
+        const pillH = 22;
+        const pillR = pillH / 2; // fully rounded ends
+        const pillTop = centerY - lineSpan - pillH - 6;
+        const pillLeft = playheadX - pillW / 2;
+
+        // Pill background
         ctx.beginPath();
-        ctx.arc(px, height - 4, 3, 0, Math.PI * 2);
+        ctx.roundRect(pillLeft, pillTop, pillW, pillH, pillR);
+        ctx.fillStyle = 'rgba(20,20,22,0.92)';
         ctx.fill();
 
+        // Pill text
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.font = pillFont;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(timeStr, playheadX, pillTop + pillH / 2);
+        // Reset alignment for subsequent draws
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+
       } else if (isRecordingRef.current && analyserRef.current && dataArrayRef.current) {
-        // Live waveform during recording — centered & mirrored symmetrically from the center
-        analyserRef.current.getByteFrequencyData(dataArrayRef.current);
-        const binCount = analyserRef.current.frequencyBinCount;
-        const barWidth = 3;
+        // Live waveform — timeline style: playhead at center, bars flow left
+        const barWidth = 2;
         const gap = 1;
-        const totalBars = Math.floor(width / (barWidth + gap));
-        
-        // Symmetrical layout: draw from center outwards to the left and right
-        const halfBars = Math.max(1, Math.floor(totalBars / 2));
-        const step = Math.ceil(binCount / halfBars);
-        const centerX = width / 2;
+        const barStep = barWidth + gap;
+        const playheadX = Math.floor(width / 2);
+
+        // Sample the current audio peak (throttled to ~barStep-width intervals)
+        const now = performance.now();
+        const msPerBar = 50; // one bar every 50ms for a smooth scroll
+        if (now - lastSampleTimeRef.current >= msPerBar) {
+          analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+          const binCount = analyserRef.current.frequencyBinCount;
+          // Compute a single peak value across all bins
+          let peak = 0;
+          for (let b = 0; b < binCount; b++) {
+            peak = Math.max(peak, dataArrayRef.current[b]);
+          }
+          liveWaveHistoryRef.current.push(peak / 255);
+          lastSampleTimeRef.current = now;
+
+          // Also push to peaksRef for the post-recording static waveform
+          peaksRef.current.push(peak / 255);
+        }
+
+        const history = liveWaveHistoryRef.current;
+        // How many bars fit from the playhead to the left edge
+        const maxVisibleBars = Math.floor(playheadX / barStep);
 
         ctx.fillStyle = recordingColor;
-        for (let i = 0; i < halfBars; i++) {
-          let val = 0;
-          // Map frequency bins starting from low frequencies at index 0 (middle of the screen)
-          for (let j = 0; j < step && (i * step + j) < binCount; j++) {
-            val = Math.max(val, dataArrayRef.current[i * step + j]);
-          }
-          const normalized = val / 255;
-          const barHeight = Math.max(3, normalized * height * 1.4);
-          
-          // Calculate symmetrical X coordinates
-          const xRight = centerX + i * (barWidth + gap);
-          const xLeft = centerX - (i + 1) * (barWidth + gap) + gap;
-          
-          ctx.globalAlpha = 0.6 + normalized * 0.4;
-          
-          // Draw the right side bar
-          ctx.fillRect(xRight, centerY - barHeight / 2, barWidth, barHeight);
-          // Draw the left side bar (mirrored copy)
-          ctx.fillRect(xLeft, centerY - barHeight / 2, barWidth, barHeight);
+        // Draw bars from newest (at playhead) to oldest (flowing left)
+        for (let i = 0; i < maxVisibleBars; i++) {
+          const histIdx = history.length - 1 - i;
+          if (histIdx < 0) break;
+
+          const val = history[histIdx];
+          const barHeight = Math.max(2, val * height * 0.8);
+          const x = playheadX - (i + 1) * barStep;
+
+          // Slight fade for older bars trailing off-screen
+          const ageFade = Math.max(0.3, 1 - (i / maxVisibleBars) * 0.5);
+          ctx.globalAlpha = (0.6 + val * 0.4) * ageFade;
+          ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
         }
         ctx.globalAlpha = 1.0;
+
+        // Draw vertical playhead line — shorter, centered on waveform
+        const lineSpan = height * 0.35; // extends 35% of canvas height up and down from center
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(playheadX, centerY - lineSpan);
+        ctx.lineTo(playheadX, centerY + lineSpan);
+        ctx.stroke();
+
+        // Draw time pill above the playhead line
+        const timeStr = (() => {
+          const t = displayTimeRef.current;
+          const mins = Math.floor(t / 60);
+          const secs = Math.floor(t % 60);
+          const ms   = Math.floor((t % 1) * 100);
+          return `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}.${String(ms).padStart(2,'0')}`;
+        })();
+
+        const pillPad = { x: 10, y: 5 };
+        const pillFont = '11px -apple-system, BlinkMacSystemFont, monospace';
+        ctx.font = pillFont;
+        const textW = ctx.measureText(timeStr).width;
+        const pillW = textW + pillPad.x * 2;
+        const pillH = 22;
+        const pillR = pillH / 2; // fully rounded ends
+        const pillTop = centerY - lineSpan - pillH - 6;
+        const pillLeft = playheadX - pillW / 2;
+
+        // Pill background
+        ctx.beginPath();
+        ctx.roundRect(pillLeft, pillTop, pillW, pillH, pillR);
+        ctx.fillStyle = 'rgba(20,20,22,0.92)';
+        ctx.fill();
+
+        // Pill text
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.font = pillFont;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(timeStr, playheadX, pillTop + pillH / 2);
+        // Reset alignment for subsequent draws
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
 
       } else {
         ctx.beginPath();
@@ -283,7 +375,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       window.removeEventListener('resize', resizeCanvas);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isRecording, recordedBlob]);
+  }, [isRecording, recordedBlob, showTranscription]);
 
   const audioUrlRef = useRef<string | null>(null);
 
@@ -518,6 +610,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       peaksRef.current = [];
+      liveWaveHistoryRef.current = [];
+      lastSampleTimeRef.current = 0;
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -611,11 +705,51 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     onClose();
   };
 
+  // --- Waveform Swiping / Scrubbing Handlers ---
+  const handleDragStart = (clientX: number) => {
+    if (!recordedBlob || isRecording) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = clientX;
+    dragStartPercentRef.current = progress;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleDragMove = (clientX: number) => {
+    if (!isDraggingRef.current || !recordedBlob || isRecording) return;
+    const dx = clientX - dragStartXRef.current;
+    
+    const barWidth = 2;
+    const gap = 1;
+    const barStep = barWidth + gap;
+    const totalWaveWidth = peaksRef.current.length * barStep;
+    
+    if (totalWaveWidth <= 0) return;
+
+    // Moving the waveform right (dx > 0) scrubs backwards in time
+    let newProgress = dragStartPercentRef.current - dx / totalWaveWidth;
+    newProgress = Math.max(0, Math.min(1, newProgress));
+    
+    setProgress(newProgress);
+    if (audioRef.current) {
+      audioRef.current.currentTime = newProgress * duration;
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+    }
+  };
+
   const currentDisplayTime = isRecording
     ? duration
     : recordedBlob
       ? progress * duration
       : 0;
+  displayTimeRef.current = currentDisplayTime;
 
   const canSave = isRecording || !!recordedBlob;
 
@@ -718,11 +852,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
               <button
                 onClick={handleSave}
                 disabled={!canSave}
-                className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-bold transition-all active:scale-95 cursor-pointer ${
-                  canSave
+                className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-[13px] font-bold transition-all active:scale-95 cursor-pointer ${canSave
                     ? 'bg-white text-black hover:bg-white/90'
                     : 'text-[var(--text-tertiary)] cursor-not-allowed'
-                }`}
+                  }`}
               >
                 <Check size={15} strokeWidth={3} />
                 Done
@@ -766,52 +899,43 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     transition={{ duration: 0.15 }}
                     className="absolute inset-0"
                   >
-                    <div ref={timelineRef} className="w-full h-full relative">
+                    <div 
+                      ref={timelineRef} 
+                      className={`w-full h-full relative select-none ${recordedBlob && !isRecording ? 'cursor-ew-resize active:cursor-grabbing' : ''}`}
+                      onMouseDown={(e) => handleDragStart(e.clientX)}
+                      onMouseMove={(e) => handleDragMove(e.clientX)}
+                      onMouseUp={handleDragEnd}
+                      onMouseLeave={handleDragEnd}
+                      onTouchStart={(e) => {
+                        if (e.touches[0]) handleDragStart(e.touches[0].clientX);
+                      }}
+                      onTouchMove={(e) => {
+                        if (e.touches[0]) handleDragMove(e.touches[0].clientX);
+                      }}
+                      onTouchEnd={handleDragEnd}
+                    >
                       <canvas ref={canvasRef} className="w-full h-full" />
                     </div>
-
-                    {/* Playback scrubber — only after recorded */}
-                    {recordedBlob && !isRecording && (
-                      <div className="absolute bottom-4 left-6 right-6">
-                        <Slider
-                          max={1}
-                          step={0.01}
-                          value={[progress]}
-                          onValueChange={(val) => {
-                            setProgress(val[0]);
-                            if (audioRef.current) audioRef.current.currentTime = val[0] * duration;
-                          }}
-                          className="h-6"
-                        />
-                      </div>
-                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-            {/* Timer pill */}
-            <div className="flex justify-center py-5 flex-shrink-0">
-              <div className="bg-[var(--bg-card)] border border-[var(--border-main)] backdrop-blur-sm rounded-full px-6 py-3 flex items-center gap-3">
-                {isRecording && (
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                )}
-                <span className="text-[var(--text-main)] text-[26px] font-bold mono tabular-nums leading-none">
-                  {formatTime(currentDisplayTime)}
-                </span>
-                {/* Playback button inside timer when post-recorded */}
-                {recordedBlob && !isRecording && (
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="ml-1 w-8 h-8 rounded-full bg-[var(--bg-hover)] hover:bg-[var(--border-main)] flex items-center justify-center transition-all active:scale-90 cursor-pointer"
-                  >
-                    {isPlaying
-                      ? <Pause size={14} fill="currentColor" className="text-[var(--text-main)]" />
-                      : <Play size={14} fill="currentColor" className="text-[var(--text-main)] ml-0.5" />
-                    }
-                  </button>
-                )}
-              </div>
+            {/* Playback Control Area — fixed height to prevent layout shifts */}
+            <div className="h-20 flex items-center justify-center flex-shrink-0">
+              {recordedBlob && !isRecording && (
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="w-14 h-14 rounded-full bg-[var(--bg-card)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-lg text-[var(--text-main)]"
+                  aria-label={isPlaying ? "Pause playback" : "Start playback"}
+                >
+                  {isPlaying ? (
+                    <Pause size={20} fill="currentColor" />
+                  ) : (
+                    <Play size={20} fill="currentColor" className="ml-0.5" />
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Bottom action bar */}
@@ -819,11 +943,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
               {/* Left: Transcription toggle */}
               <button
                 onClick={() => setShowTranscription(!showTranscription)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
-                  showTranscription
+                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${showTranscription
                     ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]'
                     : 'bg-[var(--bg-card)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'
-                }`}
+                  }`}
                 aria-label="Toggle live transcription"
               >
                 <MessageSquare size={22} />
@@ -836,11 +959,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 )}
                 <button
                   onClick={handleToggleRecord}
-                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-2xl ${
-                    isRecording
+                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-2xl ${isRecording
                       ? 'bg-red-500 hover:bg-red-400'
                       : 'bg-red-600 hover:bg-red-500'
-                  }`}
+                    }`}
                   aria-label={isRecording ? 'Stop recording' : 'Start recording'}
                 >
                   {isRecording ? (
