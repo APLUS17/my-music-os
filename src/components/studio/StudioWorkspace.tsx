@@ -436,7 +436,7 @@ const StudioWorkspace: React.FC = () => {
     }, [recordingCounter]);
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
-    const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
+    const [studioMode, setStudioMode] = useState<'flow' | 'write'>('write');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
     const [showSyllables, setShowSyllables] = useState<boolean>(() => {
@@ -869,16 +869,27 @@ const StudioWorkspace: React.FC = () => {
         
         const saveState = () => {
             setSaveIndicator('saving');
-            const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-            const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-            
+            const stripSession = ({ audioUrl: _aUrl, base64: _b64, ...rest }: RecordingSession) => ({
+                ...rest,
+                layers: rest.layers?.map(({ audioUrl: _lUrl, base64: _lb64, ...lRest }) => lRest)
+            });
+            const stripBeat = ({ audioUrl: _aUrl, base64: _b64, ...rest }: Beat) => rest;
+
+            const sessionsToSave = sessions.map(stripSession);
+            const beatsToSave = beats.map(stripBeat);
+            const projectsToSave = savedProjects.map(p => ({
+                ...p,
+                sessions: p.sessions.map(stripSession),
+                beats: p.beats.map(stripBeat)
+            }));
+
             const currentCategorySections = {
                 ...categorySections,
                 [activeCategory]: sections
             };
 
             const dataToSave = {
-                sections, scraps, notes, savedProjects,
+                sections, scraps, notes, savedProjects: projectsToSave,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
                 activeProjectId, uploadedBeatId,
@@ -899,8 +910,29 @@ const StudioWorkspace: React.FC = () => {
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
-        setRecorderMinimized(true);
+        setRecorderMinimized(false);
         setShowRecorder(true);
+        setRecorderAutoStart(true);
+    };
+
+    const handleFlowTab = () => {
+        if (!showRecorder) {
+            // Start a new recording session
+            setStudioMode('flow');
+            handleRecordStart();
+        } else {
+            // Already recording — snap overlay back to full screen
+            setRecorderMinimized(false);
+            setStudioMode('flow');
+        }
+    };
+
+    const handleWriteTab = () => {
+        setStudioMode('write');
+        if (showRecorder) {
+            // Minimize the overlay so recording continues in background
+            setRecorderMinimized(true);
+        }
     };
 
     const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => {
@@ -1045,12 +1077,9 @@ const StudioWorkspace: React.FC = () => {
             } else {
                 toast.success('Recording saved');
             }
-            const recordingToastId = toast.loading('Processing audio intelligence...');
-
-            // Wait for both Gemini structure and Groq transcription
+            // Wait for both Gemini structure and Groq transcription (runs silently)
             Promise.all([transcriptionPromise, structurePromise]).then(([aiResult, structureResult]) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.dismiss(recordingToastId);
 
                 setSessions(prev => prev.map(s => {
                     if (s.id === id) {
@@ -1089,7 +1118,7 @@ const StudioWorkspace: React.FC = () => {
                 }));
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.error(err.message, { id: recordingToastId });
+                console.error('Audio intelligence error:', err.message);
             });
         }
     };
@@ -2270,23 +2299,53 @@ const StudioWorkspace: React.FC = () => {
                             </div>
                         </div>
 
-                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Tab bar — T syllable toggle only, no Player tab */}
-                            <div className="absolute top-2 right-4 z-20 flex items-center">
+                        {/* ─── WRITE | FLOW mode toggle ─── */}
+                        <div className="flex-shrink-0 flex items-center justify-center px-4 pt-3 pb-2 relative">
+                            <div className="flex bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
                                 <button
-                                    onClick={() => setShowSyllables(!showSyllables)}
+                                    onClick={handleWriteTab}
                                     className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
-                                        showSyllables
-                                            ? "text-[var(--accent)] font-bold"
-                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95",
+                                        studioMode === 'write'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                                     )}
-                                    title="Toggle Syllables Editor"
                                 >
-                                    T
+                                    Write
+                                </button>
+                                <button
+                                    onClick={handleFlowTab}
+                                    className={cn(
+                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-2",
+                                        studioMode === 'flow'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]',
+                                        showRecorder && 'text-red-400'
+                                    )}
+                                >
+                                    {showRecorder && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    )}
+                                    Flow
                                 </button>
                             </div>
 
+                            {/* Syllable toggle — right side */}
+                            <button
+                                onClick={() => setShowSyllables(!showSyllables)}
+                                className={cn(
+                                    "absolute right-4 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:brightness-110 active:scale-95 cursor-pointer",
+                                    showSyllables
+                                        ? "text-[var(--accent)] font-bold"
+                                        : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                                )}
+                                title="Toggle Syllables Editor"
+                            >
+                                T
+                            </button>
+                        </div>
+
+                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
                                 <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
@@ -2405,7 +2464,7 @@ const StudioWorkspace: React.FC = () => {
 
                             {/* MiniPlayer pill — floats above lyrics, visible when beat or vocal loaded */}
                             <AnimatePresence>
-                                {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && (
+                                {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && !(showRecorder && recorderMinimized) && (
                                     <MiniPlayer
                                         trackName={
                                             sessions.find(s => s.id === activeSessionId)?.name
@@ -2495,19 +2554,7 @@ const StudioWorkspace: React.FC = () => {
                             </AnimatePresence>
                         </div>
 
-                        {/* Floating Record Button for Studio view */}
-                        {!showRecorder && (
-                            <div className="absolute bottom-[92px] right-6 z-40 animate-in fade-in zoom-in duration-200">
-                                <button
-                                    id="tour-nav-record"
-                                    onClick={() => handleRecordStart()}
-                                    className="w-12 h-12 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer border border-red-500/20"
-                                    title="Record Vocal Take"
-                                >
-                                    <Mic size={20} />
-                                </button>
-                            </div>
-                        )}
+                        {/* Floating record button removed — use FLOW tab to record */}
                     </div>
                 );
             default: return null;
@@ -2654,10 +2701,21 @@ const StudioWorkspace: React.FC = () => {
 
             {showRecorder && (
                 <RecorderDrawer
-                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); setLayerModeSessionId(null); }}
+                    onClose={() => {
+                        setShowRecorder(false);
+                        setRecorderAutoStart(false);
+                        setLayerModeSessionId(null);
+                        setRecorderMinimized(false);
+                        setStudioMode('write');
+                    }}
                     onSave={handleSaveRecordingSession}
+                    projectName={projectTitle || 'New Recording'}
                     isMinimized={recorderMinimized}
-                    onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
+                    onMinimizeToggle={() => {
+                        const next = !recorderMinimized;
+                        setRecorderMinimized(next);
+                        setStudioMode(next ? 'write' : 'flow');
+                    }}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
                     onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}

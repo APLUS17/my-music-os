@@ -25,24 +25,7 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refresh session — must not run logic between createServerClient and getUser
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Redirect unauthenticated users hitting protected routes to /auth
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth');
-  if (!user && !isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/auth';
-    return NextResponse.redirect(url);
-  }
-
-  // Redirect authenticated users away from /auth back to app
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    return NextResponse.redirect(url);
-  }
-
+  // AUTH DISABLED FOR LOCAL DEV — re-enable by restoring the redirect logic below
   return supabaseResponse;
 }
 

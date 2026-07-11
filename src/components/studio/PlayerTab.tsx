@@ -94,8 +94,20 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
     const progress         = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-    // Transcription Lines from the active session ONLY
-    const displayLines = activeSession?.lines || [];
+    // Transcription lines: prefer AI timestamped lines, fall back to written lyrics spread evenly
+    const displayLines = useMemo(() => {
+        if (activeSession?.lines?.length) return activeSession.lines;
+        if (!lyrics?.length) return [];
+        const rawLines = lyrics.flatMap(s => s.text.split('\n').filter(l => l.trim()));
+        if (!rawLines.length) return [];
+        const d = duration > 0 ? duration : rawLines.length * 4; // 4s/line fallback if no duration yet
+        const interval = d / rawLines.length;
+        return rawLines.map((text, i) => ({
+            text,
+            startTime: i * interval,
+            endTime: (i + 1) * interval,
+        }));
+    }, [activeSession?.lines, lyrics, duration]);
 
     const activeLyricIdx = useMemo(() => {
         if (displayLines.length === 0) return -1;
@@ -203,56 +215,60 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
             {/* ── Header ───────────────────────────────────── */}
             <div className="flex items-center justify-between px-6 pt-6 pb-2 z-30">
+                {/* Left: dismiss button OR "Now Playing" label+title */}
                 {onDismiss ? (
-                    <>
-                        <button onClick={onDismiss} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors active:scale-90 cursor-pointer">
-                            <ChevronDown size={28} />
-                        </button>
-                        <h2 className="text-sm font-semibold text-[var(--text-main)] tracking-tight truncate max-w-[200px]">{projectTitle}</h2>
-                        <div className="w-8" />
-                    </>
+                    <button onClick={onDismiss} className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors active:scale-90 cursor-pointer">
+                        <ChevronDown size={28} />
+                    </button>
                 ) : (
-                    <>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-0.5">Now Playing</span>
-                            <h2 className="text-sm font-bold text-[var(--text-main)] tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
-                        </div>
-                        {sessions && sessions.length > 0 && (
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowTakeList(!showTakeList)}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-all active:scale-95"
-                                >
-                                    <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessions.length - sessionIdx}</span>
-                                    <ChevronDown size={14} className={cn("text-[var(--text-secondary)] transition-transform duration-300", showTakeList && "rotate-180")} />
-                                </button>
-                                <AnimatePresence>
-                                    {showTakeList && (
-                                        <>
-                                            <div className="fixed inset-0 z-40" onClick={() => setShowTakeList(false)} />
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                className="absolute right-0 mt-2 w-40 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+                    <div className="flex flex-col">
+                        <span className="text-[10px] mono uppercase tracking-[0.2em] text-[var(--text-tertiary)] mb-0.5">Now Playing</span>
+                        <h2 className="text-sm font-bold text-[var(--text-main)] tracking-tight truncate max-w-[180px]">{projectTitle}</h2>
+                    </div>
+                )}
+
+                {/* Center: project title — only when dismiss button is showing */}
+                {onDismiss && (
+                    <h2 className="text-sm font-semibold text-[var(--text-main)] tracking-tight truncate max-w-[160px]">{projectTitle}</h2>
+                )}
+
+                {/* Right: takes dropdown — always visible when sessions exist */}
+                {sessions && sessions.length > 0 ? (
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowTakeList(!showTakeList)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-all active:scale-95"
+                        >
+                            <span className="text-[10px] font-bold text-[var(--accent)] mono">TAKE {sessions.length - sessionIdx}</span>
+                            <ChevronDown size={14} className={cn("text-[var(--text-secondary)] transition-transform duration-300", showTakeList && "rotate-180")} />
+                        </button>
+                        <AnimatePresence>
+                            {showTakeList && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setShowTakeList(false)} />
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 mt-2 w-40 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
+                                    >
+                                        {sessions.map((s, i) => (
+                                            <button
+                                                key={s.id}
+                                                onClick={() => { onSelectSession?.(s.id); setShowTakeList(false); }}
+                                                className={cn("w-full text-left px-4 py-3 text-xs font-semibold transition-colors flex items-center justify-between", activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]")}
                                             >
-                                                {sessions.map((s, i) => (
-                                                    <button
-                                                        key={s.id}
-                                                        onClick={() => { onSelectSession?.(s.id); setShowTakeList(false); }}
-                                                        className={cn("w-full text-left px-4 py-3 text-xs font-semibold transition-colors flex items-center justify-between", activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]")}
-                                                    >
-                                                        <span>Take {sessions.length - i}</span>
-                                                        {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />}
-                                                    </button>
-                                                ))}
-                                            </motion.div>
-                                        </>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        )}
-                    </>
+                                                <span>Take {sessions.length - i}</span>
+                                                {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                ) : (
+                    <div className="w-8" />
                 )}
             </div>
 
