@@ -23,9 +23,23 @@ interface FXPanelProps {
   onClose: () => void;
   settings: FXSettings;
   onUpdate: (key: keyof FXSettings, value: number) => void;
+  isRecordingMode?: boolean;
+  isFXActive?: boolean;
+  onFXActiveToggle?: (active: boolean) => void;
+  isMonitoringEnabled?: boolean;
+  onMonitoringToggle?: (enabled: boolean) => void;
 }
 
-export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate }) => {
+export const FXPanel: React.FC<FXPanelProps> = ({ 
+  onClose, 
+  settings, 
+  onUpdate,
+  isRecordingMode = false,
+  isFXActive = false,
+  onFXActiveToggle,
+  isMonitoringEnabled = false,
+  onMonitoringToggle
+}) => {
   return (
     <div className="absolute inset-0 bg-[var(--bg-card)] z-50 flex flex-col p-6 animate-in slide-in-from-right duration-300 overflow-y-auto">
       {/* Header */}
@@ -43,6 +57,43 @@ export const FXPanel: React.FC<FXPanelProps> = ({ onClose, settings, onUpdate })
           <X size={20} />
         </button>
       </div>
+
+      {/* Recording Mode Toggles */}
+      {isRecordingMode && (
+        <div className="mb-6 space-y-4 p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-main)] shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">Vocal FX Processing</span>
+              <span className="text-[10px] text-[var(--text-secondary)] mt-0.5">Toggle real-time vocal effects</span>
+            </div>
+            <button
+              onClick={() => onFXActiveToggle?.(!isFXActive)}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer outline-none ${isFXActive ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'bg-[var(--bg-card)] border border-[var(--border-main)]'}`}
+              aria-label="Toggle Vocal FX"
+            >
+              <span 
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isFXActive ? 'translate-x-5' : 'translate-x-0'}`} 
+              />
+            </button>
+          </div>
+          <div className="h-[1px] bg-[var(--border-main)] w-full" />
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-main)]">Live Monitoring</span>
+              <span className="text-[10px] text-red-400 font-medium mt-0.5">Use headphones to prevent feedback</span>
+            </div>
+            <button
+              onClick={() => onMonitoringToggle?.(!isMonitoringEnabled)}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer outline-none ${isMonitoringEnabled ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]' : 'bg-[var(--bg-card)] border border-[var(--border-main)]'}`}
+              aria-label="Toggle Live Monitoring"
+            >
+              <span 
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isMonitoringEnabled ? 'translate-x-5' : 'translate-x-0'}`} 
+              />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* FX Controls */}
       <div className="flex-1 space-y-8 pb-10">

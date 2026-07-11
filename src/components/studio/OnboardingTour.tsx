@@ -36,8 +36,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-nav-library',
-            title: 'Home',
-            content: 'Your home dashboard. All your songs and beats live here. Start here to find your sound or create something new.',
+            title: 'Library',
+            content: 'Your library dashboard. All your songs and beats live here. Start here to find your sound or create something new.',
             position: 'top',
             action: () => setViewMode('home')
         },

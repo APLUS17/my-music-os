@@ -586,12 +586,23 @@ const StudioWorkspace: React.FC = () => {
             // 2. Play Beat if available
             if (uploadedBeat && beatAudioRef.current) {
                 const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+                const beat = beatAudioRef.current;
+                
                 if (session && vocalAudioRef.current) {
                     const offset = session.beatOffset || 0;
-                    const beat = beatAudioRef.current;
-                    if (beat.readyState >= 1) beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                    if (beat.readyState >= 1) {
+                        beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                    } else {
+                        const syncOnMetadata = () => {
+                            if (vocalAudioRef.current) {
+                                beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                            }
+                            beat.removeEventListener('loadedmetadata', syncOnMetadata);
+                        };
+                        beat.addEventListener('loadedmetadata', syncOnMetadata);
+                    }
                 }
-                beatAudioRef.current.play().catch(console.error);
+                beat.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
             
@@ -607,7 +618,9 @@ const StudioWorkspace: React.FC = () => {
 
     const seekTo = (time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
-        if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
+        if (vocalAudioRef.current && sessions.length > 0 && vocalAudioRef.current.src) {
+            vocalAudioRef.current.currentTime = clamped;
+        }
 
         if (beatAudioRef.current) {
             const beat = beatAudioRef.current;
@@ -729,6 +742,23 @@ const StudioWorkspace: React.FC = () => {
         }
     }, [beatVolume, beatMuted]);
 
+    // Sync duration based on available tracks (vocal takes vs backing beat)
+    useEffect(() => {
+        if (sessions.length > 0) {
+            const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            if (activeSession) {
+                setDuration(activeSession.duration);
+            }
+        } else if (uploadedBeat && beatAudioRef.current) {
+            const beatDur = beatAudioRef.current.duration;
+            if (beatDur && isFinite(beatDur) && beatDur > 0) {
+                setDuration(beatDur);
+            }
+        } else {
+            setDuration(0);
+        }
+    }, [sessions.length, uploadedBeat, activeSessionId]);
+
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
             setShowTour(true);
@@ -767,53 +797,70 @@ const StudioWorkspace: React.FC = () => {
                     const parsed = JSON.parse(savedData);
 
                     const activeCat = parsed.activeCategory || 'Notes';
-                    setActiveCategory(activeCat);
-
-                    let activeCatSections = parsed.sections || [];
-                    if (parsed.categorySections) {
-                        setCategorySections(parsed.categorySections);
-                        activeCatSections = parsed.categorySections[activeCat] || [];
-                    } else {
-                        const newCategorySections: Record<string, LyricSection[]> = {};
-                        CATEGORIES.forEach(cat => {
-                            if (cat === 'Lyrics') {
-                                newCategorySections[cat] = parsed.sections || [];
-                            } else {
-                                 newCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
-                            }
-                        });
-                        setCategorySections(newCategorySections);
-                        activeCatSections = newCategorySections[activeCat] || [];
-                    }
-
-                    // Migration: clear old mock text from mission project
-                    if (parsed.sections && parsed.sections.some((s: LyricSection) =>
-                        s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
-                    )) {
-                        // Old mock text detected, reset to empty
-                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
-                        setProjectTitle('');
-                        setActiveCategory('Notes');
-                        setCategorySections({});
-                    } else if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
-                        setSections(activeCatSections);
-                        if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
-                    } else {
-                        // Default to empty project
-                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
-                        setProjectTitle('');
-                    }
-                    if (parsed.scraps) setScraps(parsed.scraps);
-                    if (parsed.notes) setNotes(parsed.notes);
+                    const prevSections = parsed.sections || [];
+                    const prevScraps = parsed.scraps || [];
+                    const prevProjectTitle = parsed.projectTitle !== undefined ? parsed.projectTitle : "";
+                    const prevCategorySections = parsed.categorySections || {};
+                    const prevActiveProjectId = parsed.activeProjectId || null;
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
                     // Remove mission project if it exists
                     loadedProjects = loadedProjects.filter((p: SavedProject) => p.id !== 'mission-001');
+
+                    // Automatically archive the previous active state into the loadedProjects list if it has content
+                    const hasContent = (prevSections && prevSections.some((s: LyricSection) => s.text.trim().length > 0)) || 
+                                       (prevScraps && prevScraps.length > 0) || 
+                                       prevProjectTitle;
+                    
+                    if (hasContent) {
+                        const archiveId = prevActiveProjectId || randomId();
+                        const existingIndex = loadedProjects.findIndex((p: SavedProject) => p.id === archiveId);
+
+                        const projectSessions = parsed.sessions ? parsed.sessions.filter((s: any) => s.projectId === archiveId) : [];
+
+                        const lastProject: SavedProject = {
+                            id: archiveId,
+                            name: prevProjectTitle || "Untitled Song",
+                            lastModified: new Date().toLocaleDateString(),
+                            sections: prevCategorySections['Lyrics'] || prevSections,
+                            scraps: prevScraps,
+                            sessions: projectSessions,
+                            beats: parsed.uploadedBeatId && parsed.beats ? parsed.beats.filter((b: any) => b.id === parsed.uploadedBeatId) : [],
+                            categorySections: prevCategorySections,
+                            activeCategory: activeCat
+                        };
+
+                        if (existingIndex !== -1) {
+                            loadedProjects[existingIndex] = lastProject;
+                        } else {
+                            loadedProjects = [lastProject, ...loadedProjects];
+                        }
+                    }
+
+                    // Save the updated project list
                     setSavedProjects(loadedProjects);
+
+                    // Initialize to a fresh, blank song in the Studio
+                    setSections([{ id: 'fresh-start', type: 'verse' as SectionType, repeats: 1, text: '' }]);
+                    setProjectTitle('');
+                    setScraps([]);
+                    setActiveProjectId(null);
+                    setActiveCategory('Notes');
+                    setCategorySections({});
+                    setUploadedBeat(null);
+                    setUploadedBeatName('');
+                    setUploadedBeatId(null);
+                    setSessions([]);
+
+                    if (parsed.scraps) {
+                        // Float scraps are not loaded to blank song, keep empty
+                    }
+                    if (parsed.notes) setNotes(parsed.notes);
 
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
 
+                    // Load all sessions from IndexedDB or storage globally
                     if (parsed.sessions) {
                         const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
                             try {
@@ -831,6 +878,7 @@ const StudioWorkspace: React.FC = () => {
                         setSessions(loadedSessions);
                     }
 
+                    // Load beats globally so they are available
                     if (parsed.beats) {
                         const loadedBeats = await Promise.all(parsed.beats.map(async (b: Beat) => {
                             try {
@@ -846,13 +894,7 @@ const StudioWorkspace: React.FC = () => {
                             }
                         }));
                         setBeats(loadedBeats);
-                        if (loadedBeats.length > 0 && !uploadedBeat) {
-                            setUploadedBeat(loadedBeats[0].audioUrl || null);
-                            setUploadedBeatName(loadedBeats[0].name || "Untitled Beat");
-                            setUploadedBeatId(parsed.uploadedBeatId || loadedBeats[0].id);
-                        }
                     }
-                    if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
                 } catch (e) { console.error("Failed to load saved state", e); }
             }
         };
@@ -1248,6 +1290,7 @@ const StudioWorkspace: React.FC = () => {
                 audio.play().catch(console.error);
             } else {
                 setIsBeatPlaying(false);
+                setIsPlaying(false);
             }
         };
 
@@ -1761,6 +1804,17 @@ const StudioWorkspace: React.FC = () => {
                             </button>
                         </div>
 
+                        {/* Library Header Greeting */}
+                        <div className="px-6 mb-4">
+                            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-main)] animate-in fade-in slide-in-from-top-4 duration-300">My Library</h1>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1 animate-in fade-in duration-300">
+                                {savedProjects.length === 0 
+                                    ? "No songs saved yet. Click the + or use Quick Capture to start creating."
+                                    : `You have ${savedProjects.length} song${savedProjects.length === 1 ? '' : 's'} in your catalog.`
+                                }
+                            </p>
+                        </div>
+
                         {isEmpty ? (
                             // Blank Start / Option States
                             <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
@@ -1832,7 +1886,7 @@ const StudioWorkspace: React.FC = () => {
                                             onClick={() => setLibraryTab('songs')}
                                             className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                                         >
-                                            Projects
+                                            Songs
                                         </button>
                                         <button
                                             onClick={() => setLibraryTab('beats')}
@@ -2293,7 +2347,15 @@ const StudioWorkspace: React.FC = () => {
                                                     // Beat structure detection disabled — interferes with transcription flow
                                                 };
                                             }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                                            onClear={() => {
+                                                if (beatAudioRef.current) {
+                                                    beatAudioRef.current.pause();
+                                                }
+                                                setUploadedBeat(null);
+                                                setUploadedBeatName("");
+                                                setUploadedBeatId(null);
+                                                setIsBeatPlaying(false);
+                                            }}
                                         />
                                     </div>
                                 </div>
@@ -2569,7 +2631,17 @@ const StudioWorkspace: React.FC = () => {
                 className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
             >
                 {/* Persistent Studio Beat Audio */}
-                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
+                <audio
+                    ref={beatAudioRef}
+                    src={uploadedBeat || undefined}
+                    className="hidden"
+                    crossOrigin="anonymous"
+                    onLoadedMetadata={e => {
+                        if (sessions.length === 0) {
+                            setDuration(e.currentTarget.duration);
+                        }
+                    }}
+                />
 
                 {/* Persistent Vocal Session Audio */}
                 <audio
@@ -2601,8 +2673,19 @@ const StudioWorkspace: React.FC = () => {
                     className="hidden"
                 />
 
-                <div className="flex-1 overflow-hidden">
-                    {getActiveView()}
+                <div className="flex-1 overflow-hidden relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={viewMode}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="h-full w-full"
+                        >
+                            {getActiveView()}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
 
             </main>
@@ -2650,32 +2733,96 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
 
-                            <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
-                                {[
-                                    { id: 'home', label: 'Home', icon: House },
-                                    { id: 'vault', label: 'Vault', icon: Archive },
-                                    { id: 'notebook', label: 'Notebook', icon: BookText },
-                                ].map((item) => {
-                                    const Icon = item.icon;
-                                    const isActive = viewMode === item.id;
-                                    return (
+                            <nav className="flex-1 py-6 space-y-6 overflow-y-auto">
+                                <div className="space-y-1">
+                                    {[
+                                        { id: 'home', label: 'Library', icon: Library },
+                                        { id: 'vault', label: 'Vault', icon: Archive },
+                                        { id: 'notebook', label: 'Notebook', icon: BookText },
+                                    ].map((item) => {
+                                        const Icon = item.icon;
+                                        const isActive = viewMode === item.id;
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => {
+                                                    setViewMode(item.id as ViewMode);
+                                                    setIsSidebarOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer font-medium text-sm ${
+                                                    isActive
+                                                        ? 'bg-[var(--accent)] text-[var(--bg-main)] shadow-lg shadow-[var(--accent)]/10 font-semibold'
+                                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
+                                                }`}
+                                            >
+                                                <Icon size={18} className={isActive ? 'text-[var(--bg-main)]' : 'text-[var(--text-secondary)]'} />
+                                                <span>{item.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Songs List Section */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between px-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                                        <span>Songs</span>
                                         <button
-                                            key={item.id}
                                             onClick={() => {
-                                                setViewMode(item.id as ViewMode);
                                                 setIsSidebarOpen(false);
+                                                handleNewProject();
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer font-medium text-sm ${
-                                                isActive
-                                                    ? 'bg-[var(--accent)] text-[var(--bg-main)] shadow-lg shadow-[var(--accent)]/10 font-semibold'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
-                                            }`}
+                                            className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all cursor-pointer"
+                                            title="New Song"
                                         >
-                                            <Icon size={18} className={isActive ? 'text-[var(--bg-main)]' : 'text-[var(--text-secondary)]'} />
-                                            <span>{item.label}</span>
+                                            <Plus size={14} />
                                         </button>
-                                    );
-                                })}
+                                    </div>
+                                    <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
+                                        {(() => {
+                                            const sortedProjects = [...savedProjects].sort((a, b) => {
+                                                const timeA = new Date(a.lastModified).getTime() || 0;
+                                                const timeB = new Date(b.lastModified).getTime() || 0;
+                                                return timeB - timeA;
+                                            });
+
+                                            if (sortedProjects.length === 0) {
+                                                return (
+                                                    <div className="px-4 py-3 text-xs italic text-[var(--text-tertiary)]">
+                                                        No saved songs
+                                                    </div>
+                                                );
+                                            }
+
+                                            return sortedProjects.map((p) => {
+                                                const isActive = viewMode === 'studio' && activeProjectId === p.id;
+                                                return (
+                                                    <button
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            loadProject(p);
+                                                            setIsSidebarOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer text-sm ${
+                                                            isActive
+                                                                ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-semibold border-l-2 border-[var(--accent)]'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <Music size={14} className={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
+                                                        <span className="truncate flex-1">{p.name || "Untitled"}</span>
+                                                        {isActive ? (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+                                                        ) : (
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0 font-normal">
+                                                                {p.lastModified.includes('/') ? `${p.lastModified.split('/')[0]}/${p.lastModified.split('/')[1]}` : p.lastModified}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
                             </nav>
 
                             <div className="pt-4 border-t border-[var(--border-main)] bg-[var(--bg-secondary)]/30 rounded-2xl p-4 space-y-3">
@@ -2683,18 +2830,34 @@ const StudioWorkspace: React.FC = () => {
                                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
                                     <span>Quick Capture</span>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        setIsSidebarOpen(false);
-                                        setShowRecorder(true);
-                                        setRecorderMinimized(true);
-                                        setRecorderAutoStart(true);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-98 font-semibold text-sm cursor-pointer"
-                                >
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                                    <span>Record Audio</span>
-                                </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {/* Left Side: Record (Red Dot) */}
+                                    <button
+                                        onClick={() => {
+                                            setIsSidebarOpen(false);
+                                            setShowRecorder(true);
+                                            setRecorderMinimized(true);
+                                            setRecorderAutoStart(true);
+                                        }}
+                                        className="flex items-center justify-center py-3 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-95 cursor-pointer"
+                                        title="Quick Record Audio"
+                                    >
+                                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                                    </button>
+
+                                    {/* Right Side: Write (Pen Icon) */}
+                                    <button
+                                        onClick={() => {
+                                            setIsSidebarOpen(false);
+                                            setViewMode('studio');
+                                            setStudioMode('write');
+                                        }}
+                                        className="flex items-center justify-center py-3 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/20 rounded-xl transition-all active:scale-95 cursor-pointer"
+                                        title="Quick Write Lyrics"
+                                    >
+                                        <PenTool size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>
@@ -2709,6 +2872,10 @@ const StudioWorkspace: React.FC = () => {
                         setLayerModeSessionId(null);
                         setRecorderMinimized(false);
                         setStudioMode('write');
+                        if (beatAudioRef.current) {
+                            beatAudioRef.current.pause();
+                        }
+                        setIsBeatPlaying(false);
                     }}
                     onSave={handleSaveRecordingSession}
                     projectName={projectTitle || 'New Recording'}
@@ -2721,6 +2888,7 @@ const StudioWorkspace: React.FC = () => {
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
                     onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}
+                    onPauseBeatAudio={() => setIsBeatPlaying(false)}
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}

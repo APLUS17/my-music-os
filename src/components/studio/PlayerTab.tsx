@@ -81,10 +81,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     const sessionIdx = sessions && activeSession ? sessions.findIndex(s => s.id === activeSession.id) : -1;
 
     // Derived — beat sections drive pills ONLY
-    // Only calculate beat highlights if recording was made WITH the beat
-    const beatCurrentTime = activeSession?.beatOffset !== null && activeSession?.beatOffset !== undefined
-      ? currentTime + activeSession.beatOffset
-      : null;
+    // Only calculate beat highlights if recording was made WITH the beat, or fall back to currentTime for beat-only practice/writing
+    const beatCurrentTime = activeSession
+      ? (activeSession.beatOffset !== null && activeSession.beatOffset !== undefined ? currentTime + activeSession.beatOffset : currentTime)
+      : currentTime;
     const beatSections = beatCurrentTime !== null ? (beat?.sections ?? []) : [];
 
     // We calculate the active index during render for O(1) performance without cascading re-renders.

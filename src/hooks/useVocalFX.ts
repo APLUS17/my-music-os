@@ -4,7 +4,7 @@ import { FXSettings } from '@/components/studio/FXPanel';
 // Cached impulse response to avoid recreation
 const impulseCache = new Map<string, AudioBuffer>();
 
-function createReverbImpulse(context: AudioContext, duration: number, decay: number) {
+export function createReverbImpulse(context: AudioContext, duration: number, decay: number) {
   const key = `${context.sampleRate}-${duration}-${decay}`;
   if (impulseCache.has(key)) {
     return impulseCache.get(key)!;

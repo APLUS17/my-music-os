@@ -6,11 +6,20 @@ import {
   X,
   MessageSquare,
   ChevronUp,
+  Sliders,
+  Radio,
+  Waves,
+  Mic,
+  Activity,
+  Zap,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from "@/components/ui/slider";
 import { RecordingLayer } from '@/types';
 import { formatTime } from '@/lib/utils/time';
+import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
+import { createReverbImpulse } from '@/hooks/useVocalFX';
+import { VOCAL_PRESETS } from '@/lib/audio/vocalPresets';
 
 interface RecorderDrawerProps {
   onClose: () => void;
@@ -27,6 +36,7 @@ interface RecorderDrawerProps {
   loopEnd?: number | null;
   isLooping?: boolean;
   onResumeBeatAudio?: () => void;
+  onPauseBeatAudio?: () => void;
   // Layer mode props
   layerMode?: boolean;
   existingLayers?: RecordingLayer[];
@@ -48,6 +58,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   loopEnd = null,
   isLooping = false,
   onResumeBeatAudio,
+  onPauseBeatAudio,
   layerMode = false,
   existingLayers = [],
   parentAudioUrl = null,
@@ -63,6 +74,27 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const [showTranscription, setShowTranscription] = useState(false);
   const [finalTranscript, setFinalTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
+
+  // Vocal FX state
+  const [showFXPanel, setShowFXPanel] = useState(false);
+  const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
+  const [isFXActive, setIsFXActive] = useState(false);
+  const [isMonitoringEnabled, setIsMonitoringEnabled] = useState(false);
+  const [activePresetId, setActivePresetId] = useState<string>('dry');
+  const [fxViewMode, setFxViewMode] = useState<'presets' | 'custom'>('presets');
+
+  // Vocal FX Web Audio nodes refs
+  const eqLowRef = useRef<BiquadFilterNode | null>(null);
+  const eqMidRef = useRef<BiquadFilterNode | null>(null);
+  const eqHighRef = useRef<BiquadFilterNode | null>(null);
+  const compRef = useRef<DynamicsCompressorNode | null>(null);
+  const delayRef = useRef<DelayNode | null>(null);
+  const delayDryRef = useRef<GainNode | null>(null);
+  const delayWetRef = useRef<GainNode | null>(null);
+  const convolverRef = useRef<ConvolverNode | null>(null);
+  const reverbWetRef = useRef<GainNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const limiterRef = useRef<DynamicsCompressorNode | null>(null);
 
   // Refs for logic
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -133,6 +165,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
       if (backingAudioRef?.current) {
         backingAudioRef.current.volume = 1.0;
+        backingAudioRef.current.pause();
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
@@ -142,8 +175,74 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
       stopMicStream();
       stopSpeechRecognition();
+
+      // Clear Vocal FX node refs
+      eqLowRef.current = null;
+      eqMidRef.current = null;
+      eqHighRef.current = null;
+      compRef.current = null;
+      delayRef.current = null;
+      delayDryRef.current = null;
+      delayWetRef.current = null;
+      convolverRef.current = null;
+      reverbWetRef.current = null;
+      masterGainRef.current = null;
+      limiterRef.current = null;
     };
   }, []);
+
+  // Synchronize Live Vocal FX settings with Web Audio Nodes
+  useEffect(() => {
+    if (!audioContext || !eqLowRef.current) return;
+
+    try {
+      if (isFXActive) {
+        // Apply EQ settings
+        if (eqLowRef.current) eqLowRef.current.gain.value = fxSettings.eqLow;
+        if (eqMidRef.current) eqMidRef.current.gain.value = fxSettings.eqMid;
+        if (eqHighRef.current) eqHighRef.current.gain.value = fxSettings.eqHigh;
+
+        // Apply Punch (Compression)
+        if (compRef.current) {
+          const punchAmount = fxSettings.punch / 100;
+          compRef.current.threshold.value = -50 * punchAmount;
+          compRef.current.ratio.value = 1 + (19 * punchAmount);
+        }
+
+        // Apply Delay (Echo)
+        if (delayWetRef.current) {
+          delayWetRef.current.gain.value = (fxSettings.echo / 100) * 0.7;
+        }
+
+        // Apply Reverb (Space)
+        if (reverbWetRef.current) {
+          reverbWetRef.current.gain.value = (fxSettings.space / 100) * 1.0;
+        }
+      } else {
+        // Flat/Bypass settings
+        if (eqLowRef.current) eqLowRef.current.gain.value = 0;
+        if (eqMidRef.current) eqMidRef.current.gain.value = 0;
+        if (eqHighRef.current) eqHighRef.current.gain.value = 0;
+
+        if (compRef.current) {
+          compRef.current.threshold.value = 0;
+          compRef.current.ratio.value = 1;
+        }
+
+        if (delayWetRef.current) delayWetRef.current.gain.value = 0;
+        if (reverbWetRef.current) reverbWetRef.current.gain.value = 0;
+      }
+    } catch (err) {
+      console.warn('Error updating recording Vocal FX nodes:', err);
+    }
+  }, [audioContext, isFXActive, fxSettings]);
+
+  // Synchronize Live Monitoring toggle with monitor Gain node
+  useEffect(() => {
+    if (monitorGainRef.current) {
+      monitorGainRef.current.gain.value = isMonitoringEnabled ? 0.8 : 0;
+    }
+  }, [isMonitoringEnabled]);
 
   // Auto-start recording when opened via nav button
   useEffect(() => {
@@ -456,6 +555,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (backingAudio && recordedBlob && !backingAudio.paused) {
         backingAudio.pause();
         backingAudio.volume = 1.0;
+        onPauseBeatAudio?.();
       }
     }
 
@@ -537,15 +637,116 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       analyserRef.current = analyser;
       dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
 
-      const merger = audioCtx.createChannelMerger(2);
-      analyser.connect(merger, 0, 0);
-      analyser.connect(merger, 0, 1);
+      // 1. EQ Nodes
+      const eqLow = audioCtx.createBiquadFilter();
+      eqLow.type = 'lowshelf';
+      eqLow.frequency.value = 250;
+      eqLow.gain.value = isFXActive ? fxSettings.eqLow : 0;
+      eqLowRef.current = eqLow;
 
+      const eqMid = audioCtx.createBiquadFilter();
+      eqMid.type = 'peaking';
+      eqMid.frequency.value = 1000;
+      eqMid.Q.value = 1;
+      eqMid.gain.value = isFXActive ? fxSettings.eqMid : 0;
+      eqMidRef.current = eqMid;
+
+      const eqHigh = audioCtx.createBiquadFilter();
+      eqHigh.type = 'highshelf';
+      eqHigh.frequency.value = 4000;
+      eqHigh.gain.value = isFXActive ? fxSettings.eqHigh : 0;
+      eqHighRef.current = eqHigh;
+
+      // 2. Compressor Node (Punch)
+      const comp = audioCtx.createDynamicsCompressor();
+      if (isFXActive) {
+        const punchAmount = fxSettings.punch / 100;
+        comp.threshold.value = -50 * punchAmount;
+        comp.ratio.value = 1 + (19 * punchAmount);
+      } else {
+        comp.threshold.value = 0;
+        comp.ratio.value = 1;
+      }
+      comp.knee.value = 30;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+      compRef.current = comp;
+
+      // 3. Delay Node (Echo)
+      const delay = audioCtx.createDelay(2.0);
+      delay.delayTime.value = 0.4;
+      delayRef.current = delay;
+
+      const delayDry = audioCtx.createGain();
+      delayDry.gain.value = 1;
+      delayDryRef.current = delayDry;
+
+      const delayWet = audioCtx.createGain();
+      delayWet.gain.value = isFXActive ? (fxSettings.echo / 100) * 0.7 : 0;
+      delayWetRef.current = delayWet;
+
+      // 4. Reverb Node (Space)
+      const convolver = audioCtx.createConvolver();
+      try {
+        convolver.buffer = createReverbImpulse(audioCtx, 2.5, 2.0);
+      } catch (err) {
+        console.warn('Could not set convolver buffer in recorder:', err);
+      }
+      convolverRef.current = convolver;
+
+      const reverbWet = audioCtx.createGain();
+      reverbWet.gain.value = isFXActive ? (fxSettings.space / 100) * 1.0 : 0;
+      reverbWetRef.current = reverbWet;
+
+      // 5. Limiter / Master
+      const masterGain = audioCtx.createGain();
+      masterGain.gain.value = 1;
+      masterGainRef.current = masterGain;
+
+      const limiter = audioCtx.createDynamicsCompressor();
+      limiter.threshold.value = -0.5;
+      limiter.knee.value = 0;
+      limiter.ratio.value = 20;
+      limiter.attack.value = 0.001;
+      limiter.release.value = 0.1;
+      limiterRef.current = limiter;
+
+      // Graph Routing
+      analyser.connect(eqLow);
+      eqLow.connect(eqMid);
+      eqMid.connect(eqHigh);
+      eqHigh.connect(comp);
+
+      // Dry path to master
+      comp.connect(masterGain);
+
+      // Parallel Delay Path
+      comp.connect(delay);
+      delay.connect(delayDry);
+      delayDry.connect(delayWet);
+      delayWet.connect(masterGain);
+
+      // Parallel Reverb Path
+      comp.connect(convolver);
+      convolver.connect(reverbWet);
+      reverbWet.connect(masterGain);
+
+      // Master to Limiter
+      masterGain.connect(limiter);
+
+      // Merger for stereo channel matching
+      const merger = audioCtx.createChannelMerger(2);
+      limiter.connect(merger, 0, 0);
+      limiter.connect(merger, 0, 1);
+
+      // Monitoring path (outputs to headphones)
       const monitorGain = audioCtx.createGain();
-      monitorGain.gain.value = 0.8;
+      monitorGain.gain.value = isMonitoringEnabled ? 0.8 : 0;
       merger.connect(monitorGain);
+      monitorGain.connect(audioCtx.destination);
       monitorGainRef.current = monitorGain;
 
+      // Recording path (outputs to MediaRecorder)
       const destination = audioCtx.createMediaStreamDestination();
       merger.connect(destination);
       recordingStreamRef.current = destination.stream;
@@ -672,6 +873,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         stopLayerPlayback();
       }
       stopSpeechRecognition();
+      if (backingAudioRef?.current) {
+        backingAudioRef.current.pause();
+      }
+      onPauseBeatAudio?.();
     }
   };
 
@@ -681,6 +886,25 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } else {
       startRecording();
     }
+  };
+
+  const handleSelectPreset = (presetId: string) => {
+    setActivePresetId(presetId);
+    const selected = VOCAL_PRESETS.find(p => p.id === presetId);
+    if (selected) {
+      setFxSettings(selected.settings);
+      if (presetId === 'dry') {
+        setIsFXActive(false);
+      } else {
+        setIsFXActive(true);
+      }
+    }
+  };
+
+  const handleUpdateCustomFX = (key: keyof FXSettings, value: number) => {
+    setFxSettings(prev => ({ ...prev, [key]: value }));
+    setActivePresetId('custom');
+    setIsFXActive(true);
   };
 
   const handleSave = () => {
@@ -919,6 +1143,173 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Floating Vocal FX Card */}
+              <AnimatePresence>
+                {showFXPanel && (
+                  <motion.div
+                    initial={{ y: 150, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 150, opacity: 0 }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+                    className="absolute bottom-4 left-4 right-4 z-[120] bg-[var(--bg-card)]/98 backdrop-blur-xl border border-[var(--border-main)] rounded-2xl p-4 flex flex-col gap-4 shadow-2xl overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-2">
+                        <Sliders size={16} className="text-[var(--accent)]" />
+                        <span className="text-[11px] font-bold text-[var(--text-main)] uppercase tracking-wider">Vocal FX Presets</span>
+                      </div>
+                      
+                      {/* Live Monitoring Switch */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-bold uppercase text-[var(--text-secondary)]">Live Monitor</span>
+                          {isMonitoringEnabled && (
+                            <span className="text-[8px] text-red-400 font-semibold leading-none">Use Headphones</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setIsMonitoringEnabled(!isMonitoringEnabled)}
+                          className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer outline-none ${isMonitoringEnabled ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]' : 'bg-[var(--bg-secondary)] border border-[var(--border-main)]'}`}
+                          aria-label="Toggle Live Monitoring"
+                        >
+                          <span 
+                            className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${isMonitoringEnabled ? 'translate-x-4' : 'translate-x-0'}`} 
+                          />
+                        </button>
+                        
+                        <div className="w-[1px] h-4 bg-[var(--border-main)] mx-1" />
+                        
+                        <button
+                          onClick={() => setShowFXPanel(false)}
+                          className="w-7 h-7 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                          aria-label="Close Vocal FX panel"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Segmented Tab Selector */}
+                    <div className="w-full bg-[var(--bg-secondary)] p-0.5 rounded-full flex gap-0.5 border border-[var(--border-main)] shrink-0">
+                      <button
+                        onClick={() => setFxViewMode('presets')}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-full transition-all text-center cursor-pointer ${fxViewMode === 'presets' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                      >
+                        Presets
+                      </button>
+                      <button
+                        onClick={() => setFxViewMode('custom')}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-full transition-all text-center cursor-pointer ${fxViewMode === 'custom' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
+                      >
+                        Custom FX
+                      </button>
+                    </div>
+
+                    {/* Sliding panels */}
+                    <div className="min-h-[100px] max-h-[140px] overflow-hidden">
+                      {fxViewMode === 'presets' ? (
+                        <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-hide snap-x select-none">
+                          {VOCAL_PRESETS.map((preset) => {
+                            // Map icon
+                            const IconComponent = (() => {
+                              switch (preset.id) {
+                                case 'studio': return Activity;
+                                case 'space': return Waves;
+                                case 'echo': return Zap;
+                                case 'radio': return Radio;
+                                default: return Mic;
+                              }
+                            })();
+                            const isSelected = activePresetId === preset.id && (preset.id === 'dry' ? !isFXActive : isFXActive);
+                            return (
+                              <button
+                                key={preset.id}
+                                onClick={() => handleSelectPreset(preset.id)}
+                                className={`snap-center flex-shrink-0 w-[84px] h-[84px] rounded-xl flex flex-col items-center justify-center gap-1.5 border transition-all active:scale-95 cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] shadow-[0_0_12px_var(--accent-dim)]'
+                                    : 'bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+                                }`}
+                              >
+                                <IconComponent size={18} />
+                                <span className="text-[9px] font-bold tracking-wider uppercase">{preset.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="h-full overflow-y-auto pr-0.5 space-y-3 pb-2 pt-1 scrollbar-thin">
+                          {/* Enable Custom FX Toggle */}
+                          <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border-main)]">
+                            <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">Enable Custom FX</span>
+                            <button
+                              onClick={() => setIsFXActive(!isFXActive)}
+                              className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer outline-none ${isFXActive ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-[var(--bg-secondary)] border border-[var(--border-main)]'}`}
+                            >
+                              <span 
+                                className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${isFXActive ? 'translate-x-4' : 'translate-x-0'}`} 
+                              />
+                            </button>
+                          </div>
+
+                          {/* Reverb Space Slider */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                              <span>REVERB (SPACE)</span>
+                              <span className="tabular-nums">{fxSettings.space}%</span>
+                            </div>
+                            <input 
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={fxSettings.space}
+                              disabled={!isFXActive}
+                              onChange={(e) => handleUpdateCustomFX('space', parseInt(e.target.value))}
+                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                            />
+                          </div>
+
+                          {/* Delay Echo Slider */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                              <span>ECHO (DELAY)</span>
+                              <span className="tabular-nums">{fxSettings.echo}%</span>
+                            </div>
+                            <input 
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={fxSettings.echo}
+                              disabled={!isFXActive}
+                              onChange={(e) => handleUpdateCustomFX('echo', parseInt(e.target.value))}
+                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                            />
+                          </div>
+
+                          {/* Compressor Punch Slider */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] font-bold">
+                              <span>PUNCH (COMPRESSOR)</span>
+                              <span className="tabular-nums">{fxSettings.punch}%</span>
+                            </div>
+                            <input 
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={fxSettings.punch}
+                              disabled={!isFXActive}
+                              onChange={(e) => handleUpdateCustomFX('punch', parseInt(e.target.value))}
+                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Playback Control Area — fixed height to prevent layout shifts */}
@@ -940,17 +1331,33 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
             {/* Bottom action bar */}
             <div className="px-10 pb-8 flex items-center justify-between flex-shrink-0">
-              {/* Left: Transcription toggle */}
-              <button
-                onClick={() => setShowTranscription(!showTranscription)}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${showTranscription
-                    ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]'
-                    : 'bg-[var(--bg-card)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'
+              {/* Left: Toggles */}
+              <div className="flex items-center gap-3">
+                {/* Transcription toggle */}
+                <button
+                  onClick={() => setShowTranscription(!showTranscription)}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${showTranscription
+                      ? 'bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.4)]'
+                      : 'bg-[var(--bg-card)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'
+                    }`}
+                  aria-label="Toggle live transcription"
+                >
+                  <MessageSquare size={22} />
+                </button>
+
+                {/* Vocal FX Settings Toggle */}
+                <button
+                  onClick={() => setShowFXPanel(!showFXPanel)}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
+                    isFXActive
+                      ? 'bg-[var(--accent)] text-white shadow-[0_0_20px_var(--accent-dim)]'
+                      : 'bg-[var(--bg-card)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'
                   }`}
-                aria-label="Toggle live transcription"
-              >
-                <MessageSquare size={22} />
-              </button>
+                  aria-label="Vocal FX Settings"
+                >
+                  <Sliders size={22} />
+                </button>
+              </div>
 
               {/* Center: Record / Stop */}
               <div className="relative">
@@ -982,6 +1389,22 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 <X size={22} />
               </button>
             </div>
+
+            {/* Vocal FX Panel Overlay */}
+            <AnimatePresence>
+              {showFXPanel && (
+                <FXPanel
+                  onClose={() => setShowFXPanel(false)}
+                  settings={fxSettings}
+                  onUpdate={(key, value) => setFxSettings(prev => ({ ...prev, [key]: value }))}
+                  isRecordingMode={true}
+                  isFXActive={isFXActive}
+                  onFXActiveToggle={setIsFXActive}
+                  isMonitoringEnabled={isMonitoringEnabled}
+                  onMonitoringToggle={setIsMonitoringEnabled}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
