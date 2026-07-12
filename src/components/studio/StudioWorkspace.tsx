@@ -45,69 +45,30 @@ import {
     Sun,
     Moon,
     BookText,
-    Archive
+    Archive,
+    Sparkles
 } from 'lucide-react';
+import { MuseView } from './MuseView';
+import { processMuseSession } from '@/lib/muse/processMuseSession';
+import { MuseManifest } from '@/types';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChevronDown, CheckCircle2, Bookmark, Menu, ChevronLeft } from 'lucide-react';
 
-// --- Database Logic Inline (to avoid module resolution errors) ---
-const DB_NAME = 'StudioProDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'audio_assets';
+import {
+    saveAudioData,
+    getAudioData,
+    deleteAudioData,
+    saveMuseAudio,
+    getMuseAudio,
+    deleteMuseAudio,
+    getMuseManifests,
+    deleteMuseChunks,
+    deleteMuseManifest,
+    getMuseChunks
+} from '@/lib/idb/studioDB';
 
-const initDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-        if (typeof window === 'undefined') return;
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
-        };
-    });
-};
-
-const saveAudioData = async (id: string, data: string) => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.put(data, id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-};
-
-const getAudioData = async (id: string): Promise<string | undefined> => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-};
-
-const deleteAudioData = async (id: string) => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-};
-
-type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook';
+type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook' | 'muse';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -512,8 +473,10 @@ const StudioWorkspace: React.FC = () => {
 
     const displaySessions = useMemo(() =>
         sessions.filter(s =>
-            !s.projectId ||  // Show sessions without projectId (floating/old)
-            s.projectId === activeProjectId  // Show sessions for current project
+            s.kind !== 'muse' && (
+                !s.projectId ||  // Show sessions without projectId (floating/old)
+                s.projectId === activeProjectId  // Show sessions for current project
+            )
         ),
         [sessions, activeProjectId]
     );
@@ -568,6 +531,14 @@ const StudioWorkspace: React.FC = () => {
         pendingPlayRef.current = true;
         if (seekTime !== undefined) pendingSeekRef.current = seekTime;
         setActiveSessionId(id);
+    };
+
+    const handlePause = () => {
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        beatAudioCtxRef.current?.suspend();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
     };
 
     // Sync Vocal and Beat
@@ -1214,6 +1185,109 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    const triggerMuseAnalysis = async (sessionId: string, blob: Blob, mimeType: string, durationSec: number) => {
+        try {
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading' } : s));
+
+            const result = await processMuseSession({
+                sessionId,
+                blob,
+                mimeType,
+                durationSec,
+                onProgress: ({ stage }) => {
+                    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: stage } : s));
+                }
+            });
+
+            setSessions(prev => prev.map(s => s.id === sessionId ? {
+                ...s,
+                name: result.recap.title,
+                museSegments: result.segments,
+                museRecap: result.recap,
+                museStatus: 'complete'
+            } : s));
+            
+            toast.success("Recap generated successfully!");
+        } catch (error: any) {
+            console.error("Muse analysis failed:", error);
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
+            toast.error("AI recap generation failed. The audio is saved safely on your device.");
+        }
+    };
+
+    const handleSaveMuseSession = async (rec: { id: string; blob: Blob; duration: number; mimeType: string }): Promise<string> => {
+        const timestamp = new Date().toISOString();
+        
+        const newSession: RecordingSession = {
+            id: rec.id,
+            name: "Studio Session",
+            timestamp,
+            isLoopSession: false,
+            duration: rec.duration,
+            sections: [],
+            kind: 'muse',
+            museStatus: 'uploading',
+            mimeType: rec.mimeType
+        };
+
+        setSessions(prev => [newSession, ...prev]);
+
+        try {
+            await saveMuseAudio(rec.id, rec.blob);
+            await deleteMuseChunks(rec.id);
+            await deleteMuseManifest(rec.id);
+        } catch (e) {
+            console.error("Failed to save Muse audio locally", e);
+        }
+
+        triggerMuseAnalysis(rec.id, rec.blob, rec.mimeType, rec.duration);
+
+        return rec.id;
+    };
+
+    const handleRetryMuseAnalysis = async (sessionId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        
+        try {
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading' } : s));
+            const blob = await getMuseAudio(sessionId);
+            if (!blob) {
+                throw new Error("Local audio recording not found in database.");
+            }
+            await triggerMuseAnalysis(sessionId, blob, session.mimeType || 'audio/webm', session.duration || 0);
+        } catch (e: any) {
+            console.error("Retry failed:", e);
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
+            toast.error(e.message || "Failed to retry analysis.");
+        }
+    };
+
+    const handleRecoverMuseSession = async (manifest: MuseManifest) => {
+        try {
+            const chunks = await getMuseChunks(manifest.id);
+            if (chunks.length === 0) {
+                throw new Error("No audio chunks found for recovery.");
+            }
+            const finalBlob = new Blob(chunks, { type: manifest.mimeType });
+            const duration = manifest.chunkCount * 20;
+
+            const rec = {
+                id: manifest.id,
+                blob: finalBlob,
+                duration,
+                mimeType: manifest.mimeType
+            };
+
+            await handleSaveMuseSession(rec);
+            toast.success("Orphaned session recovered and saved!");
+        } catch (e: any) {
+            console.error("Recovery failed:", e);
+            toast.error(e.message || "Session recovery failed.");
+            throw e;
+        }
+    };
+
     const handleDeleteSession = async (sessionId: string) => {
         if (!confirm("Permanently delete this recording?")) return;
 
@@ -1228,7 +1302,12 @@ const StudioWorkspace: React.FC = () => {
 
         // Delete from DB
         try {
-            await deleteAudioData(sessionId);
+            const session = sessions.find(s => s.id === sessionId);
+            if (session?.kind === 'muse') {
+                await deleteMuseAudio(sessionId);
+            } else {
+                await deleteAudioData(sessionId);
+            }
         } catch (e) {
             console.error("Failed to delete audio data", e);
         }
@@ -2193,7 +2272,7 @@ const StudioWorkspace: React.FC = () => {
             case 'vault':
                 return (
                     <VaultView
-                        sessions={sessions}
+                        sessions={sessions.filter(s => s.kind !== 'muse')}
                         scraps={scraps}
                         beats={beats}
                         projectTitle={projectTitle}
@@ -2211,7 +2290,7 @@ const StudioWorkspace: React.FC = () => {
                 return (
                     <NotesView
                         notes={notes}
-                        sessions={sessions}
+                        sessions={sessions.filter(s => s.kind !== 'muse')}
                         beats={beats}
                         onNotesChange={setNotes}
                         projectTitle={projectTitle}
@@ -2574,7 +2653,7 @@ const StudioWorkspace: React.FC = () => {
                                                 session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                                 onOpenFX={() => setShowFXPanel(true)}
                                                 onDismiss={() => setShowPlayerSheet(false)}
-                                                sessions={sessions}
+                                                sessions={sessions.filter(s => s.kind !== 'muse')}
                                                 beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                                 beatSrc={uploadedBeat}
                                                 beatVolume={beatVolume}
@@ -2619,6 +2698,21 @@ const StudioWorkspace: React.FC = () => {
 
                         {/* Floating record button removed — use FLOW tab to record */}
                     </div>
+                );
+            case 'muse':
+                return (
+                    <MuseView
+                        sessions={sessions}
+                        activeSessionId={activeSessionId}
+                        isPlaying={isPlaying}
+                        currentTime={currentTime}
+                        onPlaySession={handleSelectSessionAndPlay}
+                        onPauseSession={handlePause}
+                        onDeleteSession={handleDeleteSession}
+                        onSaveMuseSession={handleSaveMuseSession}
+                        onRetryAnalysis={handleRetryMuseAnalysis}
+                        onRecoverSession={handleRecoverMuseSession}
+                    />
                 );
             default: return null;
         }
@@ -2739,6 +2833,7 @@ const StudioWorkspace: React.FC = () => {
                                         { id: 'home', label: 'Library', icon: Library },
                                         { id: 'vault', label: 'Vault', icon: Archive },
                                         { id: 'notebook', label: 'Notebook', icon: BookText },
+                                        { id: 'muse', label: 'Muse', icon: Sparkles }
                                     ].map((item) => {
                                         const Icon = item.icon;
                                         const isActive = viewMode === item.id;
