@@ -178,8 +178,8 @@ export const LyricCard: React.FC<LyricCardProps> = ({
 
   return (
     <div className={cn(
-      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-4 py-3 rounded-xl border transition-all duration-300 border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]",
-      isFocused && "bg-[var(--bg-secondary)] border-[var(--shark-blue-dim)] shadow-md"
+      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]",
+      isFocused && "bg-[var(--bg-secondary)]"
     )}>
       <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
@@ -225,12 +225,11 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       <div className="space-y-1.5 relative transition-all">
         {lines.map((lineText, idx) => (
           <div key={`${section.id}-row-${idx}`} className="flex items-start w-full gap-1">
-            <div className={cn(
-              "w-6 text-right pr-1.5 text-xs font-mono text-[var(--text-tertiary)] pt-1.5 select-none tabular-nums flex-shrink-0 transition-opacity duration-200",
-              showSyllables ? "opacity-60" : "opacity-0 pointer-events-none"
-            )}>
-              {countSyllables(lineText) || '\u00A0'}
-            </div>
+            {showSyllables && (
+              <div className="w-6 text-right pr-1.5 text-xs font-mono text-[var(--text-tertiary)] opacity-60 pt-1.5 select-none tabular-nums flex-shrink-0 animate-in fade-in duration-200">
+                {countSyllables(lineText) || '\u00A0'}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <AutoResizeRowTextarea
                 id={`input-${section.id}-${idx}`}

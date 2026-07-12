@@ -171,3 +171,20 @@ CREATE POLICY "Users manage own audio" ON storage.objects
   FOR ALL USING (
     bucket_id = 'audio' AND auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- Create muse-uploads bucket (Muse session audio recordings)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'muse-uploads',
+  'muse-uploads',
+  false,
+  52428800, -- 50MB per file
+  ARRAY['audio/webm', 'audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac']
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS: users can only access their own muse audio uploads
+CREATE POLICY "Users manage own muse uploads" ON storage.objects
+  FOR ALL USING (
+    bucket_id = 'muse-uploads' AND auth.uid()::text = (storage.foldername(name))[1]
+  );

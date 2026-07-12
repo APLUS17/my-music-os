@@ -22,9 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (error) {
+        console.warn('Anonymous sign-in failed (enable it in Supabase Auth settings):', error.message);
+        setLoading(false);
+        return;
+      }
+      setSession(data.session);
+      setUser(data.user);
       setLoading(false);
     });
 

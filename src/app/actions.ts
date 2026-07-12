@@ -242,7 +242,7 @@ Return the results ONLY as a JSON array of objects with this structure:
 [{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
 
         const result = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-flash-latest',
             contents: [
                 { text: prompt },
                 {
@@ -433,7 +433,7 @@ ${sessionsStr}
         const prompt = `Context:\n${contextString}\n\nUser: ${userPrompt}`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-flash-latest',
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,

@@ -740,7 +740,7 @@ const StudioWorkspace: React.FC = () => {
         localStorage.setItem('lyriq-tour-completed', 'true');
         setShowTour(false);
         setViewMode('studio');
-        setSections([]); // Blank canvas for new users
+        setSections(createDefaultSections()); // Blank canvas for new users
         setProjectTitle('');
         setStudioMode('flow');
     };
@@ -1519,7 +1519,7 @@ const StudioWorkspace: React.FC = () => {
             archiveCurrentProject();
             
             // Reset workspace
-            setSections([]); // Empty for Flow mode
+            setSections(createDefaultSections()); // Start with an empty section ready to write in
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
@@ -1598,7 +1598,7 @@ const StudioWorkspace: React.FC = () => {
 
         setPlayingBeatId(null);
         archiveCurrentProject();
-        setSections([]); // Blank canvas for Flow mode
+        setSections(createDefaultSections()); // Start with an empty section ready to write in
         setScraps([]);
         setSessions([]);
         setActiveSessionId(null);
@@ -1759,6 +1759,10 @@ const StudioWorkspace: React.FC = () => {
 
     const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
 
+    const createDefaultSections = (): LyricSection[] => [
+        { id: randomId(), type: 'verse', repeats: 1, text: "" }
+    ];
+
     const addSection = () => {
         setSections(prev => [...prev, {
             id: randomId(),
@@ -1813,6 +1817,24 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             </section>
 
+                            <section className="pt-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Editor</h2>
+                                <button
+                                    onClick={() => setShowSyllables(!showSyllables)}
+                                    className="w-full p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
+                                >
+                                    <div className="text-left">
+                                        <h3 className="text-sm font-medium text-[var(--text-main)]">Syllable Count</h3>
+                                        <p className="text-xs text-[var(--text-tertiary)] max-w-[220px]">Show a per-line syllable count next to your lyrics in Write mode.</p>
+                                    </div>
+                                    <div className={cn(
+                                        "w-10 h-6 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0",
+                                        showSyllables ? "bg-[var(--accent)] justify-end" : "bg-[var(--bg-secondary)] justify-start"
+                                    )}>
+                                        <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                                    </div>
+                                </button>
+                            </section>
                             <section className="pt-4">
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Audio Engineering</h2>
                                 <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] space-y-4">
@@ -2471,27 +2493,13 @@ const StudioWorkspace: React.FC = () => {
                                     Flow
                                 </button>
                             </div>
-
-                            {/* Syllable toggle — right side */}
-                            <button
-                                onClick={() => setShowSyllables(!showSyllables)}
-                                className={cn(
-                                    "absolute right-4 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all hover:brightness-110 active:scale-95 cursor-pointer",
-                                    showSyllables
-                                        ? "text-[var(--accent)] font-bold"
-                                        : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                )}
-                                title="Toggle Syllables Editor"
-                            >
-                                T
-                            </button>
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
-                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
-                                    <div className="max-w-2xl mx-auto space-y-12">
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                    <div className="max-w-3xl mx-auto space-y-12">
                                         <>
                                             <AnimatePresence mode="wait">
                                                      {sections.length === 0 && showTour ? (
