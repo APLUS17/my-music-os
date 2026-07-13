@@ -34,11 +34,12 @@ export interface AutoSection {
     startTime: number;
     endTime: number;
     loopPass?: number;           // 1, 2, 3 for loop takes
-    type: 'vocal' | 'instrumental' | 'speech' | 'silence';
+    type: 'vocal' | 'instrumental' | 'speech' | 'silence' | 'melody' | 'freestyle';
     label?: string;
     transcription?: string;
     summary?: string;
     emojiTag?: string;
+    emoji?: string; // Standardize on emoji
     isBest: boolean;
     isFavorited: boolean;
     sentToLyricsId?: string;     // links to a LyricSection if committed
