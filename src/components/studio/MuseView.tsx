@@ -202,7 +202,7 @@ export function MuseView({
         if (total === 0) return null;
 
         return (
-            <div className="h-2 w-full rounded-full overflow-hidden flex bg-white/[0.04] mt-3">
+            <div className="h-2 w-full rounded-full overflow-hidden flex bg-[var(--bg-hover)] mt-3">
                 {Object.entries(stats).map(([k, val]) => {
                     const type = k as MuseSegmentType;
                     const duration = val || 0;
@@ -243,7 +243,7 @@ export function MuseView({
                             cx="96"
                             cy="96"
                             r="80"
-                            className="stroke-white/[0.03] fill-none"
+                            className="stroke-[var(--border-subtle)] fill-none"
                             strokeWidth="6"
                         />
                         <motion.circle
@@ -260,14 +260,14 @@ export function MuseView({
 
                     <div className="z-10 flex flex-col items-center">
                         <Mic className="w-10 h-10 text-red-500 mb-2 animate-pulse" />
-                        <span className="font-mono text-3xl font-bold tracking-wider text-white">
+                        <span className="font-mono text-3xl font-bold tracking-wider text-[var(--text-main)]">
                             {formatTime(recorder.elapsedSec)}
                         </span>
                     </div>
                 </div>
 
-                <h2 className="text-xl font-bold text-white mb-2">Studio Session Active</h2>
-                <p className="text-white/60 text-sm max-w-sm mb-6">
+                <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Studio Session Active</h2>
+                <p className="text-[var(--text-secondary)] text-sm max-w-sm mb-6">
                     Muse is recording everything. Freestyles, ideas, playbacks, and dialogue will be automatically split.
                 </p>
 
@@ -282,7 +282,7 @@ export function MuseView({
                     <button
                         onClick={recorder.discard}
                         disabled={recorder.status === 'stopping'}
-                        className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl text-white/50 hover:text-white/80 hover:bg-white/[0.03] transition-all"
+                        className="flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] transition-all"
                     >
                         <Trash2 className="w-5 h-5" />
                         <span className="text-xs">Discard</span>
@@ -291,7 +291,7 @@ export function MuseView({
                     <button
                         onClick={handleStopRecording}
                         disabled={recorder.status === 'stopping'}
-                        className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 active:scale-95 transition-all text-white"
+                        className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 active:scale-95 transition-all text-[var(--text-main)]"
                     >
                         {recorder.status === 'stopping' ? (
                             <Loader2 className="w-6 h-6 animate-spin" />
@@ -313,7 +313,7 @@ export function MuseView({
             <div className="flex flex-col justify-center items-center min-h-[70vh] p-6 text-center max-w-md mx-auto">
                 <button
                     onClick={() => setSelectedSessionId(null)}
-                    className="self-start flex items-center gap-2 text-white/60 hover:text-white mb-12 text-sm transition-all"
+                    className="self-start flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-main)] mb-12 text-sm transition-all"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to list</span>
@@ -332,34 +332,34 @@ export function MuseView({
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                                    className="absolute inset-0 border-t-2 border-r-2 border-t-[#7fff00] border-r-purple-500 rounded-full"
+                                    className="absolute inset-0 border-t-2 border-r-2 border-t-[var(--accent)] border-r-purple-500 rounded-full"
                                 />
-                                <Sparkles className="w-8 h-8 text-[#7fff00] animate-pulse" />
+                                <Sparkles className="w-8 h-8 text-[var(--accent)] animate-pulse" />
                             </div>
 
-                            <h3 className="text-xl font-bold text-white mb-3">Processing Session</h3>
-                            <p className="text-white/60 text-sm mb-6">
+                            <h3 className="text-xl font-bold text-[var(--text-main)] mb-3">Processing Session</h3>
+                            <p className="text-[var(--text-secondary)] text-sm mb-6">
                                 {status === 'uploading'
                                     ? 'Uploading audio to studio cloud (this is fast)...'
                                     : 'Analyzing your session with Gemini AI (takes 1-3 minutes for long files)...'}
                             </p>
 
-                            <div className="flex flex-col items-start gap-3 w-64 bg-white/[0.02] border border-white/[0.04] p-4 rounded-2xl text-left text-xs text-white/50">
-                                <div className="flex items-center gap-2 text-white">
-                                    <span className="text-[#7fff00]">✓</span>
+                            <div className="flex flex-col items-start gap-3 w-64 bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 rounded-2xl text-left text-xs text-[var(--text-secondary)]">
+                                <div className="flex items-center gap-2 text-[var(--text-main)]">
+                                    <span className="text-[var(--accent)]">✓</span>
                                     <span>Saved safely on device</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className={status === 'uploading' ? 'text-[#7fff00] animate-pulse' : 'text-[#7fff00]'}>
+                                    <span className={status === 'uploading' ? 'text-[var(--accent)] animate-pulse' : 'text-[var(--accent)]'}>
                                         {status === 'uploading' ? '●' : '✓'}
                                     </span>
-                                    <span className={status === 'uploading' ? 'text-white' : ''}>Upload to analyzer</span>
+                                    <span className={status === 'uploading' ? 'text-[var(--text-main)]' : ''}>Upload to analyzer</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className={status === 'analyzing' ? 'text-[#7fff00] animate-pulse' : ''}>
+                                    <span className={status === 'analyzing' ? 'text-[var(--accent)] animate-pulse' : ''}>
                                         {status === 'analyzing' ? '●' : '○'}
                                     </span>
-                                    <span className={status === 'analyzing' ? 'text-white' : ''}>Segment and recap timeline</span>
+                                    <span className={status === 'analyzing' ? 'text-[var(--text-main)]' : ''}>Segment and recap timeline</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -368,25 +368,25 @@ export function MuseView({
                             key="failed"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="flex flex-col items-center bg-white/[0.02] border border-red-500/10 p-6 rounded-3xl"
+                            className="flex flex-col items-center bg-[var(--bg-card)] border border-red-500/10 p-6 rounded-3xl"
                         >
                             <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-                            <h3 className="text-lg font-bold text-white mb-2">Recap Failed to Generate</h3>
-                            <p className="text-white/60 text-sm mb-6 max-w-xs">
+                            <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Recap Failed to Generate</h3>
+                            <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-xs">
                                 The AI analysis route failed or timed out. But don&apos;t worry — your session audio is safe locally.
                             </p>
 
                             <div className="flex flex-col gap-3 w-full">
                                 <button
                                     onClick={() => onRetryAnalysis(selectedSession.id)}
-                                    className="w-full bg-[#7fff00] text-black font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-[#8eff24] active:scale-[0.98] transition-all"
+                                    className="w-full bg-[var(--accent)] text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
                                 >
                                     <RefreshCw className="w-4 h-4" />
                                     <span>Retry AI Analysis</span>
                                 </button>
                                 <button
                                     onClick={() => setSelectedSessionId(null)}
-                                    className="w-full bg-white/[0.04] text-white py-3 px-4 rounded-xl hover:bg-white/[0.08] transition-all"
+                                    className="w-full bg-[var(--bg-hover)] text-[var(--text-main)] py-3 px-4 rounded-xl hover:bg-[var(--bg-elevated)] transition-all"
                                 >
                                     Close
                                 </button>
@@ -405,29 +405,31 @@ export function MuseView({
         const isCurrentlyPlayingThis = activeSessionId === selectedSession.id;
 
         return (
+            <div className="h-full flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto">
             <div className="flex flex-col gap-6 max-w-4xl mx-auto p-4 pb-28">
                 {/* Header Back Button */}
                 <button
                     onClick={() => setSelectedSessionId(null)}
-                    className="self-start flex items-center gap-2 text-white/60 hover:text-white transition-all text-sm mb-2"
+                    className="self-start flex items-center gap-2 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all text-sm mb-2"
                 >
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Sessions</span>
                 </button>
 
                 {/* Recap Hero details */}
-                <div className="bg-white/[0.02] border border-white/[0.05] rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-[#7fff00]/5 blur-[80px] rounded-full pointer-events-none" />
+                <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-3xl p-6 backdrop-blur-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/5 blur-[80px] rounded-full pointer-events-none" />
                     
                     <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
                         <div>
                             <span className="text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full uppercase">
                                 Muse AI Recap
                             </span>
-                            <h2 className="text-2xl font-bold text-white mt-2">
+                            <h2 className="text-2xl font-bold text-[var(--text-main)] mt-2">
                                 {recap?.title || selectedSession.name || 'Studio Session'}
                             </h2>
-                            <div className="flex items-center gap-4 text-white/50 text-xs mt-1">
+                            <div className="flex items-center gap-4 text-[var(--text-secondary)] text-xs mt-1">
                                 <span className="flex items-center gap-1">
                                     <Calendar className="w-3.5 h-3.5" />
                                     {formatDate(selectedSession.timestamp)}
@@ -448,7 +450,7 @@ export function MuseView({
                                     onPlaySession(selectedSession.id, 0);
                                 }
                             }}
-                            className="bg-[#7fff00] text-black w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+                            className="bg-[var(--accent)] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
                         >
                             {isCurrentlyPlayingThis && isPlaying ? (
                                 <Pause className="w-5 h-5 fill-current" />
@@ -459,8 +461,8 @@ export function MuseView({
                     </div>
 
                     {/* Proportional Duration Bar */}
-                    <div className="mt-6 pt-4 border-t border-white/[0.04]">
-                        <h4 className="text-xs font-bold text-white/40 mb-2 uppercase tracking-wide">Timeline breakdown</h4>
+                    <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
+                        <h4 className="text-xs font-bold text-[var(--text-tertiary)] mb-2 uppercase tracking-wide">Timeline breakdown</h4>
                         {renderProportionalBar(selectedSession)}
                         
                         {/* Legend */}
@@ -470,7 +472,7 @@ export function MuseView({
                                 const dur = val || 0;
                                 if (dur === 0) return null;
                                 return (
-                                    <div key={type} className="flex items-center gap-1.5 text-xs text-white/60">
+                                    <div key={type} className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                                         <span
                                             className="w-2.5 h-2.5 rounded-full"
                                             style={{ backgroundColor: MUSE_TYPE_META[type].color }}
@@ -484,8 +486,8 @@ export function MuseView({
 
                     {/* AI Executive Summary */}
                     {recap?.summary && (
-                        <div className="bg-white/[0.01] border border-white/[0.03] rounded-2xl p-4 mt-6">
-                            <p className="text-white/80 text-sm leading-relaxed italic">
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4 mt-6">
+                            <p className="text-[var(--text-secondary)] text-sm leading-relaxed italic">
                                 &ldquo;{recap.summary}&rdquo;
                             </p>
                         </div>
@@ -495,7 +497,7 @@ export function MuseView({
                 {/* Highlights Section */}
                 {recap?.highlights && recap.highlights.length > 0 && (
                     <div className="flex flex-col gap-3">
-                        <h3 className="text-sm font-bold text-white/40 uppercase tracking-wide flex items-center gap-1.5 px-1">
+                        <h3 className="text-sm font-bold text-[var(--text-tertiary)] uppercase tracking-wide flex items-center gap-1.5 px-1">
                             <Sparkles className="w-4 h-4 text-purple-400" />
                             <span>Highlights & Sparks</span>
                         </h3>
@@ -503,18 +505,18 @@ export function MuseView({
                             {recap.highlights.map((hl, idx) => {
                                 // Find matching segment for details
                                 const matchedSeg = segments.find(s => s.id === hl.segmentId);
-                                const color = matchedSeg ? MUSE_TYPE_META[matchedSeg.type]?.color : '#7fff00';
+                                const color = matchedSeg ? MUSE_TYPE_META[matchedSeg.type]?.color : 'var(--accent)';
                                 const emoji = matchedSeg ? MUSE_TYPE_META[matchedSeg.type]?.emoji : '✨';
                                 
                                 return (
                                     <button
                                         key={idx}
                                         onClick={() => onPlaySession(selectedSession.id, hl.startTime)}
-                                        className="bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.05] hover:border-white/[0.1] rounded-2xl p-4 text-left transition-all group flex items-start gap-3.5"
+                                        className="bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border-main)] hover:border-[var(--border-strong)] rounded-2xl p-4 text-left transition-all group flex items-start gap-3.5"
                                     >
                                         <div
                                             className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-lg"
-                                            style={{ backgroundColor: matchedSeg ? MUSE_TYPE_META[matchedSeg.type]?.bg : 'rgba(255,255,255,0.05)' }}
+                                            style={{ backgroundColor: matchedSeg ? MUSE_TYPE_META[matchedSeg.type]?.bg : 'var(--bg-hover)' }}
                                         >
                                             {emoji}
                                         </div>
@@ -526,9 +528,9 @@ export function MuseView({
                                                 >
                                                     {formatTime(hl.startTime)}
                                                 </span>
-                                                <span className="text-[10px] text-white/30 uppercase tracking-wide">Jump</span>
+                                                <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wide">Jump</span>
                                             </div>
-                                            <p className="text-white/80 text-xs font-medium mt-1 leading-snug">
+                                            <p className="text-[var(--text-secondary)] text-xs font-medium mt-1 leading-snug">
                                                 {hl.reason}
                                             </p>
                                         </div>
@@ -541,16 +543,16 @@ export function MuseView({
 
                 {/* Timeline Section */}
                 <div className="flex flex-col gap-4 mt-2">
-                    <h3 className="text-sm font-bold text-white/40 uppercase tracking-wide px-1">
+                    <h3 className="text-sm font-bold text-[var(--text-tertiary)] uppercase tracking-wide px-1">
                         Session Timeline
                     </h3>
 
                     {segments.length === 0 ? (
-                        <div className="text-center py-12 text-white/40 text-sm">
+                        <div className="text-center py-12 text-[var(--text-tertiary)] text-sm">
                             No segments mapped.
                         </div>
                     ) : (
-                        <div className="relative pl-6 border-l border-white/10 flex flex-col gap-6">
+                        <div className="relative pl-6 border-l border-[var(--border-main)] flex flex-col gap-6">
                             {segments.map((seg, idx) => {
                                 const meta = MUSE_TYPE_META[seg.type] || MUSE_TYPE_META.downtime;
                                 const isActive = isCurrentlyPlayingThis && activeSegmentIdx === idx;
@@ -562,9 +564,9 @@ export function MuseView({
                                     >
                                         {/* Dot on the rail */}
                                         <div
-                                            className="absolute -left-[31px] top-4 w-4 h-4 rounded-full border-2 border-black flex items-center justify-center transition-all"
+                                            className="absolute -left-[31px] top-4 w-4 h-4 rounded-full border-2 border-[var(--bg-main)] flex items-center justify-center transition-all"
                                             style={{
-                                                backgroundColor: isActive ? meta.color : 'rgba(255,255,255,0.1)',
+                                                backgroundColor: isActive ? meta.color : 'var(--border-strong)',
                                                 boxShadow: isActive ? `0 0 10px ${meta.color}` : 'none'
                                             }}
                                         />
@@ -574,8 +576,8 @@ export function MuseView({
                                             onClick={() => onPlaySession(selectedSession.id, seg.startTime)}
                                             className={`w-full text-left rounded-3xl p-5 border backdrop-blur-xl transition-all flex flex-col md:flex-row md:items-start gap-4 ${
                                                 isActive
-                                                    ? 'bg-white/[0.04] border-white/20 shadow-md shadow-black/20'
-                                                    : 'bg-white/[0.01] hover:bg-white/[0.03] border-white/[0.04] hover:border-white/[0.08]'
+                                                    ? 'bg-[var(--bg-hover)] border-[var(--border-strong)] shadow-md shadow-black/20'
+                                                    : 'bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border-[var(--border-subtle)] hover:border-[var(--border-main)]'
                                             }`}
                                         >
                                             {/* Left Icon circle */}
@@ -599,22 +601,22 @@ export function MuseView({
                                                         >
                                                             {meta.name}
                                                         </span>
-                                                        <h4 className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-sm">
+                                                        <h4 className="text-sm font-bold text-[var(--text-main)] truncate max-w-[200px] md:max-w-sm">
                                                             {seg.label}
                                                         </h4>
                                                     </div>
-                                                    <span className="font-mono text-xs text-white/40">
+                                                    <span className="font-mono text-xs text-[var(--text-tertiary)]">
                                                         {formatTime(seg.startTime)} – {formatTime(seg.endTime)}
                                                     </span>
                                                 </div>
 
-                                                <p className="text-white/60 text-xs mt-2 leading-relaxed">
+                                                <p className="text-[var(--text-secondary)] text-xs mt-2 leading-relaxed">
                                                     {seg.summary}
                                                 </p>
 
                                                 {seg.quote && (
-                                                    <div className="border-l-2 border-white/10 pl-3 mt-3">
-                                                        <p className="text-white/40 text-xs italic">
+                                                    <div className="border-l-2 border-[var(--border-main)] pl-3 mt-3">
+                                                        <p className="text-[var(--text-tertiary)] text-xs italic">
                                                             &ldquo;{seg.quote}&rdquo;
                                                         </p>
                                                     </div>
@@ -628,21 +630,25 @@ export function MuseView({
                     )}
                 </div>
             </div>
+            </div>
+            </div>
         );
     }
 
     // 4. IDLE / LIST STATE
     return (
+        <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-4 flex flex-col gap-6">
-            
+
             {/* Header */}
-            <div className="flex flex-wrap justify-between items-center gap-4 bg-white/[0.01] border border-white/[0.03] p-6 rounded-3xl backdrop-blur-xl">
+            <div className="flex flex-wrap justify-between items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] p-6 rounded-3xl backdrop-blur-xl">
                 <div>
-                    <h2 className="text-2xl font-extrabold text-white flex items-center gap-2">
-                        <Sparkles className="w-6 h-6 text-[#7fff00] animate-pulse" />
+                    <h2 className="text-2xl font-extrabold text-[var(--text-main)] flex items-center gap-2">
+                        <Sparkles className="w-6 h-6 text-[var(--accent)] animate-pulse" />
                         <span>Muse Logger</span>
                     </h2>
-                    <p className="text-white/50 text-xs mt-1 max-w-sm leading-relaxed">
+                    <p className="text-[var(--text-secondary)] text-xs mt-1 max-w-sm leading-relaxed">
                         Automatic, always-on songwriting capture. AI maps taking, practicing, conversations, and highlights.
                     </p>
                 </div>
@@ -650,9 +656,9 @@ export function MuseView({
                 {/* Record Button */}
                 <button
                     onClick={handleStartRecording}
-                    className="relative group overflow-hidden bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 font-semibold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 shadow-lg shadow-red-500/10 hover:shadow-red-500/20 transition-all"
+                    className="relative group overflow-hidden bg-gradient-to-r from-red-500 to-pink-500 text-[var(--text-main)] hover:from-red-600 hover:to-pink-600 font-semibold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 shadow-lg shadow-red-500/10 hover:shadow-red-500/20 transition-all"
                 >
-                    <Mic className="w-5 h-5 text-white/95" />
+                    <Mic className="w-5 h-5 text-[var(--text-main)]" />
                     <span>Record Session</span>
                 </button>
             </div>
@@ -666,8 +672,8 @@ export function MuseView({
                     <div className="flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         <div>
-                            <h4 className="text-sm font-bold text-white">Unfinished Session Detected</h4>
-                            <p className="text-xs text-white/50">
+                            <h4 className="text-sm font-bold text-[var(--text-main)]">Unfinished Session Detected</h4>
+                            <p className="text-xs text-[var(--text-secondary)]">
                                 Session crashed or browser closed from {formatDate(manifest.startedAt)}.
                             </p>
                         </div>
@@ -683,7 +689,7 @@ export function MuseView({
                         <button
                             onClick={() => handleDiscardRecovery(manifest.id)}
                             disabled={isRecovering === manifest.id}
-                            className="text-white/40 hover:text-white/60 p-2 rounded-xl hover:bg-white/[0.04] transition-all"
+                            className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] p-2 rounded-xl hover:bg-[var(--bg-hover)] transition-all"
                         >
                             <Trash2 className="w-4 h-4" />
                         </button>
@@ -693,15 +699,15 @@ export function MuseView({
 
             {/* Past Sessions List */}
             <div className="flex flex-col gap-6 mt-2">
-                <h3 className="text-sm font-bold text-white/40 uppercase tracking-wide px-1">
+                <h3 className="text-sm font-bold text-[var(--text-tertiary)] uppercase tracking-wide px-1">
                     Recorded Sessions
                 </h3>
 
                 {museSessions.length === 0 ? (
-                    <div className="text-center py-20 bg-white/[0.01] border border-dashed border-white/[0.05] rounded-3xl flex flex-col items-center justify-center">
-                        <FileAudio className="w-12 h-12 text-white/10 mb-3" />
-                        <h4 className="text-white/70 font-semibold text-sm">No studio sessions yet</h4>
-                        <p className="text-white/40 text-xs mt-1 max-w-xs">
+                    <div className="text-center py-20 bg-[var(--bg-card)] border border-dashed border-[var(--border-main)] rounded-3xl flex flex-col items-center justify-center">
+                        <FileAudio className="w-12 h-12 text-[var(--text-tertiary)] mb-3" />
+                        <h4 className="text-[var(--text-secondary)] font-semibold text-sm">No studio sessions yet</h4>
+                        <p className="text-[var(--text-tertiary)] text-xs mt-1 max-w-xs">
                             Tap &quot;Record Session&quot; to begin your first always-on logging stream.
                         </p>
                     </div>
@@ -709,7 +715,7 @@ export function MuseView({
                     <div className="flex flex-col gap-6">
                         {groupedSessions.map((group) => (
                             <div key={group.label} className="flex flex-col gap-3">
-                                <h4 className="text-xs font-semibold text-white/30 px-1">{group.label}</h4>
+                                <h4 className="text-xs font-semibold text-[var(--text-tertiary)] px-1">{group.label}</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {group.sessions.map((session) => {
                                         const dateLabel = formatDate(session.timestamp);
@@ -718,7 +724,7 @@ export function MuseView({
                                         return (
                                             <div
                                                 key={session.id}
-                                                className="group relative bg-white/[0.01] hover:bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] rounded-3xl p-5 backdrop-blur-xl transition-all flex flex-col justify-between"
+                                                className="group relative bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] hover:border-[var(--border-main)] rounded-3xl p-5 backdrop-blur-xl transition-all flex flex-col justify-between"
                                             >
                                                 {/* Card click link wrapper */}
                                                 <button
@@ -728,11 +734,11 @@ export function MuseView({
                                                 
                                                 <div className="z-10 relative flex justify-between items-start gap-4">
                                                     <div className="min-w-0">
-                                                        <h4 className="text-sm font-bold text-white group-hover:text-[#7fff00] transition-colors truncate">
+                                                        <h4 className="text-sm font-bold text-[var(--text-main)] group-hover:text-[var(--accent)] transition-colors truncate">
                                                             {session.name || 'Studio Session'}
                                                         </h4>
                                                         
-                                                        <div className="flex items-center gap-3 text-white/40 text-[11px] font-medium mt-1">
+                                                        <div className="flex items-center gap-3 text-[var(--text-tertiary)] text-[11px] font-medium mt-1">
                                                             <span className="flex items-center gap-1">
                                                                 <Clock className="w-3.5 h-3.5" />
                                                                 {formatTime(session.duration || 0)}
@@ -750,7 +756,7 @@ export function MuseView({
                                                                 onDeleteSession(session.id);
                                                             }
                                                         }}
-                                                        className="z-20 text-white/30 hover:text-red-400 p-2 rounded-xl hover:bg-white/[0.03] transition-all opacity-0 group-hover:opacity-100"
+                                                        className="z-20 text-[var(--text-tertiary)] hover:text-red-400 p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
@@ -765,7 +771,7 @@ export function MuseView({
                                                                     e.stopPropagation();
                                                                     onRetryAnalysis(session.id);
                                                                 }}
-                                                                className="z-20 text-[#7fff00] hover:text-white text-xs font-bold transition-all"
+                                                                className="z-20 text-[var(--accent)] hover:text-[var(--text-main)] text-xs font-bold transition-all"
                                                             >
                                                                 Retry
                                                             </button>
@@ -783,6 +789,8 @@ export function MuseView({
                     </div>
                 )}
             </div>
+        </div>
+        </div>
         </div>
     );
 }

@@ -521,6 +521,19 @@ const StudioWorkspace: React.FC = () => {
 
     // Select a session and start playing once it loads (used by play buttons)
     const handleSelectSessionAndPlay = (id: string, seekTime?: number) => {
+        // If this session's audio is already loaded and active, seek+play directly.
+        // setActiveSessionId(id) below is a no-op when id === activeSessionId (same
+        // state value, no re-render), so the <audio> element's src never changes and
+        // onLoadedMetadata never re-fires — meaning the pending-seek/play refs further
+        // down would never get consumed. Jumping to a new timestamp within the same
+        // already-playing session (e.g. clicking a different highlight/segment) needs
+        // this fast path instead.
+        if (id === activeSessionId && vocalAudioRef.current && vocalAudioRef.current.readyState >= 1) {
+            if (seekTime !== undefined) seekTo(seekTime);
+            togglePlayback(true);
+            return;
+        }
+
         if (isPlaying) {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
@@ -835,6 +848,15 @@ const StudioWorkspace: React.FC = () => {
                     if (parsed.sessions) {
                         const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
                             try {
+                                // Muse recordings live in a separate IDB store (muse_audio) from
+                                // regular takes (audio_assets) — hydrate from the right one.
+                                if (t.kind === 'muse') {
+                                    const blob = await getMuseAudio(t.id);
+                                    if (!blob) return t;
+                                    const url = URL.createObjectURL(blob);
+                                    createdUrls.push(url);
+                                    return { ...t, audioUrl: url };
+                                }
                                 const b64 = await getAudioData(t.id);
                                 if (!b64) return t;
                                 const blob = await base64ToBlob(b64);
@@ -1217,7 +1239,12 @@ const StudioWorkspace: React.FC = () => {
 
     const handleSaveMuseSession = async (rec: { id: string; blob: Blob; duration: number; mimeType: string }): Promise<string> => {
         const timestamp = new Date().toISOString();
-        
+
+        // Muse audio lives in a separate IDB store (muse_audio, see studioDB.ts) from
+        // regular takes (audio_assets) — populate audioUrl directly from the recorded
+        // blob so playback works immediately without waiting on a reload/hydration pass.
+        const audioUrl = URL.createObjectURL(rec.blob);
+
         const newSession: RecordingSession = {
             id: rec.id,
             name: "Studio Session",
@@ -1227,7 +1254,8 @@ const StudioWorkspace: React.FC = () => {
             sections: [],
             kind: 'muse',
             museStatus: 'uploading',
-            mimeType: rec.mimeType
+            mimeType: rec.mimeType,
+            audioUrl
         };
 
         setSessions(prev => [newSession, ...prev]);
