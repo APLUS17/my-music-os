@@ -266,15 +266,15 @@ export function MuseView({
                     </div>
                 </div>
 
-                <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Studio Session Active</h2>
+                <h2 className="text-xl font-bold text-[var(--text-main)] mb-2">Recording</h2>
                 <p className="text-[var(--text-secondary)] text-sm max-w-sm mb-6">
-                    Muse is recording everything. Freestyles, ideas, playbacks, and dialogue will be automatically split.
+                    Everything gets auto-split into takes, ideas, and freestyles.
                 </p>
 
                 {recorder.wakeLockActive && (
                     <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/20 rounded-full px-4 py-2 mb-8 text-yellow-500 text-xs">
                         <AlertTriangle className="w-4 h-4" />
-                        <span>Keep screen on — recording pauses if the phone locks.</span>
+                        <span>Keep screen on, or recording pauses.</span>
                     </div>
                 )}
 
@@ -340,8 +340,8 @@ export function MuseView({
                             <h3 className="text-xl font-bold text-[var(--text-main)] mb-3">Processing Session</h3>
                             <p className="text-[var(--text-secondary)] text-sm mb-6">
                                 {status === 'uploading'
-                                    ? 'Uploading audio to studio cloud (this is fast)...'
-                                    : 'Analyzing your session with Gemini AI (takes 1-3 minutes for long files)...'}
+                                    ? 'Uploading audio…'
+                                    : 'AI is mapping your session…'}
                             </p>
 
                             <div className="flex flex-col items-start gap-3 w-64 bg-[var(--bg-card)] border border-[var(--border-subtle)] p-4 rounded-2xl text-left text-xs text-[var(--text-secondary)]">
@@ -359,7 +359,7 @@ export function MuseView({
                                     <span className={status === 'analyzing' ? 'text-[var(--accent)] animate-pulse' : ''}>
                                         {status === 'analyzing' ? '●' : '○'}
                                     </span>
-                                    <span className={status === 'analyzing' ? 'text-[var(--text-main)]' : ''}>Segment and recap timeline</span>
+                                    <span className={status === 'analyzing' ? 'text-[var(--text-main)]' : ''}>Build recap timeline</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -371,9 +371,9 @@ export function MuseView({
                             className="flex flex-col items-center bg-[var(--bg-card)] border border-red-500/10 p-6 rounded-3xl"
                         >
                             <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
-                            <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Recap Failed to Generate</h3>
+                            <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Recap Failed</h3>
                             <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-xs">
-                                The AI analysis route failed or timed out. But don&apos;t worry — your session audio is safe locally.
+                                Analysis timed out. Your audio is safe on device.
                             </p>
 
                             <div className="flex flex-col gap-3 w-full">
@@ -556,7 +556,8 @@ export function MuseView({
                             {segments.map((seg, idx) => {
                                 const meta = MUSE_TYPE_META[seg.type] || MUSE_TYPE_META.downtime;
                                 const isActive = isCurrentlyPlayingThis && activeSegmentIdx === idx;
-                                
+                                const isSegPlaying = isActive && isPlaying;
+
                                 return (
                                     <div
                                         key={seg.id}
@@ -572,21 +573,42 @@ export function MuseView({
                                         />
 
                                         {/* Segment block */}
-                                        <button
+                                        <div
                                             onClick={() => onPlaySession(selectedSession.id, seg.startTime)}
-                                            className={`w-full text-left rounded-3xl p-5 border backdrop-blur-xl transition-all flex flex-col md:flex-row md:items-start gap-4 ${
+                                            className={`w-full text-left rounded-3xl p-5 border backdrop-blur-xl transition-all flex flex-col md:flex-row md:items-start gap-4 cursor-pointer ${
                                                 isActive
                                                     ? 'bg-[var(--bg-hover)] border-[var(--border-strong)] shadow-md shadow-black/20'
                                                     : 'bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border-[var(--border-subtle)] hover:border-[var(--border-main)]'
                                             }`}
                                         >
-                                            {/* Left Icon circle */}
-                                            <div
-                                                className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                                            {/* Left play/pause control — emoji until hovered/active */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isSegPlaying) {
+                                                        onPauseSession();
+                                                    } else {
+                                                        onPlaySession(selectedSession.id, seg.startTime);
+                                                    }
+                                                }}
+                                                aria-label={isSegPlaying ? 'Pause segment' : 'Play segment'}
+                                                className="relative w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 transition-all hover:scale-105 active:scale-95 group/play"
                                                 style={{ backgroundColor: meta.bg }}
                                             >
-                                                {meta.emoji}
-                                            </div>
+                                                <span className={`transition-opacity ${isActive ? 'opacity-0' : 'opacity-100 group-hover/play:opacity-0'}`}>
+                                                    {meta.emoji}
+                                                </span>
+                                                <span
+                                                    className={`absolute inset-0 flex items-center justify-center transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover/play:opacity-100'}`}
+                                                    style={{ color: meta.color }}
+                                                >
+                                                    {isSegPlaying ? (
+                                                        <Pause className="w-5 h-5 fill-current" />
+                                                    ) : (
+                                                        <Play className="w-5 h-5 fill-current translate-x-0.5" />
+                                                    )}
+                                                </span>
+                                            </button>
 
                                             {/* Details */}
                                             <div className="flex-1 min-w-0">
@@ -622,7 +644,7 @@ export function MuseView({
                                                     </div>
                                                 )}
                                             </div>
-                                        </button>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -649,7 +671,7 @@ export function MuseView({
                         <span>Muse Logger</span>
                     </h2>
                     <p className="text-[var(--text-secondary)] text-xs mt-1 max-w-sm leading-relaxed">
-                        Automatic, always-on songwriting capture. AI maps taking, practicing, conversations, and highlights.
+                        Always-on capture. AI maps your whole session automatically.
                     </p>
                 </div>
                 
@@ -672,9 +694,9 @@ export function MuseView({
                     <div className="flex items-start gap-3">
                         <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         <div>
-                            <h4 className="text-sm font-bold text-[var(--text-main)]">Unfinished Session Detected</h4>
+                            <h4 className="text-sm font-bold text-[var(--text-main)]">Unfinished Session</h4>
                             <p className="text-xs text-[var(--text-secondary)]">
-                                Session crashed or browser closed from {formatDate(manifest.startedAt)}.
+                                Interrupted {formatDate(manifest.startedAt)}.
                             </p>
                         </div>
                     </div>
@@ -706,9 +728,9 @@ export function MuseView({
                 {museSessions.length === 0 ? (
                     <div className="text-center py-20 bg-[var(--bg-card)] border border-dashed border-[var(--border-main)] rounded-3xl flex flex-col items-center justify-center">
                         <FileAudio className="w-12 h-12 text-[var(--text-tertiary)] mb-3" />
-                        <h4 className="text-[var(--text-secondary)] font-semibold text-sm">No studio sessions yet</h4>
+                        <h4 className="text-[var(--text-secondary)] font-semibold text-sm">No sessions yet</h4>
                         <p className="text-[var(--text-tertiary)] text-xs mt-1 max-w-xs">
-                            Tap &quot;Record Session&quot; to begin your first always-on logging stream.
+                            Tap Record to start capturing.
                         </p>
                     </div>
                 ) : (
@@ -720,7 +742,10 @@ export function MuseView({
                                     {group.sessions.map((session) => {
                                         const dateLabel = formatDate(session.timestamp);
                                         const isFailed = session.museStatus === 'failed';
-                                        
+                                        const isProcessing = session.museStatus === 'uploading' || session.museStatus === 'analyzing';
+                                        const canPlay = !isFailed && !isProcessing;
+                                        const isThisPlaying = activeSessionId === session.id && isPlaying;
+
                                         return (
                                             <div
                                                 key={session.id}
@@ -748,18 +773,41 @@ export function MuseView({
                                                         </div>
                                                     </div>
 
-                                                    {/* Delete button (must be relative z-20 to avoid bubbling) */}
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (confirm('Delete this session?')) {
-                                                                onDeleteSession(session.id);
-                                                            }
-                                                        }}
-                                                        className="z-20 text-[var(--text-tertiary)] hover:text-red-400 p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {/* Controls (relative z-20 to avoid bubbling into the card overlay) */}
+                                                    <div className="z-20 relative flex items-center gap-1 flex-shrink-0">
+                                                        {canPlay && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (isThisPlaying) {
+                                                                        onPauseSession();
+                                                                    } else {
+                                                                        onPlaySession(session.id, 0);
+                                                                    }
+                                                                }}
+                                                                aria-label={isThisPlaying ? 'Pause session' : 'Play session'}
+                                                                className="bg-[var(--accent)] text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all"
+                                                            >
+                                                                {isThisPlaying ? (
+                                                                    <Pause className="w-4 h-4 fill-current" />
+                                                                ) : (
+                                                                    <Play className="w-4 h-4 fill-current translate-x-0.5" />
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (confirm('Delete this session?')) {
+                                                                    onDeleteSession(session.id);
+                                                                }
+                                                            }}
+                                                            aria-label="Delete session"
+                                                            className="text-[var(--text-tertiary)] hover:text-red-400 p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
 
                                                 <div className="z-10 relative mt-4">

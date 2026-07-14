@@ -12,6 +12,7 @@ import {
   Mic,
   Activity,
   Zap,
+  RotateCcw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from "@/components/ui/slider";
@@ -929,6 +930,23 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     onClose();
   };
 
+  // Discard the current take and jump straight back into recording a fresh one.
+  const handleRetry = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+    setRecordedBlob(null);
+    setDuration(0);
+    setProgress(0);
+    peaksRef.current = [];
+    liveWaveHistoryRef.current = [];
+    lastSampleTimeRef.current = 0;
+    setFinalTranscript('');
+    setInterimTranscript('');
+    startRecording();
+  };
+
   // --- Waveform Swiping / Scrubbing Handlers ---
   const handleDragStart = (clientX: number) => {
     if (!recordedBlob || isRecording) return;
@@ -1313,19 +1331,31 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
             </div>
 
             {/* Playback Control Area — fixed height to prevent layout shifts */}
-            <div className="h-20 flex items-center justify-center flex-shrink-0">
+            <div className="h-20 flex items-center justify-center gap-6 flex-shrink-0">
               {recordedBlob && !isRecording && (
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="w-14 h-14 rounded-full bg-[var(--bg-card)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-lg text-[var(--text-main)]"
-                  aria-label={isPlaying ? "Pause playback" : "Start playback"}
-                >
-                  {isPlaying ? (
-                    <Pause size={20} fill="currentColor" />
-                  ) : (
-                    <Play size={20} fill="currentColor" className="ml-0.5" />
-                  )}
-                </button>
+                <>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="w-14 h-14 rounded-full bg-[var(--bg-card)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-lg text-[var(--text-main)]"
+                    aria-label={isPlaying ? "Pause playback" : "Start playback"}
+                  >
+                    {isPlaying ? (
+                      <Pause size={20} fill="currentColor" />
+                    ) : (
+                      <Play size={20} fill="currentColor" className="ml-0.5" />
+                    )}
+                  </button>
+
+                  {/* Retry — discard this take and re-record */}
+                  <button
+                    onClick={handleRetry}
+                    className="flex items-center gap-2 h-11 pl-4 pr-5 rounded-full bg-[var(--bg-card)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all active:scale-90 cursor-pointer shadow-lg"
+                    aria-label="Discard this take and record again"
+                  >
+                    <RotateCcw size={17} />
+                    <span className="text-[13px] font-semibold">Retry</span>
+                  </button>
+                </>
               )}
             </div>
 

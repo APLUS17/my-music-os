@@ -70,7 +70,7 @@ export default function AuthGate() {
               >
                 <div>
                   <h2 className="text-lg font-semibold text-white">Sign in</h2>
-                  <p className="mt-1 text-sm text-white/50">We'll send a code to your email.</p>
+                  <p className="mt-1 text-sm text-white/50">We&apos;ll send a code to your email.</p>
                 </div>
                 <input
                   type="email"

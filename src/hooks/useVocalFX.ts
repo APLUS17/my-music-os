@@ -161,7 +161,7 @@ export function useVocalFX(
       // 4. Reverb (Space) - Parallel chain
       const convolver = ctx.createConvolver();
       try {
-        convolver.buffer = createReverbImpulse(ctx, 2.5, 2.0);
+        convolver.buffer = createReverbImpulse(ctx, 1.8, 2.5);
       } catch (err) {
         console.warn('Could not set convolver buffer:', err);
         return;
@@ -312,11 +312,13 @@ export function useVocalFX(
       }
 
       if (delayWetRef.current) {
-        delayWetRef.current.gain.value = (settings.echo / 100) * 0.7;
+        // Cap echo so it stays a texture, not a slap that competes with the dry vocal
+        delayWetRef.current.gain.value = (settings.echo / 100) * 0.4;
       }
 
       if (reverbWetRef.current) {
-        reverbWetRef.current.gain.value = (settings.space / 100) * 1.0;
+        // Cap reverb wet/dry — 100% used to fully drown the vocal; keep it musical
+        reverbWetRef.current.gain.value = (settings.space / 100) * 0.45;
       }
     } catch (err) {
       console.warn('Error applying FX settings:', err);

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { LyricSection, SECTION_TYPES } from '@/types';
-import { Minus, Plus, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, ChevronUp, ChevronDown } from 'lucide-react';
 import { countSyllables } from '@/lib/utils/syllable';
 import { cn } from '@/lib/utils';
 

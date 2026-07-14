@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat, Note } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
+import { OpenEditor } from './OpenEditor';
 import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
@@ -411,6 +412,18 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('lyriq_show_syllables', String(showSyllables));
     }, [showSyllables]);
+
+    // Editor layout preference: 'cards' (structured section cards) or 'open' (blank notes page)
+    const [editorLayout, setEditorLayout] = useState<'cards' | 'open'>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('lyriq_editor_layout') === 'open' ? 'open' : 'cards';
+        }
+        return 'cards';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lyriq_editor_layout', editorLayout);
+    }, [editorLayout]);
 
     // Sync sections edits to categorySections
     useEffect(() => {
@@ -999,7 +1012,8 @@ const StudioWorkspace: React.FC = () => {
 
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
-        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED === 'true'
+        // Transcription runs by default; set NEXT_PUBLIC_GROQ_ENABLED=false to explicitly disable it.
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED !== 'false'
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 
@@ -1861,21 +1875,52 @@ const StudioWorkspace: React.FC = () => {
 
                             <section className="pt-4">
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Editor</h2>
-                                <button
-                                    onClick={() => setShowSyllables(!showSyllables)}
-                                    className="w-full p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
-                                >
-                                    <div className="text-left">
-                                        <h3 className="text-sm font-medium text-[var(--text-main)]">Syllable Count</h3>
-                                        <p className="text-xs text-[var(--text-tertiary)] max-w-[220px]">Show a per-line syllable count next to your lyrics in Write mode.</p>
+                                <div className="space-y-3">
+                                    <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)]">
+                                        <div className="mb-3">
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Workspace Layout</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[240px]">Choose how your lyrics surface looks — structured section cards, or a single blank page like a notes app.</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {([
+                                                { key: 'cards', label: 'Cards', desc: 'Structured sections' },
+                                                { key: 'open', label: 'Open Editor', desc: 'Blank notes page' },
+                                            ] as const).map((opt) => (
+                                                <button
+                                                    key={opt.key}
+                                                    onClick={() => setEditorLayout(opt.key)}
+                                                    className={cn(
+                                                        "p-3 rounded-lg border text-left transition-all",
+                                                        editorLayout === opt.key
+                                                            ? 'bg-[var(--bg-secondary)] border-[var(--accent)]'
+                                                            : 'bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)]'
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-[var(--text-main)]">{opt.label}</span>
+                                                        {editorLayout === opt.key && <Check size={14} className="text-[var(--accent)]" />}
+                                                    </div>
+                                                    <span className="text-[11px] text-[var(--text-tertiary)]">{opt.desc}</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className={cn(
-                                        "w-10 h-6 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0",
-                                        showSyllables ? "bg-[var(--accent)] justify-end" : "bg-[var(--bg-secondary)] justify-start"
-                                    )}>
-                                        <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
-                                    </div>
-                                </button>
+                                    <button
+                                        onClick={() => setShowSyllables(!showSyllables)}
+                                        className="w-full p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Syllable Count</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[220px]">Show a per-line syllable count next to your lyrics in Write mode.</p>
+                                        </div>
+                                        <div className={cn(
+                                            "w-10 h-6 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0",
+                                            showSyllables ? "bg-[var(--accent)] justify-end" : "bg-[var(--bg-secondary)] justify-start"
+                                        )}>
+                                            <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                                        </div>
+                                    </button>
+                                </div>
                             </section>
                             <section className="pt-4">
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Audio Engineering</h2>
@@ -2117,7 +2162,7 @@ const StudioWorkspace: React.FC = () => {
                                                         
                                                         {lyricPreview ? (
                                                             <p className="text-[10px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-3 whitespace-pre-wrap flex-1 mb-3">
-                                                                "{lyricPreview}"
+                                                                &ldquo;{lyricPreview}&rdquo;
                                                             </p>
                                                         ) : (
                                                             <p className="text-[10px] text-[var(--text-tertiary)] italic leading-relaxed flex-1 mb-3">
@@ -2544,112 +2589,119 @@ const StudioWorkspace: React.FC = () => {
                                 <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-3xl mx-auto space-y-12">
                                         <>
-                                            <AnimatePresence mode="wait">
-                                                     {sections.length === 0 && showTour ? (
-                                                            <motion.div 
-                                                                key="flow-canvas"
-                                                                id="tour-lyric-card"
-                                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                                animate={{ opacity: 1, scale: 1 }}
-                                                                exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-                                                                className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
-                                                            >
-                                                                {/* Abstract Background Shapes */}
-                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                                <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                                
-                                                                <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                                    <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
-                                                                    <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                                    
-                                                                    {/* Orbiting particles animation */}
-                                                                    <motion.div 
-                                                                        animate={{ rotate: 360 }}
-                                                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                        className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                                    />
-                                                                </div>
-
-                                                                <motion.h2 
-                                                                    initial={{ opacity: 0, y: 10 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.2 }}
-                                                                    className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
-                                                                >
-                                                                    Capture the Flow
-                                                                </motion.h2>
-                                                                
-                                                                <motion.p 
-                                                                    initial={{ opacity: 0, y: 10 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.3 }}
-                                                                    className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
-                                                                >
-                                                                    Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
-                                                                </motion.p>
-
-                                                                <motion.button
-                                                                    initial={{ opacity: 0, y: 20 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.4 }}
-                                                                    onClick={addSection}
-                                                                    className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
-                                                                >
-                                                                    <Plus size={20} strokeWidth={3} /> Start Writing
-                                                                </motion.button>
-                                                                
-                                                                {/* Optional quick start types */}
+                                            {editorLayout === 'open' && !(sections.length === 0 && showTour) ? (
+                                                <OpenEditor
+                                                    sections={sections}
+                                                    onUpdateSections={setSections}
+                                                />
+                                            ) : (
+                                                <AnimatePresence mode="wait">
+                                                         {sections.length === 0 && showTour ? (
                                                                 <motion.div 
-                                                                    initial={{ opacity: 0 }}
-                                                                    animate={{ opacity: 1 }}
-                                                                    transition={{ delay: 0.6 }}
-                                                                    className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                    key="flow-canvas"
+                                                                    id="tour-lyric-card"
+                                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                                    className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                                 >
-                                                                    <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                                    <div className="flex gap-4">
-                                                                        {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                            <button 
-                                                                                key={type}
-                                                                                onClick={addSection}
-                                                                                className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                            >
-                                                                                {type}
-                                                                            </button>
-                                                                        ))}
+                                                                    {/* Abstract Background Shapes */}
+                                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                                    <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                                
+                                                                    <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                        <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                                        <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
+                                                                        <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                                    
+                                                                        {/* Orbiting particles animation */}
+                                                                        <motion.div 
+                                                                            animate={{ rotate: 360 }}
+                                                                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                            className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                        />
                                                                     </div>
+
+                                                                    <motion.h2 
+                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.2 }}
+                                                                        className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
+                                                                    >
+                                                                        Capture the Flow
+                                                                    </motion.h2>
+                                                                
+                                                                    <motion.p 
+                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.3 }}
+                                                                        className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                    >
+                                                                        Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                                    </motion.p>
+
+                                                                    <motion.button
+                                                                        initial={{ opacity: 0, y: 20 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.4 }}
+                                                                        onClick={addSection}
+                                                                        className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                                                    >
+                                                                        <Plus size={20} strokeWidth={3} /> Start Writing
+                                                                    </motion.button>
+                                                                
+                                                                    {/* Optional quick start types */}
+                                                                    <motion.div 
+                                                                        initial={{ opacity: 0 }}
+                                                                        animate={{ opacity: 1 }}
+                                                                        transition={{ delay: 0.6 }}
+                                                                        className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                    >
+                                                                        <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                                        <div className="flex gap-4">
+                                                                            {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                                <button 
+                                                                                    key={type}
+                                                                                    onClick={addSection}
+                                                                                    className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                                >
+                                                                                    {type}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </motion.div>
                                                                 </motion.div>
+                                                         ) : (
+                                                             <motion.div 
+                                                                 key="write-mode"
+                                                                 initial={{ opacity: 0 }}
+                                                                 animate={{ opacity: 1 }}
+                                                                 exit={{ opacity: 0 }}
+                                                                 className="space-y-12"
+                                                             >
+                                                                {sections.map((section, idx) => (
+                                                                    <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                                        <LyricCard
+                                                                            section={section}
+                                                                            onUpdate={updateSection}
+                                                                            onDelete={deleteSection}
+                                                                            onMove={moveSection}
+                                                                            showSyllables={showSyllables}
+                                                                        />
+                                                                    </motion.div>
+                                                                ))}
+                                                                <button
+                                                                    onClick={addSection}
+                                                                    className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                                                >
+                                                                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                    <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
+                                                                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                </button>
                                                             </motion.div>
-                                                     ) : (
-                                                         <motion.div 
-                                                             key="write-mode"
-                                                             initial={{ opacity: 0 }}
-                                                             animate={{ opacity: 1 }}
-                                                             exit={{ opacity: 0 }}
-                                                             className="space-y-12"
-                                                         >
-                                                            {sections.map((section, idx) => (
-                                                                <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                                                                    <LyricCard
-                                                                        section={section}
-                                                                        onUpdate={updateSection}
-                                                                        onDelete={deleteSection}
-                                                                        onMove={moveSection}
-                                                                        showSyllables={showSyllables}
-                                                                    />
-                                                                </motion.div>
-                                                            ))}
-                                                            <button
-                                                                onClick={addSection}
-                                                                className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                                            >
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                                <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                        )}
+                                                    </AnimatePresence>
+                                            )}
                                         </>
                                     </div>
                                 </div>
