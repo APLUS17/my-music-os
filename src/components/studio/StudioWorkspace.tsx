@@ -534,6 +534,20 @@ const StudioWorkspace: React.FC = () => {
             return;
         }
 
+        // Re-selecting the currently-active session whose <audio> element lost its
+        // loaded data (readyState 0) — e.g. the browser reclaimed it while the PWA
+        // was backgrounded/screen-switched-away. setActiveSessionId(id) below would
+        // be a same-value no-op here too (no re-render → src never re-applied →
+        // onLoadedMetadata never fires), leaving pendingPlayRef stuck forever and
+        // this session permanently unplayable. Force a reload so the load event
+        // fires again to consume the pending play/seek.
+        if (id === activeSessionId && vocalAudioRef.current) {
+            pendingPlayRef.current = true;
+            if (seekTime !== undefined) pendingSeekRef.current = seekTime;
+            vocalAudioRef.current.load();
+            return;
+        }
+
         if (isPlaying) {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
@@ -2328,6 +2342,7 @@ const StudioWorkspace: React.FC = () => {
                         projectTitle={projectTitle}
                         onPlaySession={handleSelectSessionAndPlay}
                         playingSessionId={activeSessionId}
+                        isSessionPlaying={isPlaying}
                         onPlayBeat={handlePlayBeat}
                         playingBeatId={playingBeatId}
                         currentTime={currentTime}

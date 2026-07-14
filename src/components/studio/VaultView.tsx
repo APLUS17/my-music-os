@@ -146,6 +146,7 @@ const VaultStickyNote = ({ scrap, compact = false }: { scrap: LyricScrap; compac
 const VaultListView = ({
     items,
     playingSessionId,
+    isSessionPlaying,
     playingBeatId,
     onPlaySession,
     onPlayBeat,
@@ -154,6 +155,7 @@ const VaultListView = ({
 }: {
     items: { type: 'session' | 'scrap' | 'beat'; data: RecordingSession | LyricScrap | Beat }[];
     playingSessionId: string | null;
+    isSessionPlaying: boolean;
     playingBeatId: string | null;
     onPlaySession: (id: string) => void;
     onPlayBeat: (id: string) => void;
@@ -163,7 +165,7 @@ const VaultListView = ({
     <div className="flex flex-col w-full divide-y divide-[var(--border-main)]">
         {items.map((item, idx) => {
             const d = item.data as any;
-            const isPlaying = (item.type === 'session' && playingSessionId === d.id) ||
+            const isPlaying = (item.type === 'session' && isSessionPlaying && playingSessionId === d.id) ||
                               (item.type === 'beat' && playingBeatId === d.id);
 
             const title = item.type === 'session' ? (d.name || 'Untitled Recording')
@@ -232,6 +234,7 @@ interface VaultViewProps {
     projectTitle: string;
     onPlaySession: (id: string) => void;
     playingSessionId: string | null;
+    isSessionPlaying: boolean;
     onPlayBeat: (id: string) => void;
     playingBeatId: string | null;
     currentTime: number;
@@ -242,7 +245,7 @@ interface VaultViewProps {
 
 export const VaultView: React.FC<VaultViewProps> = ({
     sessions, scraps, beats,
-    projectTitle, onPlaySession, playingSessionId,
+    projectTitle, onPlaySession, playingSessionId, isSessionPlaying,
     onPlayBeat, playingBeatId,
     currentTime, duration, onOpenSidebar
 }) => {
@@ -330,10 +333,10 @@ export const VaultView: React.FC<VaultViewProps> = ({
                                             id={(item.data as RecordingSession).id}
                                             title={(item.data as RecordingSession).name || 'Untitled Take'}
                                             type="session"
-                                            isPlaying={playingSessionId === (item.data as RecordingSession).id}
+                                            isPlaying={isSessionPlaying && playingSessionId === (item.data as RecordingSession).id}
                                             onPlay={onPlaySession}
-                                            currentTime={playingSessionId === (item.data as RecordingSession).id ? currentTime : 0}
-                                            duration={playingSessionId === (item.data as RecordingSession).id ? duration : 0}
+                                            currentTime={isSessionPlaying && playingSessionId === (item.data as RecordingSession).id ? currentTime : 0}
+                                            duration={isSessionPlaying && playingSessionId === (item.data as RecordingSession).id ? duration : 0}
                                             compact
                                         />
                                     )}
@@ -367,6 +370,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                         <VaultListView
                             items={items}
                             playingSessionId={playingSessionId}
+                            isSessionPlaying={isSessionPlaying}
                             playingBeatId={playingBeatId}
                             onPlaySession={onPlaySession}
                             onPlayBeat={onPlayBeat}
