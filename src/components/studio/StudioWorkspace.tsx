@@ -509,6 +509,11 @@ const StudioWorkspace: React.FC = () => {
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
     const [beatMuted, setBeatMuted] = useState(false);
+
+    // Recording (vocal take) volume — independent from the beat so the two
+    // tracks can be balanced against each other during mixed playback
+    const [vocalVolume, setVocalVolume] = useState(1);
+    const [vocalMuted, setVocalMuted] = useState(false);
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
     const [isBeatLooping, setIsBeatLooping] = useState(false);
@@ -587,18 +592,32 @@ const StudioWorkspace: React.FC = () => {
 
         if (shouldPlay) {
             beatAudioCtxRef.current?.resume();
-            
+
             // 1. Play Vocal if available
             const hasVocals = sessions.length > 0 && vocalAudioRef.current;
             if (hasVocals) {
                 vocalAudioRef.current?.play().catch(console.error);
             }
 
+            const activeSess = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            const isMuseSession = activeSess?.kind === 'muse';
+
+            // Muse sessions are full-room captures that already contain any
+            // beat that was playing — layering the studio beat on top would
+            // make the audio bleed. Keep (or force) the beat silent instead.
+            if (isMuseSession) {
+                if (beatAudioRef.current && !beatAudioRef.current.paused) {
+                    beatAudioRef.current.pause();
+                    beatAudioCtxRef.current?.suspend();
+                }
+                setIsBeatPlaying(false);
+            }
+
             // 2. Play Beat if available
-            if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            if (uploadedBeat && beatAudioRef.current && !isMuseSession) {
+                const session = activeSess;
                 const beat = beatAudioRef.current;
-                
+
                 if (session && vocalAudioRef.current) {
                     const offset = session.beatOffset || 0;
                     if (beat.readyState >= 1) {
@@ -752,6 +771,18 @@ const StudioWorkspace: React.FC = () => {
             beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
         }
     }, [beatVolume, beatMuted]);
+
+    // Update Recording (vocal) Volume
+    useEffect(() => {
+        if (vocalAudioRef.current) {
+            vocalAudioRef.current.volume = vocalMuted ? 0 : vocalVolume;
+        }
+        // globalAudioRef doubles as the beat-preview player; only touch it
+        // while it's playing a recording session
+        if (globalAudioRef.current && playingSessionId) {
+            globalAudioRef.current.volume = vocalMuted ? 0 : vocalVolume;
+        }
+    }, [vocalVolume, vocalMuted, playingSessionId]);
 
     // Sync duration based on available tracks (vocal takes vs backing beat)
     useEffect(() => {
@@ -1202,9 +1233,10 @@ const StudioWorkspace: React.FC = () => {
             setPlayingSessionId(null);
         } else {
             if (globalAudioRef.current) globalAudioRef.current.pause();
-            
+
             const audio = new Audio(session.audioUrl || session.base64);
-            
+            audio.volume = vocalMuted ? 0 : vocalVolume;
+
             audio.onended = () => {
                 // Only clear if this specific session is still the one marked as playing
                 setPlayingSessionId(prev => {
@@ -2763,6 +2795,10 @@ const StudioWorkspace: React.FC = () => {
                                                 beatMuted={beatMuted}
                                                 onVolumeChange={setBeatVolume}
                                                 onMuteChange={setBeatMuted}
+                                                vocalVolume={vocalVolume}
+                                                vocalMuted={vocalMuted}
+                                                onVocalVolumeChange={setVocalVolume}
+                                                onVocalMuteChange={setVocalMuted}
                                                 isBeatLooping={isBeatLooping}
                                                 beatLoopStart={beatLoopStart}
                                                 beatLoopEnd={beatLoopEnd}

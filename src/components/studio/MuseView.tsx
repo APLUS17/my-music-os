@@ -15,15 +15,11 @@ import {
     RefreshCw,
     Clock,
     Calendar,
-    MessageSquare,
-    Lightbulb,
     FileAudio,
-    Dribbble,
-    UserCheck,
-    Coffee,
-    X
+    Upload
 } from 'lucide-react';
-import { RecordingSession, MuseSegment, MuseRecap, MuseSegmentType, MuseManifest } from '@/types';
+import { RecordingSession, MuseSegmentType, MuseManifest } from '@/types';
+import { generateId } from '@/lib/utils/id';
 import { useMuseRecorder } from '@/hooks/useMuseRecorder';
 import { useActiveBeatSection } from './useActiveBeatSection';
 
@@ -67,6 +63,8 @@ export function MuseView({
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [recoveryManifests, setRecoveryManifests] = useState<MuseManifest[]>([]);
     const [isRecovering, setIsRecovering] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     const recorder = useMuseRecorder();
 
@@ -171,6 +169,43 @@ export function MuseView({
         }
     };
 
+    // Upload action — feeds an existing audio file through the same
+    // save + AI analysis pipeline as a live recording
+    const readAudioDuration = (file: File): Promise<number> => {
+        return new Promise((resolve) => {
+            const url = URL.createObjectURL(file);
+            const probe = new Audio();
+            probe.preload = 'metadata';
+            const finish = (duration: number) => {
+                URL.revokeObjectURL(url);
+                resolve(duration);
+            };
+            probe.onloadedmetadata = () => {
+                finish(isFinite(probe.duration) && probe.duration > 0 ? Math.round(probe.duration) : 0);
+            };
+            probe.onerror = () => finish(0);
+            probe.src = url;
+        });
+    };
+
+    const handleUploadFile = async (file: File) => {
+        setIsUploading(true);
+        try {
+            const duration = await readAudioDuration(file);
+            const newSessionId = await onSaveMuseSession({
+                id: generateId('muse-'),
+                blob: file,
+                duration,
+                mimeType: file.type || 'audio/mpeg'
+            });
+            setSelectedSessionId(newSessionId);
+        } catch (e) {
+            console.error('Audio upload failed:', e);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     // Recovery action
     const handleTriggerRecovery = async (manifest: MuseManifest) => {
         setIsRecovering(manifest.id);
@@ -234,7 +269,7 @@ export function MuseView({
                     <motion.div
                         animate={{ scale: [1, 1.25, 1], opacity: [0.15, 0.4, 0.15] }}
                         transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                        className="absolute inset-0 rounded-full bg-red-500/20 blur-xl"
+                        className="absolute inset-0 rounded-full bg-[var(--studio-red)]/20 blur-xl"
                     />
                     
                     {/* Circular Level meter */}
@@ -250,7 +285,7 @@ export function MuseView({
                             cx="96"
                             cy="96"
                             r="80"
-                            className="stroke-red-500 fill-none"
+                            className="stroke-[var(--studio-red)] fill-none"
                             strokeWidth="8"
                             strokeDasharray={2 * Math.PI * 80}
                             strokeDashoffset={2 * Math.PI * 80 * (1 - recorder.level)}
@@ -259,7 +294,7 @@ export function MuseView({
                     </svg>
 
                     <div className="z-10 flex flex-col items-center">
-                        <Mic className="w-10 h-10 text-red-500 mb-2 animate-pulse" />
+                        <Mic className="w-10 h-10 text-[var(--studio-red)] mb-2 animate-pulse" />
                         <span className="font-mono text-3xl font-bold tracking-wider text-[var(--text-main)]">
                             {formatTime(recorder.elapsedSec)}
                         </span>
@@ -291,7 +326,7 @@ export function MuseView({
                     <button
                         onClick={handleStopRecording}
                         disabled={recorder.status === 'stopping'}
-                        className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-lg shadow-red-500/20 active:scale-95 transition-all text-[var(--text-main)]"
+                        className="w-16 h-16 rounded-full bg-[var(--studio-red)] hover:opacity-90 flex items-center justify-center shadow-lg shadow-[var(--studio-red)]/20 active:scale-95 transition-all text-white"
                     >
                         {recorder.status === 'stopping' ? (
                             <Loader2 className="w-6 h-6 animate-spin" />
@@ -332,7 +367,7 @@ export function MuseView({
                                 <motion.div
                                     animate={{ rotate: 360 }}
                                     transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
-                                    className="absolute inset-0 border-t-2 border-r-2 border-t-[var(--accent)] border-r-purple-500 rounded-full"
+                                    className="absolute inset-0 border-t-2 border-r-2 border-t-[var(--accent)] border-r-[var(--accent-dim)] rounded-full"
                                 />
                                 <Sparkles className="w-8 h-8 text-[var(--accent)] animate-pulse" />
                             </div>
@@ -368,9 +403,9 @@ export function MuseView({
                             key="failed"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="flex flex-col items-center bg-[var(--bg-card)] border border-red-500/10 p-6 rounded-3xl"
+                            className="flex flex-col items-center bg-[var(--bg-card)] border border-[var(--studio-red)]/10 p-6 rounded-3xl"
                         >
-                            <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+                            <AlertTriangle className="w-12 h-12 text-[var(--studio-red)] mb-4" />
                             <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Recap Failed</h3>
                             <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-xs">
                                 Analysis timed out. Your audio is safe on device.
@@ -379,7 +414,7 @@ export function MuseView({
                             <div className="flex flex-col gap-3 w-full">
                                 <button
                                     onClick={() => onRetryAnalysis(selectedSession.id)}
-                                    className="w-full bg-[var(--accent)] text-white font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                                    className="w-full bg-[var(--accent)] text-[var(--bg-main)] font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
                                 >
                                     <RefreshCw className="w-4 h-4" />
                                     <span>Retry AI Analysis</span>
@@ -423,7 +458,7 @@ export function MuseView({
                     
                     <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
                         <div>
-                            <span className="text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 px-3 py-1 rounded-full uppercase">
+                            <span className="text-xs font-semibold tracking-wider text-[var(--accent)] bg-[var(--accent)]/10 px-3 py-1 rounded-full uppercase">
                                 Muse AI Recap
                             </span>
                             <h2 className="text-2xl font-bold text-[var(--text-main)] mt-2">
@@ -450,7 +485,7 @@ export function MuseView({
                                     onPlaySession(selectedSession.id, 0);
                                 }
                             }}
-                            className="bg-[var(--accent)] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
+                            className="bg-[var(--accent)] text-[var(--bg-main)] w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all"
                         >
                             {isCurrentlyPlayingThis && isPlaying ? (
                                 <Pause className="w-5 h-5 fill-current" />
@@ -498,7 +533,7 @@ export function MuseView({
                 {recap?.highlights && recap.highlights.length > 0 && (
                     <div className="flex flex-col gap-3">
                         <h3 className="text-sm font-bold text-[var(--text-tertiary)] uppercase tracking-wide flex items-center gap-1.5 px-1">
-                            <Sparkles className="w-4 h-4 text-purple-400" />
+                            <Sparkles className="w-4 h-4 text-[var(--accent)]" />
                             <span>Highlights & Sparks</span>
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -674,15 +709,42 @@ export function MuseView({
                         Always-on capture. AI maps your whole session automatically.
                     </p>
                 </div>
-                
-                {/* Record Button */}
-                <button
-                    onClick={handleStartRecording}
-                    className="relative group overflow-hidden bg-gradient-to-r from-red-500 to-pink-500 text-[var(--text-main)] hover:from-red-600 hover:to-pink-600 font-semibold px-6 py-3 rounded-2xl flex items-center gap-2 active:scale-95 shadow-lg shadow-red-500/10 hover:shadow-red-500/20 transition-all"
-                >
-                    <Mic className="w-5 h-5 text-[var(--text-main)]" />
-                    <span>Record Session</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                    {/* Upload Button */}
+                    <input
+                        ref={uploadInputRef}
+                        type="file"
+                        accept="audio/*"
+                        className="hidden"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadFile(file);
+                            e.target.value = '';
+                        }}
+                    />
+                    <button
+                        onClick={() => uploadInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-main)] text-[var(--text-main)] font-semibold px-5 py-3 rounded-2xl flex items-center gap-2 active:scale-95 transition-all disabled:opacity-60"
+                    >
+                        {isUploading ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Upload className="w-5 h-5" />
+                        )}
+                        <span>Upload</span>
+                    </button>
+
+                    {/* Record Button */}
+                    <button
+                        onClick={handleStartRecording}
+                        className="bg-[var(--studio-red)] hover:opacity-90 text-white font-semibold px-5 py-3 rounded-2xl flex items-center gap-2 active:scale-95 shadow-lg shadow-[var(--studio-red)]/10 hover:shadow-[var(--studio-red)]/20 transition-all"
+                    >
+                        <Mic className="w-5 h-5" />
+                        <span>Record</span>
+                    </button>
+                </div>
             </div>
 
             {/* Crash Recovery banner */}
@@ -730,7 +792,7 @@ export function MuseView({
                         <FileAudio className="w-12 h-12 text-[var(--text-tertiary)] mb-3" />
                         <h4 className="text-[var(--text-secondary)] font-semibold text-sm">No sessions yet</h4>
                         <p className="text-[var(--text-tertiary)] text-xs mt-1 max-w-xs">
-                            Tap Record to start capturing.
+                            Tap Record to start capturing, or upload an audio file.
                         </p>
                     </div>
                 ) : (
@@ -786,7 +848,7 @@ export function MuseView({
                                                                     }
                                                                 }}
                                                                 aria-label={isThisPlaying ? 'Pause session' : 'Play session'}
-                                                                className="bg-[var(--accent)] text-white w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all"
+                                                                className="bg-[var(--accent)] text-[var(--bg-main)] w-9 h-9 rounded-full flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all"
                                                             >
                                                                 {isThisPlaying ? (
                                                                     <Pause className="w-4 h-4 fill-current" />
@@ -803,7 +865,7 @@ export function MuseView({
                                                                 }
                                                             }}
                                                             aria-label="Delete session"
-                                                            className="text-[var(--text-tertiary)] hover:text-red-400 p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
+                                                            className="text-[var(--text-tertiary)] hover:text-[var(--studio-red)] p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -812,8 +874,8 @@ export function MuseView({
 
                                                 <div className="z-10 relative mt-4">
                                                     {isFailed ? (
-                                                        <div className="flex items-center justify-between gap-3 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl">
-                                                            <span className="text-red-400 text-xs font-semibold">Analysis failed</span>
+                                                        <div className="flex items-center justify-between gap-3 bg-[var(--studio-red)]/10 border border-[var(--studio-red)]/20 px-3 py-2 rounded-xl">
+                                                            <span className="text-[var(--studio-red)] text-xs font-semibold">Analysis failed</span>
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();

@@ -18,6 +18,10 @@ interface PlayerTabProps {
     beatMuted: boolean;
     onVolumeChange: (v: number) => void;
     onMuteChange: (m: boolean) => void;
+    vocalVolume?: number;
+    vocalMuted?: boolean;
+    onVocalVolumeChange?: (v: number) => void;
+    onVocalMuteChange?: (m: boolean) => void;
     isBeatLooping?: boolean;
     beatLoopStart?: number | null;
     beatLoopEnd?: number | null;
@@ -39,6 +43,49 @@ interface PlayerTabProps {
     onSeek: (time: number) => void;
 }
 
+// One mixer channel: mute toggle + label on the left, level slider on the right.
+// Lets the beat and the recording be balanced independently so neither bleeds
+// over the other during mixed playback.
+const ChannelVolumeRow: React.FC<{
+    label: string;
+    volume: number;
+    muted: boolean;
+    onVolumeChange: (v: number) => void;
+    onMuteChange: (m: boolean) => void;
+}> = ({ label, volume, muted, onVolumeChange, onMuteChange }) => {
+    const effective = muted ? 0 : volume;
+    return (
+        <div className="flex items-center gap-3">
+            <button
+                onClick={() => onMuteChange(!muted)}
+                aria-label={muted ? `Unmute ${label.toLowerCase()}` : `Mute ${label.toLowerCase()}`}
+                className={cn(
+                    'flex items-center gap-1.5 w-[104px] shrink-0 text-left active:opacity-60 transition-colors',
+                    muted ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
+                )}
+            >
+                {muted ? <VolumeX size={16} /> : effective > 0.5 ? <Volume2 size={16} /> : <Volume1 size={16} />}
+                <span className="text-[11px] font-semibold uppercase tracking-wider truncate">{label}</span>
+            </button>
+            <input
+                type="range" min={0} max={1} step={0.01} value={effective}
+                onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    onVolumeChange(v);
+                    if (v > 0 && muted) onMuteChange(false);
+                    if (v === 0) onMuteChange(true);
+                }}
+                className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer slider-v
+                [&::-webkit-slider-runnable-track]:h-full [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
+                [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
+                [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--text-main)] [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+                style={{ touchAction: 'none', background: `linear-gradient(to right, var(--text-main) 0%, var(--text-main) ${effective * 100}%, var(--border-strong) ${effective * 100}%, var(--border-strong) 100%)` }}
+            />
+        </div>
+    );
+};
+
 export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     projectTitle,
     session,
@@ -49,6 +96,10 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     beatMuted,
     onVolumeChange,
     onMuteChange,
+    vocalVolume = 1,
+    vocalMuted = false,
+    onVocalVolumeChange,
+    onVocalMuteChange,
     isBeatLooping,
     beatLoopStart,
     beatLoopEnd,
@@ -409,18 +460,35 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                 )}
             </div>
 
-            {/* ── Volume ─────── */}
-            <div className="flex items-center gap-3 px-8 pt-1 pb-2">
-                <button onClick={() => beatMuted ? onMuteChange(false) : onVolumeChange(Math.max(0, beatVolume - 0.1))} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] shrink-0 active:opacity-60 transition-opacity"><Volume1 size={16} /></button>
-                <input type="range" min={0} max={1} step={0.01} value={beatMuted ? 0 : beatVolume} onChange={e => { const v = parseFloat(e.target.value); onVolumeChange(v); if (v > 0 && beatMuted) onMuteChange(false); if (v === 0) onMuteChange(true); }}
-                    className="flex-1 h-[3px] my-4 appearance-none rounded-full cursor-pointer slider-v
-                    [&::-webkit-slider-runnable-track]:h-full [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-transparent
-                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:-mt-[4px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
-                    [&::-moz-range-track]:bg-transparent [&::-moz-range-track]:rounded-full [&::-moz-range-track]:border-none
-                    [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--text-main)] [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-                    style={{ touchAction: 'none', background: `linear-gradient(to right, var(--text-main) 0%, var(--text-main) ${(beatMuted ? 0 : beatVolume) * 100}%, var(--border-strong) ${(beatMuted ? 0 : beatVolume) * 100}%, var(--border-strong) 100%)` }}
-                />
-                <button onClick={() => beatMuted ? (onMuteChange(false), onVolumeChange(1)) : onVolumeChange(Math.min(1, beatVolume + 0.1))} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] shrink-0 active:opacity-60 transition-opacity"><Volume2 size={16} /></button>
+            {/* ── Volume — independent Recording / Beat channels ─────── */}
+            <div className="flex flex-col gap-1 px-8 pt-1 pb-2">
+                {activeSession && onVocalVolumeChange && (
+                    <ChannelVolumeRow
+                        label="Recording"
+                        volume={vocalVolume}
+                        muted={vocalMuted}
+                        onVolumeChange={onVocalVolumeChange}
+                        onMuteChange={onVocalMuteChange ?? (() => {})}
+                    />
+                )}
+                {beatSrc && (
+                    <ChannelVolumeRow
+                        label="Beat"
+                        volume={beatVolume}
+                        muted={beatMuted}
+                        onVolumeChange={onVolumeChange}
+                        onMuteChange={onMuteChange}
+                    />
+                )}
+                {!beatSrc && !(activeSession && onVocalVolumeChange) && (
+                    <ChannelVolumeRow
+                        label="Volume"
+                        volume={beatVolume}
+                        muted={beatMuted}
+                        onVolumeChange={onVolumeChange}
+                        onMuteChange={onMuteChange}
+                    />
+                )}
             </div>
 
             {/* Spacer to prevent overlap with floating navigation bar */}
