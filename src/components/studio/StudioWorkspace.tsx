@@ -1276,7 +1276,7 @@ const StudioWorkspace: React.FC = () => {
 
     const triggerMuseAnalysis = async (sessionId: string, blob: Blob, mimeType: string, durationSec: number) => {
         try {
-            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading' } : s));
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading', museError: undefined } : s));
 
             const result = await processMuseSession({
                 sessionId,
@@ -1293,14 +1293,16 @@ const StudioWorkspace: React.FC = () => {
                 name: result.recap.title,
                 museSegments: result.segments,
                 museRecap: result.recap,
-                museStatus: 'complete'
+                museStatus: 'complete',
+                museError: undefined
             } : s));
-            
+
             toast.success("Recap generated successfully!");
         } catch (error: any) {
+            const msg = error?.message || 'Unknown error';
             console.error("Muse analysis failed:", error);
-            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
-            toast.error("AI recap generation failed. The audio is saved safely on your device.");
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed', museError: msg } : s));
+            toast.error(`AI recap failed: ${msg}. Your audio is safe on device.`);
         }
     };
 
@@ -1383,13 +1385,17 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleDeleteSession = async (sessionId: string) => {
-        if (!confirm("Permanently delete this recording?")) return;
-
+    const deleteSessionImmediate = async (sessionId: string) => {
         // Stop playback if deleting current
         if (playingSessionId === sessionId) {
             globalAudioRef.current?.pause();
             setPlayingSessionId(null);
+        }
+
+        // If the deleted take is currently active, fall back to the next one
+        if (activeSessionId === sessionId) {
+            const remaining = sessions.filter(s => s.id !== sessionId && s.kind !== 'muse');
+            setActiveSessionId(remaining[0]?.id ?? null);
         }
 
         // Remove from sessions list
@@ -1406,6 +1412,11 @@ const StudioWorkspace: React.FC = () => {
         } catch (e) {
             console.error("Failed to delete audio data", e);
         }
+    };
+
+    const handleDeleteSession = async (sessionId: string) => {
+        if (!confirm("Permanently delete this recording?")) return;
+        await deleteSessionImmediate(sessionId);
     };
 
     const handlePlayBeat = (beatId: string) => {
@@ -2817,6 +2828,7 @@ const StudioWorkspace: React.FC = () => {
                                                 onTogglePlay={togglePlayback}
                                                 onSeek={seekTo}
                                                 onSelectSession={setActiveSessionId}
+                                                onDeleteSession={deleteSessionImmediate}
                                                 onBeatPlaybackChange={(isP) => {
                                                     if (isP && isBeatPlaying && beatAudioRef.current) {
                                                         beatAudioRef.current.pause();
