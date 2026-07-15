@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ interface PlayerTabProps {
     onClearLoop?: () => void;
     lyrics?: LyricSection[];
     onSelectSession?: (id: string) => void;
+    onDeleteSession?: (id: string) => void;
     isAnalyzingVocal?: boolean;
     isAnalyzingBeat?: boolean;
     onOpenFX?: () => void;
@@ -108,6 +109,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     onClearLoop,
     lyrics,
     onSelectSession,
+    onDeleteSession,
     isAnalyzingBeat,
     onOpenFX,
     onDismiss,
@@ -122,6 +124,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
     const lyricRefs = useRef<(HTMLParagraphElement | null)[]>([]);
     const [showTakeList, setShowTakeList] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!showTakeList) setConfirmDeleteId(null);
+    }, [showTakeList]);
 
     const skip = (delta: number) => onSeek(currentTime + delta);
 
@@ -303,16 +310,57 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                         className="absolute right-0 mt-2 w-40 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl shadow-2xl z-50 overflow-hidden py-1"
                                     >
-                                        {sessions.map((s, i) => (
-                                            <button
-                                                key={s.id}
-                                                onClick={() => { onSelectSession?.(s.id); setShowTakeList(false); }}
-                                                className={cn("w-full text-left px-4 py-3 text-xs font-semibold transition-colors flex items-center justify-between", activeSession?.id === s.id ? "text-[var(--accent)] bg-[var(--accent)]/5" : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]")}
-                                            >
-                                                <span>Take {sessions.length - i}</span>
-                                                {activeSession?.id === s.id && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />}
-                                            </button>
-                                        ))}
+                                        {sessions.map((s, i) => {
+                                            const isActive = activeSession?.id === s.id;
+                                            const isConfirming = confirmDeleteId === s.id;
+                                            return (
+                                                <div
+                                                    key={s.id}
+                                                    className={cn(
+                                                        "group w-full flex items-center transition-colors",
+                                                        isActive ? "bg-[var(--accent)]/5" : "hover:bg-[var(--bg-hover)]"
+                                                    )}
+                                                >
+                                                    <button
+                                                        onClick={() => { onSelectSession?.(s.id); setShowTakeList(false); }}
+                                                        className={cn(
+                                                            "flex-1 text-left pl-4 pr-2 py-3 text-xs font-semibold flex items-center justify-between min-w-0",
+                                                            isActive ? "text-[var(--accent)]" : "text-[var(--text-secondary)]"
+                                                        )}
+                                                    >
+                                                        <span className="truncate">Take {sessions.length - i}</span>
+                                                        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)] shrink-0 ml-2" />}
+                                                    </button>
+                                                    {onDeleteSession && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (isConfirming) {
+                                                                    onDeleteSession(s.id);
+                                                                    setConfirmDeleteId(null);
+                                                                } else {
+                                                                    setConfirmDeleteId(s.id);
+                                                                }
+                                                            }}
+                                                            aria-label={isConfirming ? `Confirm delete take ${sessions.length - i}` : `Delete take ${sessions.length - i}`}
+                                                            title={isConfirming ? "Tap again to confirm" : "Delete take"}
+                                                            className={cn(
+                                                                "shrink-0 mr-2 h-7 rounded-md flex items-center justify-center transition-all active:scale-95",
+                                                                isConfirming
+                                                                    ? "px-2 bg-red-500 text-white"
+                                                                    : "w-7 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10"
+                                                            )}
+                                                        >
+                                                            {isConfirming ? (
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider">Delete?</span>
+                                                            ) : (
+                                                                <Trash2 size={14} />
+                                                            )}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </motion.div>
                                 </>
                             )}
