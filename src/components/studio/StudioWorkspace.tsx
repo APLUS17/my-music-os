@@ -494,6 +494,14 @@ const StudioWorkspace: React.FC = () => {
         [sessions, activeProjectId]
     );
 
+    const activeSession = useMemo(() => {
+        return sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? undefined;
+    }, [sessions, activeSessionId]);
+
+    const strictActiveSession = useMemo(() => {
+        return sessions.find(s => s.id === activeSessionId) ?? undefined;
+    }, [sessions, activeSessionId]);
+
     // Stable refs so the RAF loop reads current values without restarting
     const animFrameRef = useRef<number | null>(null);
     const sessionsRef = useRef(sessions);
@@ -599,7 +607,7 @@ const StudioWorkspace: React.FC = () => {
                 vocalAudioRef.current?.play().catch(console.error);
             }
 
-            const activeSess = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            const activeSess = activeSession;
             const isMuseSession = activeSess?.kind === 'muse';
 
             // Muse sessions are full-room captures that already contain any
@@ -654,7 +662,7 @@ const StudioWorkspace: React.FC = () => {
 
         if (beatAudioRef.current) {
             const beat = beatAudioRef.current;
-            const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            const session = activeSession;
             if (beat.readyState >= 1) {
                 if (session) {
                     beat.currentTime = clamped + (session.beatOffset || 0);
@@ -669,7 +677,7 @@ const StudioWorkspace: React.FC = () => {
     const handleBeatSeek = (beatTime: number) => {
         if (!beatAudioRef.current) return;
         
-        const session = sessions.find(s => s.id === activeSessionId);
+        const session = strictActiveSession;
         if (session && vocalAudioRef.current) {
             const offset = session.beatOffset || 0;
             const vocalTime = Math.max(0, beatTime - offset);
@@ -787,7 +795,6 @@ const StudioWorkspace: React.FC = () => {
     // Sync duration based on available tracks (vocal takes vs backing beat)
     useEffect(() => {
         if (sessions.length > 0) {
-            const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
             if (activeSession) {
                 setDuration(activeSession.duration ?? 0);
             }
@@ -799,7 +806,7 @@ const StudioWorkspace: React.FC = () => {
         } else {
             setDuration(0);
         }
-    }, [sessions.length, uploadedBeat, activeSessionId]);
+    }, [sessions.length, uploadedBeat, activeSession]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
@@ -2744,8 +2751,7 @@ const StudioWorkspace: React.FC = () => {
                                 {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && !(showRecorder && recorderMinimized) && (
                                     <MiniPlayer
                                         trackName={
-                                            sessions.find(s => s.id === activeSessionId)?.name
-                                            ?? sessions[0]?.name
+                                            activeSession?.name
                                             ?? uploadedBeatName
                                             ?? 'Now Playing'
                                         }
@@ -2785,7 +2791,7 @@ const StudioWorkspace: React.FC = () => {
                                         >
                                             <PlayerTab
                                                 projectTitle={projectTitle || "Untitled Project"}
-                                                session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
+                                                session={activeSession ?? null}
                                                 onOpenFX={() => setShowFXPanel(true)}
                                                 onDismiss={() => setShowPlayerSheet(false)}
                                                 sessions={sessions.filter(s => s.kind !== 'muse')}
@@ -2879,7 +2885,7 @@ const StudioWorkspace: React.FC = () => {
                 {/* Persistent Vocal Session Audio */}
                 <audio
                     ref={vocalAudioRef}
-                    src={sessions.length > 0 ? (sessions.find(s => s.id === activeSessionId)?.audioUrl || sessions.find(s => s.id === activeSessionId)?.base64 || sessions[0]?.audioUrl || sessions[0]?.base64 || undefined) : undefined}
+                    src={activeSession?.audioUrl || activeSession?.base64 || undefined}
                     onLoadedMetadata={e => {
                         setDuration(e.currentTarget.duration);
                         if (pendingPlayRef.current) {
