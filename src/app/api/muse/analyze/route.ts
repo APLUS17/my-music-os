@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@/lib/supabase/server';
 import {
     buildMusePrompt,
     mapMuseResponse,
@@ -13,8 +14,15 @@ export const maxDuration = 300; // Vercel Fluid Compute timeout (5 min)
 // /api/muse/upload-init — this route only takes the resulting fileUri
 // and runs the analysis, keeping the request body tiny.
 export async function POST(request: NextRequest) {
-    let ai: GoogleGenAI | null = null;
-    let fileName: string | null = null;
+const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let uploadResponse: any = null; 
+  let ai: GoogleGenAI | null = null;
+  let fileName: string | null = null;
 
     try {
         const { sessionId, fileUri, fileName: fileNameIn, mimeType, durationSec } =
