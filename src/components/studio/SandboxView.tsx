@@ -74,39 +74,45 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   const [focusedLineId, setFocusedLineId] = useState<string | null>(null);
 
   // Flatten sections into editable lines for Flow mode
-  type FlowLine = { id: string; text: string; sectionId: string; sessionId?: string };
-  const lines: FlowLine[] = sections.flatMap(section =>
-    section.text.split('\n').map((lineText, idx) => ({
-      id: `${section.id}-line-${idx}`,
-      text: lineText,
-      sectionId: section.id,
-      sessionId: section.pinnedSessionId
-    }))
-  );
+  type FlowLine = { id: string; text: string; sectionId: string; sectionLineIdx: number; sessionId?: string };
 
-  // Ensure at least one line exists
-  if (lines.length === 0) {
-    lines.push({ id: 'initial', text: '', sectionId: sections[0]?.id || 'default' });
-  }
+  const lines: FlowLine[] = React.useMemo(() => {
+    const flattened: FlowLine[] = sections.flatMap(section =>
+      section.text.split('\n').map((lineText, idx) => ({
+        id: `${section.id}-line-${idx}`,
+        text: lineText,
+        sectionId: section.id,
+        sectionLineIdx: idx,
+        sessionId: section.pinnedSessionId
+      }))
+    );
+
+    // Ensure at least one line exists
+    if (flattened.length === 0) {
+      flattened.push({ id: 'initial', text: '', sectionId: sections[0]?.id || 'default', sectionLineIdx: 0 });
+    }
+    return flattened;
+  }, [sections]);
 
   const handleLineChange = (lineId: string, newText: string) => {
-    const lineIndex = lines.findIndex(l => l.id === lineId);
-    if (lineIndex === -1) return;
+    const line = lines.find(l => l.id === lineId);
+    if (!line) return;
 
-    const updatedLines = [...lines];
-    updatedLines[lineIndex] = { ...updatedLines[lineIndex], text: newText };
+    // Get all lines belonging to the updated section
+    const sectionLines = lines.filter(l => l.sectionId === line.sectionId);
 
-    // Convert lines back to sections
-    const sectionMap = new Map<string, string>();
-    updatedLines.forEach(line => {
-      const existing = sectionMap.get(line.sectionId) || '';
-      sectionMap.set(line.sectionId, existing ? `${existing}\n${line.text}` : line.text);
+    // Construct the new text for this specific section by updating only the changed line
+    const updatedSectionText = sectionLines.map(l =>
+      l.id === lineId ? newText : l.text
+    ).join('\n');
+
+    // Update only the targeted section, preserving references of all other sections
+    const updatedSections = sections.map(section => {
+      if (section.id === line.sectionId) {
+        return { ...section, text: updatedSectionText };
+      }
+      return section;
     });
-
-    const updatedSections = sections.map(section => ({
-      ...section,
-      text: sectionMap.get(section.id) || ''
-    }));
 
     onUpdateSections(updatedSections);
   };
@@ -120,13 +126,8 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
 
       // Double Enter detection: If current line is empty, creating a new section break
       if (currentLine.text.trim() === '') {
-        // We are splitting the section or creating a new one
         const sectionLines = currentSection.text.split('\n');
-        // Find the index of this line within the section's lines
-        // We need robust index finding since multiple lines might have same text
-        // relying on the ID format `${section.id}-line-${idx}` we constructed
-        const lineIdxStr = currentLine.id.split('-line-').pop();
-        const lineIdx = lineIdxStr ? parseInt(lineIdxStr) : -1;
+        const lineIdx = currentLine.sectionLineIdx;
 
         if (lineIdx !== -1) {
           const textBefore = sectionLines.slice(0, lineIdx).join('\n');
@@ -174,18 +175,21 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
       e.preventDefault();
       const prevLineId = lines[index - 1]?.id;
 
-      // Remove empty line by updating section text
-      const updatedLines = lines.filter(l => l.id !== id);
-      const sectionMap = new Map<string, string>();
-      updatedLines.forEach(line => {
-        const existing = sectionMap.get(line.sectionId) || '';
-        sectionMap.set(line.sectionId, existing ? `${existing}\n${line.text}` : line.text);
-      });
+      // Remove empty line from its section by filtering it out from the section lines
+      const targetLine = lines[index];
+      const sectionLines = lines.filter(l => l.sectionId === targetLine.sectionId);
 
-      const updatedSections = sections.map(section => ({
-        ...section,
-        text: sectionMap.get(section.id) || ''
-      }));
+      const updatedSectionText = sectionLines
+        .filter(l => l.id !== id)
+        .map(l => l.text)
+        .join('\n');
+
+      const updatedSections = sections.map(section => {
+        if (section.id === targetLine.sectionId) {
+          return { ...section, text: updatedSectionText };
+        }
+        return section;
+      });
       onUpdateSections(updatedSections);
 
       if (prevLineId) {
@@ -215,13 +219,6 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
   const handleDrop = (e: React.DragEvent, targetLineId: string) => {
     e.preventDefault();
     const sessionId = e.dataTransfer.getData('text/plain');
-
-    // Remove session from any other line and add to target
-    const newLines = lines.map(line => {
-      if (line.id === targetLineId) return { ...line, sessionId };
-      if (line.sessionId === sessionId) return { ...line, sessionId: undefined };
-      return line;
-    });
 
     // Convert back to sections (simplified - just update the pinned session on the section)
     const targetLine = lines.find(l => l.id === targetLineId);
@@ -318,17 +315,19 @@ export const SandboxView: React.FC<SandboxViewProps> = ({
               <button
                 onClick={() => {
                   if (lines.length > 1) {
-                    // Remove this line by updating section text
-                    const updatedLines = lines.filter(l => l.id !== line.id);
-                    const sectionMap = new Map<string, string>();
-                    updatedLines.forEach(l => {
-                      const existing = sectionMap.get(l.sectionId) || '';
-                      sectionMap.set(l.sectionId, existing ? `${existing}\n${l.text}` : l.text);
+                    // Remove this line from its section by filtering it out from section lines
+                    const sectionLines = lines.filter(l => l.sectionId === line.sectionId);
+                    const updatedSectionText = sectionLines
+                      .filter(l => l.id !== line.id)
+                      .map(l => l.text)
+                      .join('\n');
+
+                    const updatedSections = sections.map(section => {
+                      if (section.id === line.sectionId) {
+                        return { ...section, text: updatedSectionText };
+                      }
+                      return section;
                     });
-                    const updatedSections = sections.map(section => ({
-                      ...section,
-                      text: sectionMap.get(section.id) || ''
-                    }));
                     onUpdateSections(updatedSections);
                   } else {
                     handleLineChange(line.id, "");
