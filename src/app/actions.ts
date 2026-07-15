@@ -220,7 +220,8 @@ export interface GeminiSection {
 
 export async function analyzeAudioStructure(audioBase64: string, lyricsContext?: string) {
     try {
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+await getAuthenticatedClient();
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error("API Key missing");
 
         const ai = new GoogleGenAI({ apiKey });
@@ -260,8 +261,11 @@ Return the results ONLY as a JSON array of objects with this structure:
         const detectedSections = JSON.parse(jsonText) as GeminiSection[];
 
         return { success: true, sections: detectedSections };
-    } catch (error) {
+    } catch (error: any) {
         console.error("Gemini Audio Analysis Error:", error);
+        if (error?.message === "Unauthorized") {
+            return { success: false, error: "Unauthorized" };
+        }
         return { success: false, error: "Failed to analyze audio structure" };
     }
 }
@@ -282,7 +286,8 @@ export type FacilitatorContext = {
 
 export async function chatWithFacilitator(userPrompt: string, context: FacilitatorContext) {
     try {
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+await getAuthenticatedClient();
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) {
             console.warn("GOOGLE_API_KEY is not set. Using fallback response.");
             return {
@@ -443,8 +448,14 @@ ${sessionsStr}
         const reply = response.text || "I don't have a specific response for that right now.";
 
         return { reply, success: true };
-    } catch (error) {
+    } catch (error: any) {
         console.error("Gemini Error in Facilitator:", error);
+        if (error?.message === "Unauthorized") {
+            return {
+                reply: "You must be signed in to use the Facilitator AI.",
+                success: false
+            };
+        }
         return {
             reply: "I'm having trouble connecting to my brain right now. Try again in a moment.",
             success: false
