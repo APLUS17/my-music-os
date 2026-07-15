@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Slider } from "@/components/ui/slider";
 import { RecordingLayer } from '@/types';
 import { formatTime } from '@/lib/utils/time';
-import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
+import { FXSettings, defaultFXSettings } from './FXPanel';
 import { createReverbImpulse } from '@/hooks/useVocalFX';
 import { VOCAL_PRESETS } from '@/lib/audio/vocalPresets';
 
@@ -1419,22 +1419,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 <X size={22} />
               </button>
             </div>
-
-            {/* Vocal FX Panel Overlay */}
-            <AnimatePresence>
-              {showFXPanel && (
-                <FXPanel
-                  onClose={() => setShowFXPanel(false)}
-                  settings={fxSettings}
-                  onUpdate={(key, value) => setFxSettings(prev => ({ ...prev, [key]: value }))}
-                  isRecordingMode={true}
-                  isFXActive={isFXActive}
-                  onFXActiveToggle={setIsFXActive}
-                  isMonitoringEnabled={isMonitoringEnabled}
-                  onMonitoringToggle={setIsMonitoringEnabled}
-                />
-              )}
-            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
