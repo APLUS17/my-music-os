@@ -113,6 +113,7 @@ export interface RecordingSession {
     museSegments?: MuseSegment[];
     museRecap?: MuseRecap;
     museStatus?: MuseStatus;
+    museError?: string; // last analysis-failure reason shown to the user
     mimeType?: string; // real mime for Gemini (webm vs mp4)
 }
 
