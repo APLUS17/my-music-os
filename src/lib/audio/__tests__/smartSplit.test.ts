@@ -132,6 +132,23 @@ describe('analyzeAudioAndSplit', () => {
         });
     });
 
+    describe('Edge Cases', () => {
+        it('should return empty sections and not call getChannelData if duration is 0', async () => {
+            const getChannelDataSpy = vi.fn(() => new Float32Array(0));
+            const buffer = {
+                duration: 0,
+                sampleRate: 44100,
+                getChannelData: getChannelDataSpy,
+                length: 0,
+                numberOfChannels: 1
+            } as unknown as AudioBuffer;
+
+            const sections = await analyzeAudioAndSplit(buffer);
+            expect(sections).toHaveLength(0);
+            expect(getChannelDataSpy).not.toHaveBeenCalled();
+        });
+    });
+
     describe('Loop Mode', () => {
         it('should split into multiple passes based on loop duration', async () => {
             const loopStart = 1;
@@ -214,14 +231,6 @@ describe('analyzeAudioAndSplit', () => {
             });
 
             expect(sections[0].loopPass).toBeUndefined();
-        });
-
-        it('should return empty sections if duration is 0', async () => {
-            const samples = new Float32Array(0);
-            const audioBuffer = mockAudioBuffer(samples);
-            const sections = await analyzeAudioAndSplit(audioBuffer);
-
-            expect(sections).toHaveLength(0);
         });
     });
 
