@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@/lib/supabase/server';
 import {
     buildMusePrompt,
     mapMuseResponse,
@@ -10,10 +11,19 @@ import {
 export const maxDuration = 300; // Vercel Fluid Compute timeout (5 min)
 
 export async function POST(request: NextRequest) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let uploadResponse: any = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let ai: any = null;
 
     try {
+        // Authenticate the user session before allowing processing
+        const supabase = await createClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
+
         const formData = await request.formData();
         const sessionId = formData.get('sessionId') as string | null;
         const mimeType = formData.get('mimeType') as string | null;
@@ -80,6 +90,7 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true, segments, recap });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
         console.error('API Muse Analyze Route Error:', e);
         return NextResponse.json({ success: false, error: e.message || 'An error occurred during session analysis' }, { status: 500 });
