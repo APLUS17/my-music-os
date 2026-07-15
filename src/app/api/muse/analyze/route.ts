@@ -10,60 +10,63 @@ import {
 
 export const maxDuration = 300; // Vercel Fluid Compute timeout (5 min)
 
+// Audio bytes are uploaded to Gemini directly from the browser via
+// /api/muse/upload-init — this route only takes the resulting fileUri
+// and runs the analysis, keeping the request body tiny.
 export async function POST(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
+const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
 
-    let uploadResponse: any = null;
-    let ai: any = null;
+  let uploadResponse: any = null; 
+  let ai: GoogleGenAI | null = null;
+  let fileName: string | null = null;
 
     try {
-        const formData = await request.formData();
-        const sessionId = formData.get('sessionId') as string | null;
-        const mimeType = formData.get('mimeType') as string | null;
-        const durationSec = Number(formData.get('durationSec'));
-        const audioFile = formData.get('audio') as File | null;
+        const { sessionId, fileUri, fileName: fileNameIn, mimeType, durationSec } =
+            await request.json();
 
-        if (!sessionId || !mimeType || !audioFile || isNaN(durationSec)) {
-            return NextResponse.json({ success: false, error: 'Missing required parameters' }, { status: 400 });
+        if (!sessionId || !fileUri || !mimeType || typeof durationSec !== 'number') {
+            return NextResponse.json(
+                { success: false, error: 'Missing sessionId, fileUri, mimeType, or durationSec' },
+                { status: 400 }
+            );
         }
 
-        // 1. Initialize Gemini
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        const apiKey =
+            process.env.GOOGLE_API_KEY ||
+            process.env.NEXT_PUBLIC_GOOGLE_API_KEY ||
+            process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ success: false, error: 'Gemini API Key missing on server' }, { status: 500 });
+            return NextResponse.json(
+                { success: false, error: 'Gemini API key missing on server' },
+                { status: 500 }
+            );
         }
         ai = new GoogleGenAI({ apiKey });
+        fileName = fileNameIn || null;
 
-        // 2. Convert uploaded file to native File object
-        const arrayBuffer = await audioFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const fileObj = new File([buffer], `session_${sessionId}`, { type: mimeType });
+        // Poll until the uploaded file is ACTIVE.
+        if (fileName) {
+            let fileInfo = await ai.files.get({ name: fileName });
+            const startTime = Date.now();
+            const timeoutMs = 180000; // 3 minutes
 
-        // 3. Upload file
-        uploadResponse = await ai.files.upload({ file: fileObj });
-
-        // 4. Poll until ACTIVE
-        let fileInfo = await ai.files.get({ name: uploadResponse.name });
-        const startTime = Date.now();
-        const timeoutMs = 180000; // 3 minutes
-
-        while (fileInfo.state === 'PROCESSING') {
-            if (Date.now() - startTime > timeoutMs) {
-                throw new Error('Gemini file processing timed out');
+            while (fileInfo.state === 'PROCESSING') {
+                if (Date.now() - startTime > timeoutMs) {
+                    throw new Error('Gemini file processing timed out');
+                }
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+                fileInfo = await ai.files.get({ name: fileName });
             }
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            fileInfo = await ai.files.get({ name: uploadResponse.name });
+
+            if (fileInfo.state === 'FAILED') {
+                throw new Error('Gemini file processing failed');
+            }
         }
 
-        if (fileInfo.state === 'FAILED') {
-            throw new Error('Gemini file processing failed');
-        }
-
-        // 5. Generate content using prompts
         const promptText = buildMusePrompt(durationSec);
         const generateResponse = await ai.models.generateContent({
             model: MUSE_MODEL,
@@ -71,8 +74,8 @@ export async function POST(request: NextRequest) {
                 { text: promptText },
                 {
                     fileData: {
-                        fileUri: fileInfo.uri,
-                        mimeType: fileInfo.mimeType
+                        fileUri,
+                        mimeType
                     }
                 }
             ],
@@ -86,15 +89,17 @@ export async function POST(request: NextRequest) {
         const { segments, recap } = mapMuseResponse(responseText, durationSec);
 
         return NextResponse.json({ success: true, segments, recap });
-
     } catch (e: any) {
         console.error('API Muse Analyze Route Error:', e);
-        return NextResponse.json({ success: false, error: e.message || 'An error occurred during session analysis' }, { status: 500 });
+        return NextResponse.json(
+            { success: false, error: e?.message || 'An error occurred during session analysis' },
+            { status: 500 }
+        );
     } finally {
-        // Clean up Gemini Files API file
-        if (ai && uploadResponse?.name) {
+        // Clean up the uploaded file — best effort.
+        if (ai && fileName) {
             try {
-                await ai.files.delete({ name: uploadResponse.name });
+                await ai.files.delete({ name: fileName });
             } catch (err) {
                 console.warn('Failed to delete Gemini file:', err);
             }
