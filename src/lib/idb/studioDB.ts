@@ -7,9 +7,12 @@ const CHUNKS_STORE = 'muse_chunks';
 const AUDIO_STORE = 'muse_audio';
 const MANIFESTS_STORE = 'muse_manifests';
 
-export const initDB = (): Promise<IDBDatabase> => {
+export const initDB = (): Promise<IDBDatabase | undefined> => {
     return new Promise((resolve, reject) => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined') {
+            resolve(undefined);
+            return;
+        }
         const request = indexedDB.open(DB_NAME, DB_VERSION);
         request.onerror = () => reject(request.error);
         request.onsuccess = () => resolve(request.result);
@@ -37,6 +40,7 @@ export const initDB = (): Promise<IDBDatabase> => {
 export const saveAudioData = async (id: string, data: string): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
@@ -49,6 +53,7 @@ export const saveAudioData = async (id: string, data: string): Promise<void> => 
 export const getAudioData = async (id: string): Promise<string | undefined> => {
     if (typeof window === 'undefined') return undefined;
     const db = await initDB();
+    if (!db) return undefined;
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
@@ -61,6 +66,7 @@ export const getAudioData = async (id: string): Promise<string | undefined> => {
 export const deleteAudioData = async (id: string): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
@@ -74,6 +80,7 @@ export const deleteAudioData = async (id: string): Promise<void> => {
 export const putMuseChunk = async (recId: string, seq: number, blob: Blob): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     const key = `${recId}:${String(seq).padStart(6, '0')}`;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(CHUNKS_STORE, 'readwrite');
@@ -87,6 +94,7 @@ export const putMuseChunk = async (recId: string, seq: number, blob: Blob): Prom
 export const getMuseChunks = async (recId: string): Promise<Blob[]> => {
     if (typeof window === 'undefined') return [];
     const db = await initDB();
+    if (!db) return [];
     return new Promise<Blob[]>((resolve, reject) => {
         const tx = db.transaction(CHUNKS_STORE, 'readonly');
         const store = tx.objectStore(CHUNKS_STORE);
@@ -100,6 +108,7 @@ export const getMuseChunks = async (recId: string): Promise<Blob[]> => {
 export const deleteMuseChunks = async (recId: string): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     const range = IDBKeyRange.bound(`${recId}:`, `${recId}:\uffff`);
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(CHUNKS_STORE, 'readwrite');
@@ -131,6 +140,7 @@ export const deleteMuseChunks = async (recId: string): Promise<void> => {
 export const saveMuseAudio = async (id: string, blob: Blob): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(AUDIO_STORE, 'readwrite');
         const store = tx.objectStore(AUDIO_STORE);
@@ -143,6 +153,7 @@ export const saveMuseAudio = async (id: string, blob: Blob): Promise<void> => {
 export const getMuseAudio = async (id: string): Promise<Blob | undefined> => {
     if (typeof window === 'undefined') return undefined;
     const db = await initDB();
+    if (!db) return undefined;
     return new Promise((resolve, reject) => {
         const tx = db.transaction(AUDIO_STORE, 'readonly');
         const store = tx.objectStore(AUDIO_STORE);
@@ -155,6 +166,7 @@ export const getMuseAudio = async (id: string): Promise<Blob | undefined> => {
 export const deleteMuseAudio = async (id: string): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(AUDIO_STORE, 'readwrite');
         const store = tx.objectStore(AUDIO_STORE);
@@ -168,6 +180,7 @@ export const deleteMuseAudio = async (id: string): Promise<void> => {
 export const putMuseManifest = async (manifest: MuseManifest): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(MANIFESTS_STORE, 'readwrite');
         const store = tx.objectStore(MANIFESTS_STORE);
@@ -180,6 +193,7 @@ export const putMuseManifest = async (manifest: MuseManifest): Promise<void> => 
 export const getMuseManifests = async (): Promise<MuseManifest[]> => {
     if (typeof window === 'undefined') return [];
     const db = await initDB();
+    if (!db) return [];
     return new Promise<MuseManifest[]>((resolve, reject) => {
         const tx = db.transaction(MANIFESTS_STORE, 'readonly');
         const store = tx.objectStore(MANIFESTS_STORE);
@@ -192,6 +206,7 @@ export const getMuseManifests = async (): Promise<MuseManifest[]> => {
 export const deleteMuseManifest = async (id: string): Promise<void> => {
     if (typeof window === 'undefined') return;
     const db = await initDB();
+    if (!db) return;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(MANIFESTS_STORE, 'readwrite');
         const store = tx.objectStore(MANIFESTS_STORE);
