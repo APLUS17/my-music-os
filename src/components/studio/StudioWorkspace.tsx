@@ -1383,13 +1383,17 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleDeleteSession = async (sessionId: string) => {
-        if (!confirm("Permanently delete this recording?")) return;
-
+    const deleteSessionImmediate = async (sessionId: string) => {
         // Stop playback if deleting current
         if (playingSessionId === sessionId) {
             globalAudioRef.current?.pause();
             setPlayingSessionId(null);
+        }
+
+        // If the deleted take is currently active, fall back to the next one
+        if (activeSessionId === sessionId) {
+            const remaining = sessions.filter(s => s.id !== sessionId && s.kind !== 'muse');
+            setActiveSessionId(remaining[0]?.id ?? null);
         }
 
         // Remove from sessions list
@@ -1406,6 +1410,11 @@ const StudioWorkspace: React.FC = () => {
         } catch (e) {
             console.error("Failed to delete audio data", e);
         }
+    };
+
+    const handleDeleteSession = async (sessionId: string) => {
+        if (!confirm("Permanently delete this recording?")) return;
+        await deleteSessionImmediate(sessionId);
     };
 
     const handlePlayBeat = (beatId: string) => {
@@ -2817,6 +2826,7 @@ const StudioWorkspace: React.FC = () => {
                                                 onTogglePlay={togglePlayback}
                                                 onSeek={seekTo}
                                                 onSelectSession={setActiveSessionId}
+                                                onDeleteSession={deleteSessionImmediate}
                                                 onBeatPlaybackChange={(isP) => {
                                                     if (isP && isBeatPlaying && beatAudioRef.current) {
                                                         beatAudioRef.current.pause();
