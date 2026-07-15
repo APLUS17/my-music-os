@@ -22,6 +22,8 @@ import { FXSettings, defaultFXSettings } from './FXPanel';
 import { createReverbImpulse } from '@/hooks/useVocalFX';
 import { VOCAL_PRESETS } from '@/lib/audio/vocalPresets';
 
+import { Loader2 } from 'lucide-react';
+
 interface RecorderDrawerProps {
   onClose: () => void;
   onSave: (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => void;
@@ -42,6 +44,8 @@ interface RecorderDrawerProps {
   layerMode?: boolean;
   existingLayers?: RecordingLayer[];
   parentAudioUrl?: string | null;
+  isBeatLoading?: boolean;
+  onRecordingStateChange?: (isRecording: boolean) => void;
 }
 
 export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
@@ -63,6 +67,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   layerMode = false,
   existingLayers = [],
   parentAudioUrl = null,
+  isBeatLoading = false,
+  onRecordingStateChange,
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -165,7 +171,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         mediaRecorderRef.current.stop();
       }
       if (backingAudioRef?.current) {
-        backingAudioRef.current.volume = 1.0;
         backingAudioRef.current.pause();
       }
       if (animationFrameRef.current) {
@@ -547,7 +552,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         const compensatedStartOffset = Math.max(0, recordingStartOffsetRef.current - (latencyCompensation / 1000));
         const beatPos = getBeatPosition(audio.currentTime, compensatedStartOffset);
         backingAudio.currentTime = beatPos;
-        backingAudio.volume = 0.55;
         onResumeBeatAudio?.();
         backingAudio.play().catch(console.error);
       }
@@ -555,7 +559,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (!audio.paused) audio.pause();
       if (backingAudio && recordedBlob && !backingAudio.paused) {
         backingAudio.pause();
-        backingAudio.volume = 1.0;
         onPauseBeatAudio?.();
       }
     }
@@ -881,7 +884,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   };
 
+  useEffect(() => {
+    onRecordingStateChange?.(isRecording);
+  }, [isRecording, onRecordingStateChange]);
+
   const handleToggleRecord = () => {
+    if (isBeatLoading) return;
     if (isRecording) {
       stopRecording();
     } else {
@@ -1396,13 +1404,19 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 )}
                 <button
                   onClick={handleToggleRecord}
-                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-2xl ${isRecording
-                      ? 'bg-red-500 hover:bg-red-400'
-                      : 'bg-red-600 hover:bg-red-500'
-                    }`}
-                  aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+                  disabled={isBeatLoading}
+                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-2xl ${
+                    isBeatLoading
+                      ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                      : isRecording
+                        ? 'bg-red-500 hover:bg-red-400'
+                        : 'bg-red-600 hover:bg-red-500'
+                  }`}
+                  aria-label={isBeatLoading ? 'Loading beat...' : isRecording ? 'Stop recording' : 'Start recording'}
                 >
-                  {isRecording ? (
+                  {isBeatLoading ? (
+                    <Loader2 size={32} className="text-white animate-spin" />
+                  ) : isRecording ? (
                     <div className="w-7 h-7 bg-white rounded-[5px]" />
                   ) : (
                     <div className="w-8 h-8 bg-white rounded-full" />

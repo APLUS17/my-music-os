@@ -89,14 +89,15 @@ describe('API Route Security Authentication Tests', () => {
 
             const req = new NextRequest('http://localhost/api/muse/analyze', {
                 method: 'POST',
-                body: new FormData(), // empty form data will fail missing parameters check
+                body: JSON.stringify({}), // Sending empty JSON body
             });
 
             const res = await analyzePOST(req);
             expect(res.status).toBe(400);
 
             const body = await res.json();
-            expect(body).toEqual({ success: false, error: 'Missing required parameters' });
+            expect(body.success).toBe(false);
+            expect(body.error).toContain('Missing sessionId, fileUri, mimeType, or durationSec');
         });
     });
 });
