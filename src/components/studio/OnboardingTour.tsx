@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 interface Step {
@@ -26,6 +26,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [rect, setRect] = useState<DOMRect | null>(null);
+    const cardRef = useRef<HTMLDivElement | null>(null);
+    const [cardSize, setCardSize] = useState({ width: 340, height: 300 });
 
     const STEPS: Step[] = [
         {
@@ -36,8 +38,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         },
         {
             targetId: 'tour-nav-library',
-            title: 'Home',
-            content: 'Your home dashboard. All your songs and beats live here. Start here to find your sound or create something new.',
+            title: 'Library',
+            content: 'Your library dashboard. All your songs and beats live here. Start here to find your sound or create something new.',
             position: 'top',
             action: () => setViewMode('home')
         },
@@ -136,11 +138,57 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
         }
     };
 
+    // Measure the card so we can keep it fully inside the viewport on any screen size
+    useLayoutEffect(() => {
+        const measure = () => {
+            if (cardRef.current) {
+                const r = cardRef.current.getBoundingClientRect();
+                setCardSize((prev) =>
+                    prev.width === r.width && prev.height === r.height
+                        ? prev
+                        : { width: r.width, height: r.height }
+                );
+            }
+        };
+        measure();
+        window.addEventListener('resize', measure);
+        return () => window.removeEventListener('resize', measure);
+    }, [currentStep, rect]);
+
     if (!rect && params.targetId !== 'welcome-step') return null;
 
     const isWelcome = params.targetId === 'welcome-step';
-    const tooltipX = isWelcome ? window.innerWidth / 2 : rect!.left + (rect!.width / 2);
-    const clampedX = Math.max(160, Math.min(window.innerWidth - 160, tooltipX));
+    const margin = 16;
+    const gap = 24;
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 375;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 667;
+
+    // Desired top-left corner of the card, then clamp both axes into the viewport.
+    let cardLeft: number;
+    let cardTop: number;
+
+    if (isWelcome) {
+        cardLeft = (vw - cardSize.width) / 2;
+        cardTop = (vh - cardSize.height) / 2;
+    } else {
+        const centerX = rect!.left + rect!.width / 2;
+        cardLeft = centerX - cardSize.width / 2;
+        cardTop =
+            params.position === 'top'
+                ? rect!.top - gap - cardSize.height
+                : rect!.bottom + gap;
+
+        // If placing above/below would push it off-screen, flip to the other side.
+        if (params.position === 'top' && cardTop < margin) {
+            cardTop = rect!.bottom + gap;
+        } else if (params.position !== 'top' && cardTop + cardSize.height > vh - margin) {
+            cardTop = rect!.top - gap - cardSize.height;
+        }
+    }
+
+    // Final clamp so the whole card is always visible.
+    cardLeft = Math.max(margin, Math.min(vw - cardSize.width - margin, cardLeft));
+    cardTop = Math.max(margin, Math.min(vh - cardSize.height - margin, cardTop));
 
     return (
         <div className="fixed inset-0 z-[9999] pointer-events-auto touch-none">
@@ -161,19 +209,11 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 
             {/* The Tooltip/Card */}
             <div
-                className="absolute flex flex-col p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-500 pointer-events-auto w-[calc(100%-48px)] max-w-[340px]"
+                ref={cardRef}
+                className="absolute flex flex-col p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-main)] shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-500 pointer-events-auto w-[calc(100%-32px)] max-w-[340px] max-h-[calc(100dvh-32px)] overflow-y-auto"
                 style={{
-                    top: isWelcome
-                        ? '50%'
-                        : params.position === 'top'
-                            ? rect!.top - 24
-                            : rect!.bottom + 24,
-                    left: clampedX,
-                    transform: isWelcome
-                        ? 'translate(-50%, -50%)'
-                        : params.position === 'top'
-                            ? 'translate(-50%, -100%)'
-                            : 'translate(-50%, 0)'
+                    top: cardTop,
+                    left: cardLeft,
                 }}
             >
                 <div className="mb-6">

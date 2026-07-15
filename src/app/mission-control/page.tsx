@@ -6,7 +6,7 @@ import {
   Map, Calendar, FileText, Heart, TrendingUp, RefreshCw,
   Link2, Target, StickyNote, Package, LayoutGrid,
   GitBranch, Clock, Plus, Eye, EyeOff, ArrowLeft, ChevronRight,
-  Database, Info, Check, Play, Pause, Trash2
+  Database
 } from "lucide-react";
 
 const CC: Record<string, string> = { Strategy: "#818cf8", Growth: "#f472b6", Product: "#34d399", Business: "#fb923c" };

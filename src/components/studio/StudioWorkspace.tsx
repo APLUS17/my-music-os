@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat, Note } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
+import { OpenEditor } from './OpenEditor';
 import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
@@ -44,69 +45,31 @@ import {
     History,
     Sun,
     Moon,
-    BookText
+    BookText,
+    Archive,
+    Sparkles
 } from 'lucide-react';
+import { MuseView } from './MuseView';
+import { processMuseSession } from '@/lib/muse/processMuseSession';
+import { MuseManifest } from '@/types';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChevronDown, CheckCircle2, Bookmark, Menu, ChevronLeft } from 'lucide-react';
 
-// --- Database Logic Inline (to avoid module resolution errors) ---
-const DB_NAME = 'StudioProDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'audio_assets';
+import {
+    saveAudioData,
+    getAudioData,
+    deleteAudioData,
+    saveMuseAudio,
+    getMuseAudio,
+    deleteMuseAudio,
+    getMuseManifests,
+    deleteMuseChunks,
+    deleteMuseManifest,
+    getMuseChunks
+} from '@/lib/idb/studioDB';
 
-const initDB = (): Promise<IDBDatabase> => {
-    return new Promise((resolve, reject) => {
-        if (typeof window === 'undefined') return;
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
-        request.onupgradeneeded = (event) => {
-            const db = (event.target as IDBOpenDBRequest).result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME);
-            }
-        };
-    });
-};
-
-const saveAudioData = async (id: string, data: string) => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.put(data, id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-};
-
-const getAudioData = async (id: string): Promise<string | undefined> => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-};
-
-const deleteAudioData = async (id: string) => {
-    if (typeof window === 'undefined') return;
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-};
-
-type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook';
+type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook' | 'muse';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -436,7 +399,7 @@ const StudioWorkspace: React.FC = () => {
     }, [recordingCounter]);
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
-    const [studioMode, setStudioMode] = useState<'flow' | 'write'>(sections.length > 0 ? 'write' : 'flow');
+    const [studioMode, setStudioMode] = useState<'flow' | 'write'>('write');
     const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
     const [showSyllables, setShowSyllables] = useState<boolean>(() => {
@@ -449,6 +412,18 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => {
         localStorage.setItem('lyriq_show_syllables', String(showSyllables));
     }, [showSyllables]);
+
+    // Editor layout preference: 'cards' (structured section cards) or 'open' (blank notes page)
+    const [editorLayout, setEditorLayout] = useState<'cards' | 'open'>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('lyriq_editor_layout') === 'open' ? 'open' : 'cards';
+        }
+        return 'cards';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('lyriq_editor_layout', editorLayout);
+    }, [editorLayout]);
 
     // Sync sections edits to categorySections
     useEffect(() => {
@@ -511,8 +486,10 @@ const StudioWorkspace: React.FC = () => {
 
     const displaySessions = useMemo(() =>
         sessions.filter(s =>
-            !s.projectId ||  // Show sessions without projectId (floating/old)
-            s.projectId === activeProjectId  // Show sessions for current project
+            s.kind !== 'muse' && (
+                !s.projectId ||  // Show sessions without projectId (floating/old)
+                s.projectId === activeProjectId  // Show sessions for current project
+            )
         ),
         [sessions, activeProjectId]
     );
@@ -532,6 +509,11 @@ const StudioWorkspace: React.FC = () => {
     const [isBeatPlaying, setIsBeatPlaying] = useState(false);
     const [beatVolume, setBeatVolume] = useState(1);
     const [beatMuted, setBeatMuted] = useState(false);
+
+    // Recording (vocal take) volume — independent from the beat so the two
+    // tracks can be balanced against each other during mixed playback
+    const [vocalVolume, setVocalVolume] = useState(1);
+    const [vocalMuted, setVocalMuted] = useState(false);
     const [beatLoopStart, setBeatLoopStart] = useState<number | null>(null);
     const [beatLoopEnd, setBeatLoopEnd] = useState<number | null>(null);
     const [isBeatLooping, setIsBeatLooping] = useState(false);
@@ -557,6 +539,33 @@ const StudioWorkspace: React.FC = () => {
 
     // Select a session and start playing once it loads (used by play buttons)
     const handleSelectSessionAndPlay = (id: string, seekTime?: number) => {
+        // If this session's audio is already loaded and active, seek+play directly.
+        // setActiveSessionId(id) below is a no-op when id === activeSessionId (same
+        // state value, no re-render), so the <audio> element's src never changes and
+        // onLoadedMetadata never re-fires — meaning the pending-seek/play refs further
+        // down would never get consumed. Jumping to a new timestamp within the same
+        // already-playing session (e.g. clicking a different highlight/segment) needs
+        // this fast path instead.
+        if (id === activeSessionId && vocalAudioRef.current && vocalAudioRef.current.readyState >= 1) {
+            if (seekTime !== undefined) seekTo(seekTime);
+            togglePlayback(true);
+            return;
+        }
+
+        // Re-selecting the currently-active session whose <audio> element lost its
+        // loaded data (readyState 0) — e.g. the browser reclaimed it while the PWA
+        // was backgrounded/screen-switched-away. setActiveSessionId(id) below would
+        // be a same-value no-op here too (no re-render → src never re-applied →
+        // onLoadedMetadata never fires), leaving pendingPlayRef stuck forever and
+        // this session permanently unplayable. Force a reload so the load event
+        // fires again to consume the pending play/seek.
+        if (id === activeSessionId && vocalAudioRef.current) {
+            pendingPlayRef.current = true;
+            if (seekTime !== undefined) pendingSeekRef.current = seekTime;
+            vocalAudioRef.current.load();
+            return;
+        }
+
         if (isPlaying) {
             vocalAudioRef.current?.pause();
             beatAudioRef.current?.pause();
@@ -569,28 +578,61 @@ const StudioWorkspace: React.FC = () => {
         setActiveSessionId(id);
     };
 
+    const handlePause = () => {
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        beatAudioCtxRef.current?.suspend();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+    };
+
     // Sync Vocal and Beat
     const togglePlayback = (play?: boolean) => {
         const shouldPlay = play !== undefined ? play : !isPlaying;
 
         if (shouldPlay) {
             beatAudioCtxRef.current?.resume();
-            
+
             // 1. Play Vocal if available
             const hasVocals = sessions.length > 0 && vocalAudioRef.current;
             if (hasVocals) {
                 vocalAudioRef.current?.play().catch(console.error);
             }
 
+            const activeSess = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            const isMuseSession = activeSess?.kind === 'muse';
+
+            // Muse sessions are full-room captures that already contain any
+            // beat that was playing — layering the studio beat on top would
+            // make the audio bleed. Keep (or force) the beat silent instead.
+            if (isMuseSession) {
+                if (beatAudioRef.current && !beatAudioRef.current.paused) {
+                    beatAudioRef.current.pause();
+                    beatAudioCtxRef.current?.suspend();
+                }
+                setIsBeatPlaying(false);
+            }
+
             // 2. Play Beat if available
-            if (uploadedBeat && beatAudioRef.current) {
-                const session = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            if (uploadedBeat && beatAudioRef.current && !isMuseSession) {
+                const session = activeSess;
+                const beat = beatAudioRef.current;
+
                 if (session && vocalAudioRef.current) {
                     const offset = session.beatOffset || 0;
-                    const beat = beatAudioRef.current;
-                    if (beat.readyState >= 1) beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                    if (beat.readyState >= 1) {
+                        beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                    } else {
+                        const syncOnMetadata = () => {
+                            if (vocalAudioRef.current) {
+                                beat.currentTime = vocalAudioRef.current.currentTime + offset;
+                            }
+                            beat.removeEventListener('loadedmetadata', syncOnMetadata);
+                        };
+                        beat.addEventListener('loadedmetadata', syncOnMetadata);
+                    }
                 }
-                beatAudioRef.current.play().catch(console.error);
+                beat.play().catch(console.error);
                 setIsBeatPlaying(true);
             }
             
@@ -606,7 +648,9 @@ const StudioWorkspace: React.FC = () => {
 
     const seekTo = (time: number) => {
         const clamped = Math.max(0, Math.min(duration || 0, time));
-        if (vocalAudioRef.current) vocalAudioRef.current.currentTime = clamped;
+        if (vocalAudioRef.current && sessions.length > 0 && vocalAudioRef.current.src) {
+            vocalAudioRef.current.currentTime = clamped;
+        }
 
         if (beatAudioRef.current) {
             const beat = beatAudioRef.current;
@@ -728,6 +772,35 @@ const StudioWorkspace: React.FC = () => {
         }
     }, [beatVolume, beatMuted]);
 
+    // Update Recording (vocal) Volume
+    useEffect(() => {
+        if (vocalAudioRef.current) {
+            vocalAudioRef.current.volume = vocalMuted ? 0 : vocalVolume;
+        }
+        // globalAudioRef doubles as the beat-preview player; only touch it
+        // while it's playing a recording session
+        if (globalAudioRef.current && playingSessionId) {
+            globalAudioRef.current.volume = vocalMuted ? 0 : vocalVolume;
+        }
+    }, [vocalVolume, vocalMuted, playingSessionId]);
+
+    // Sync duration based on available tracks (vocal takes vs backing beat)
+    useEffect(() => {
+        if (sessions.length > 0) {
+            const activeSession = sessions.find(s => s.id === activeSessionId) ?? sessions[0];
+            if (activeSession) {
+                setDuration(activeSession.duration ?? 0);
+            }
+        } else if (uploadedBeat && beatAudioRef.current) {
+            const beatDur = beatAudioRef.current.duration;
+            if (beatDur && isFinite(beatDur) && beatDur > 0) {
+                setDuration(beatDur);
+            }
+        } else {
+            setDuration(0);
+        }
+    }, [sessions.length, uploadedBeat, activeSessionId]);
+
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
             setShowTour(true);
@@ -738,7 +811,7 @@ const StudioWorkspace: React.FC = () => {
         localStorage.setItem('lyriq-tour-completed', 'true');
         setShowTour(false);
         setViewMode('studio');
-        setSections([]); // Blank canvas for new users
+        setSections(createDefaultSections()); // Blank canvas for new users
         setProjectTitle('');
         setStudioMode('flow');
     };
@@ -766,56 +839,82 @@ const StudioWorkspace: React.FC = () => {
                     const parsed = JSON.parse(savedData);
 
                     const activeCat = parsed.activeCategory || 'Notes';
-                    setActiveCategory(activeCat);
-
-                    let activeCatSections = parsed.sections || [];
-                    if (parsed.categorySections) {
-                        setCategorySections(parsed.categorySections);
-                        activeCatSections = parsed.categorySections[activeCat] || [];
-                    } else {
-                        const newCategorySections: Record<string, LyricSection[]> = {};
-                        CATEGORIES.forEach(cat => {
-                            if (cat === 'Lyrics') {
-                                newCategorySections[cat] = parsed.sections || [];
-                            } else {
-                                 newCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
-                            }
-                        });
-                        setCategorySections(newCategorySections);
-                        activeCatSections = newCategorySections[activeCat] || [];
-                    }
-
-                    // Migration: clear old mock text from mission project
-                    if (parsed.sections && parsed.sections.some((s: LyricSection) =>
-                        s.text.includes("Hit play on the beat") || s.text.includes("switch to 'Studio' mode")
-                    )) {
-                        // Old mock text detected, reset to empty
-                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
-                        setProjectTitle('');
-                        setActiveCategory('Notes');
-                        setCategorySections({});
-                    } else if (parsed.sections && parsed.sections.some((s: LyricSection) => s.text.trim().length > 0)) {
-                        setSections(activeCatSections);
-                        if (parsed.projectTitle !== undefined) setProjectTitle(parsed.projectTitle);
-                    } else {
-                        // Default to empty project
-                        setSections([{ id: 'fresh-start', type: 'verse', repeats: 1, text: '' }]);
-                        setProjectTitle('');
-                    }
-                    if (parsed.scraps) setScraps(parsed.scraps);
-                    if (parsed.notes) setNotes(parsed.notes);
+                    const prevSections = parsed.sections || [];
+                    const prevScraps = parsed.scraps || [];
+                    const prevProjectTitle = parsed.projectTitle !== undefined ? parsed.projectTitle : "";
+                    const prevCategorySections = parsed.categorySections || {};
+                    const prevActiveProjectId = parsed.activeProjectId || null;
 
                     let loadedProjects: SavedProject[] = parsed.savedProjects || [];
                     // Remove mission project if it exists
                     loadedProjects = loadedProjects.filter((p: SavedProject) => p.id !== 'mission-001');
+
+                    // Automatically archive the previous active state into the loadedProjects list if it has content
+                    const hasContent = (prevSections && prevSections.some((s: LyricSection) => s.text.trim().length > 0)) || 
+                                       (prevScraps && prevScraps.length > 0) || 
+                                       prevProjectTitle;
+                    
+                    if (hasContent) {
+                        const archiveId = prevActiveProjectId || randomId();
+                        const existingIndex = loadedProjects.findIndex((p: SavedProject) => p.id === archiveId);
+
+                        const projectSessions = parsed.sessions ? parsed.sessions.filter((s: any) => s.projectId === archiveId) : [];
+
+                        const lastProject: SavedProject = {
+                            id: archiveId,
+                            name: prevProjectTitle || "Untitled Song",
+                            lastModified: new Date().toLocaleDateString(),
+                            sections: prevCategorySections['Lyrics'] || prevSections,
+                            scraps: prevScraps,
+                            sessions: projectSessions,
+                            beats: parsed.uploadedBeatId && parsed.beats ? parsed.beats.filter((b: any) => b.id === parsed.uploadedBeatId) : [],
+                            categorySections: prevCategorySections,
+                            activeCategory: activeCat
+                        };
+
+                        if (existingIndex !== -1) {
+                            loadedProjects[existingIndex] = lastProject;
+                        } else {
+                            loadedProjects = [lastProject, ...loadedProjects];
+                        }
+                    }
+
+                    // Save the updated project list
                     setSavedProjects(loadedProjects);
+
+                    // Initialize to a fresh, blank song in the Studio
+                    setSections([{ id: 'fresh-start', type: 'verse' as SectionType, repeats: 1, text: '' }]);
+                    setProjectTitle('');
+                    setScraps([]);
+                    setActiveProjectId(null);
+                    setActiveCategory('Notes');
+                    setCategorySections({});
+                    setUploadedBeat(null);
+                    setUploadedBeatName('');
+                    setUploadedBeatId(null);
+                    setSessions([]);
+
+                    if (parsed.scraps) {
+                        // Float scraps are not loaded to blank song, keep empty
+                    }
+                    if (parsed.notes) setNotes(parsed.notes);
 
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
 
+                    // Load all sessions from IndexedDB or storage globally
                     if (parsed.sessions) {
                         const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
                             try {
+                                // Muse recordings live in a separate IDB store (muse_audio) from
+                                // regular takes (audio_assets) — hydrate from the right one.
+                                if (t.kind === 'muse') {
+                                    const blob = await getMuseAudio(t.id);
+                                    if (!blob) return t;
+                                    const url = URL.createObjectURL(blob);
+                                    createdUrls.push(url);
+                                    return { ...t, audioUrl: url };
+                                }
                                 const b64 = await getAudioData(t.id);
                                 if (!b64) return t;
                                 const blob = await base64ToBlob(b64);
@@ -830,6 +929,7 @@ const StudioWorkspace: React.FC = () => {
                         setSessions(loadedSessions);
                     }
 
+                    // Load beats globally so they are available
                     if (parsed.beats) {
                         const loadedBeats = await Promise.all(parsed.beats.map(async (b: Beat) => {
                             try {
@@ -845,13 +945,7 @@ const StudioWorkspace: React.FC = () => {
                             }
                         }));
                         setBeats(loadedBeats);
-                        if (loadedBeats.length > 0 && !uploadedBeat) {
-                            setUploadedBeat(loadedBeats[0].audioUrl || null);
-                            setUploadedBeatName(loadedBeats[0].name || "Untitled Beat");
-                            setUploadedBeatId(parsed.uploadedBeatId || loadedBeats[0].id);
-                        }
                     }
-                    if (parsed.activeProjectId) setActiveProjectId(parsed.activeProjectId);
                 } catch (e) { console.error("Failed to load saved state", e); }
             }
         };
@@ -869,16 +963,27 @@ const StudioWorkspace: React.FC = () => {
         
         const saveState = () => {
             setSaveIndicator('saving');
-            const sessionsToSave = sessions.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-            const beatsToSave = beats.map(({ audioUrl: _aUrl, base64: _b64, ...rest }) => rest);
-            
+            const stripSession = ({ audioUrl: _aUrl, base64: _b64, ...rest }: RecordingSession) => ({
+                ...rest,
+                layers: rest.layers?.map(({ audioUrl: _lUrl, base64: _lb64, ...lRest }) => lRest)
+            });
+            const stripBeat = ({ audioUrl: _aUrl, base64: _b64, ...rest }: Beat) => rest;
+
+            const sessionsToSave = sessions.map(stripSession);
+            const beatsToSave = beats.map(stripBeat);
+            const projectsToSave = savedProjects.map(p => ({
+                ...p,
+                sessions: p.sessions.map(stripSession),
+                beats: p.beats.map(stripBeat)
+            }));
+
             const currentCategorySections = {
                 ...categorySections,
                 [activeCategory]: sections
             };
 
             const dataToSave = {
-                sections, scraps, notes, savedProjects,
+                sections, scraps, notes, savedProjects: projectsToSave,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
                 activeProjectId, uploadedBeatId,
@@ -899,8 +1004,29 @@ const StudioWorkspace: React.FC = () => {
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
-        setRecorderMinimized(true);
+        setRecorderMinimized(false);
         setShowRecorder(true);
+        setRecorderAutoStart(true);
+    };
+
+    const handleFlowTab = () => {
+        if (!showRecorder) {
+            // Start a new recording session
+            setStudioMode('flow');
+            handleRecordStart();
+        } else {
+            // Already recording — snap overlay back to full screen
+            setRecorderMinimized(false);
+            setStudioMode('flow');
+        }
+    };
+
+    const handleWriteTab = () => {
+        setStudioMode('write');
+        if (showRecorder) {
+            // Minimize the overlay so recording continues in background
+            setRecorderMinimized(true);
+        }
     };
 
     const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => {
@@ -917,7 +1043,8 @@ const StudioWorkspace: React.FC = () => {
 
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
-        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED === 'true'
+        // Transcription runs by default; set NEXT_PUBLIC_GROQ_ENABLED=false to explicitly disable it.
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED !== 'false'
             ? transcribeAudio(base64)
             : Promise.resolve(null);
 
@@ -1045,12 +1172,9 @@ const StudioWorkspace: React.FC = () => {
             } else {
                 toast.success('Recording saved');
             }
-            const recordingToastId = toast.loading('Processing audio intelligence...');
-
-            // Wait for both Gemini structure and Groq transcription
+            // Wait for both Gemini structure and Groq transcription (runs silently)
             Promise.all([transcriptionPromise, structurePromise]).then(([aiResult, structureResult]) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.dismiss(recordingToastId);
 
                 setSessions(prev => prev.map(s => {
                     if (s.id === id) {
@@ -1089,7 +1213,7 @@ const StudioWorkspace: React.FC = () => {
                 }));
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                toast.error(err.message, { id: recordingToastId });
+                console.error('Audio intelligence error:', err.message);
             });
         }
     };
@@ -1109,9 +1233,10 @@ const StudioWorkspace: React.FC = () => {
             setPlayingSessionId(null);
         } else {
             if (globalAudioRef.current) globalAudioRef.current.pause();
-            
+
             const audio = new Audio(session.audioUrl || session.base64);
-            
+            audio.volume = vocalMuted ? 0 : vocalVolume;
+
             audio.onended = () => {
                 // Only clear if this specific session is still the one marked as playing
                 setPlayingSessionId(prev => {
@@ -1142,6 +1267,115 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    const triggerMuseAnalysis = async (sessionId: string, blob: Blob, mimeType: string, durationSec: number) => {
+        try {
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading' } : s));
+
+            const result = await processMuseSession({
+                sessionId,
+                blob,
+                mimeType,
+                durationSec,
+                onProgress: ({ stage }) => {
+                    setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: stage } : s));
+                }
+            });
+
+            setSessions(prev => prev.map(s => s.id === sessionId ? {
+                ...s,
+                name: result.recap.title,
+                museSegments: result.segments,
+                museRecap: result.recap,
+                museStatus: 'complete'
+            } : s));
+            
+            toast.success("Recap generated successfully!");
+        } catch (error: any) {
+            console.error("Muse analysis failed:", error);
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
+            toast.error("AI recap generation failed. The audio is saved safely on your device.");
+        }
+    };
+
+    const handleSaveMuseSession = async (rec: { id: string; blob: Blob; duration: number; mimeType: string }): Promise<string> => {
+        const timestamp = new Date().toISOString();
+
+        // Muse audio lives in a separate IDB store (muse_audio, see studioDB.ts) from
+        // regular takes (audio_assets) — populate audioUrl directly from the recorded
+        // blob so playback works immediately without waiting on a reload/hydration pass.
+        const audioUrl = URL.createObjectURL(rec.blob);
+
+        const newSession: RecordingSession = {
+            id: rec.id,
+            name: "Studio Session",
+            timestamp,
+            isLoopSession: false,
+            duration: rec.duration,
+            sections: [],
+            kind: 'muse',
+            museStatus: 'uploading',
+            mimeType: rec.mimeType,
+            audioUrl
+        };
+
+        setSessions(prev => [newSession, ...prev]);
+
+        try {
+            await saveMuseAudio(rec.id, rec.blob);
+            await deleteMuseChunks(rec.id);
+            await deleteMuseManifest(rec.id);
+        } catch (e) {
+            console.error("Failed to save Muse audio locally", e);
+        }
+
+        triggerMuseAnalysis(rec.id, rec.blob, rec.mimeType, rec.duration);
+
+        return rec.id;
+    };
+
+    const handleRetryMuseAnalysis = async (sessionId: string) => {
+        const session = sessions.find(s => s.id === sessionId);
+        if (!session) return;
+        
+        try {
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'uploading' } : s));
+            const blob = await getMuseAudio(sessionId);
+            if (!blob) {
+                throw new Error("Local audio recording not found in database.");
+            }
+            await triggerMuseAnalysis(sessionId, blob, session.mimeType || 'audio/webm', session.duration || 0);
+        } catch (e: any) {
+            console.error("Retry failed:", e);
+            setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
+            toast.error(e.message || "Failed to retry analysis.");
+        }
+    };
+
+    const handleRecoverMuseSession = async (manifest: MuseManifest) => {
+        try {
+            const chunks = await getMuseChunks(manifest.id);
+            if (chunks.length === 0) {
+                throw new Error("No audio chunks found for recovery.");
+            }
+            const finalBlob = new Blob(chunks, { type: manifest.mimeType });
+            const duration = manifest.chunkCount * 20;
+
+            const rec = {
+                id: manifest.id,
+                blob: finalBlob,
+                duration,
+                mimeType: manifest.mimeType
+            };
+
+            await handleSaveMuseSession(rec);
+            toast.success("Orphaned session recovered and saved!");
+        } catch (e: any) {
+            console.error("Recovery failed:", e);
+            toast.error(e.message || "Session recovery failed.");
+            throw e;
+        }
+    };
+
     const handleDeleteSession = async (sessionId: string) => {
         if (!confirm("Permanently delete this recording?")) return;
 
@@ -1156,7 +1390,12 @@ const StudioWorkspace: React.FC = () => {
 
         // Delete from DB
         try {
-            await deleteAudioData(sessionId);
+            const session = sessions.find(s => s.id === sessionId);
+            if (session?.kind === 'muse') {
+                await deleteMuseAudio(sessionId);
+            } else {
+                await deleteAudioData(sessionId);
+            }
         } catch (e) {
             console.error("Failed to delete audio data", e);
         }
@@ -1218,6 +1457,7 @@ const StudioWorkspace: React.FC = () => {
                 audio.play().catch(console.error);
             } else {
                 setIsBeatPlaying(false);
+                setIsPlaying(false);
             }
         };
 
@@ -1367,7 +1607,7 @@ const StudioWorkspace: React.FC = () => {
             archiveCurrentProject();
             
             // Reset workspace
-            setSections([]); // Empty for Flow mode
+            setSections(createDefaultSections()); // Start with an empty section ready to write in
             setScraps([]);
             setSessions([]);
             setActiveSessionId(null);
@@ -1446,7 +1686,7 @@ const StudioWorkspace: React.FC = () => {
 
         setPlayingBeatId(null);
         archiveCurrentProject();
-        setSections([]); // Blank canvas for Flow mode
+        setSections(createDefaultSections()); // Start with an empty section ready to write in
         setScraps([]);
         setSessions([]);
         setActiveSessionId(null);
@@ -1607,6 +1847,10 @@ const StudioWorkspace: React.FC = () => {
 
     const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
 
+    const createDefaultSections = (): LyricSection[] => [
+        { id: randomId(), type: 'verse', repeats: 1, text: "" }
+    ];
+
     const addSection = () => {
         setSections(prev => [...prev, {
             id: randomId(),
@@ -1661,6 +1905,55 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
                             </section>
 
+                            <section className="pt-4">
+                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Editor</h2>
+                                <div className="space-y-3">
+                                    <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)]">
+                                        <div className="mb-3">
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Workspace Layout</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[240px]">Choose how your lyrics surface looks — structured section cards, or a single blank page like a notes app.</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {([
+                                                { key: 'cards', label: 'Cards', desc: 'Structured sections' },
+                                                { key: 'open', label: 'Open Editor', desc: 'Blank notes page' },
+                                            ] as const).map((opt) => (
+                                                <button
+                                                    key={opt.key}
+                                                    onClick={() => setEditorLayout(opt.key)}
+                                                    className={cn(
+                                                        "p-3 rounded-lg border text-left transition-all",
+                                                        editorLayout === opt.key
+                                                            ? 'bg-[var(--bg-secondary)] border-[var(--accent)]'
+                                                            : 'bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)]'
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-medium text-[var(--text-main)]">{opt.label}</span>
+                                                        {editorLayout === opt.key && <Check size={14} className="text-[var(--accent)]" />}
+                                                    </div>
+                                                    <span className="text-[11px] text-[var(--text-tertiary)]">{opt.desc}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowSyllables(!showSyllables)}
+                                        className="w-full p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
+                                    >
+                                        <div className="text-left">
+                                            <h3 className="text-sm font-medium text-[var(--text-main)]">Syllable Count</h3>
+                                            <p className="text-xs text-[var(--text-tertiary)] max-w-[220px]">Show a per-line syllable count next to your lyrics in Write mode.</p>
+                                        </div>
+                                        <div className={cn(
+                                            "w-10 h-6 rounded-full flex items-center px-0.5 transition-colors flex-shrink-0",
+                                            showSyllables ? "bg-[var(--accent)] justify-end" : "bg-[var(--bg-secondary)] justify-start"
+                                        )}>
+                                            <div className="w-5 h-5 rounded-full bg-white shadow-sm" />
+                                        </div>
+                                    </button>
+                                </div>
+                            </section>
                             <section className="pt-4">
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Audio Engineering</h2>
                                 <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] space-y-4">
@@ -1729,6 +2022,17 @@ const StudioWorkspace: React.FC = () => {
                             >
                                 {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
                             </button>
+                        </div>
+
+                        {/* Library Header Greeting */}
+                        <div className="px-6 mb-4">
+                            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-main)] animate-in fade-in slide-in-from-top-4 duration-300">My Library</h1>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1 animate-in fade-in duration-300">
+                                {savedProjects.length === 0 
+                                    ? "No songs saved yet. Click the + or use Quick Capture to start creating."
+                                    : `You have ${savedProjects.length} song${savedProjects.length === 1 ? '' : 's'} in your catalog.`
+                                }
+                            </p>
                         </div>
 
                         {isEmpty ? (
@@ -1802,7 +2106,7 @@ const StudioWorkspace: React.FC = () => {
                                             onClick={() => setLibraryTab('songs')}
                                             className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
                                         >
-                                            Projects
+                                            Songs
                                         </button>
                                         <button
                                             onClick={() => setLibraryTab('beats')}
@@ -1890,7 +2194,7 @@ const StudioWorkspace: React.FC = () => {
                                                         
                                                         {lyricPreview ? (
                                                             <p className="text-[10px] text-[var(--text-secondary)] italic leading-relaxed line-clamp-3 whitespace-pre-wrap flex-1 mb-3">
-                                                                "{lyricPreview}"
+                                                                &ldquo;{lyricPreview}&rdquo;
                                                             </p>
                                                         ) : (
                                                             <p className="text-[10px] text-[var(--text-tertiary)] italic leading-relaxed flex-1 mb-3">
@@ -2109,25 +2413,26 @@ const StudioWorkspace: React.FC = () => {
             case 'vault':
                 return (
                     <VaultView
-                        sessions={sessions}
+                        sessions={sessions.filter(s => s.kind !== 'muse')}
                         scraps={scraps}
                         beats={beats}
-
                         projectTitle={projectTitle}
                         onPlaySession={handleSelectSessionAndPlay}
                         playingSessionId={activeSessionId}
+                        isSessionPlaying={isPlaying}
                         onPlayBeat={handlePlayBeat}
                         playingBeatId={playingBeatId}
                         currentTime={currentTime}
                         duration={duration}
                         ritualStats={ritualStats}
+                        onOpenSidebar={() => setIsSidebarOpen(true)}
                     />
                 );
             case 'notebook':
                 return (
                     <NotesView
                         notes={notes}
-                        sessions={sessions}
+                        sessions={sessions.filter(s => s.kind !== 'muse')}
                         beats={beats}
                         onNotesChange={setNotes}
                         projectTitle={projectTitle}
@@ -2263,141 +2568,172 @@ const StudioWorkspace: React.FC = () => {
                                                     // Beat structure detection disabled — interferes with transcription flow
                                                 };
                                             }}
-                                            onClear={() => { setUploadedBeat(null); setUploadedBeatName(""); }}
+                                            onClear={() => {
+                                                if (beatAudioRef.current) {
+                                                    beatAudioRef.current.pause();
+                                                }
+                                                setUploadedBeat(null);
+                                                setUploadedBeatName("");
+                                                setUploadedBeatId(null);
+                                                setIsBeatPlaying(false);
+                                            }}
                                         />
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
-                            {/* Tab bar — T syllable toggle only, no Player tab */}
-                            <div className="absolute top-2 right-4 z-20 flex items-center">
+                        {/* ─── WRITE | FLOW mode toggle ─── */}
+                        <div className="flex-shrink-0 flex items-center justify-center px-4 pt-3 pb-2 relative">
+                            <div className="flex bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
                                 <button
-                                    onClick={() => setShowSyllables(!showSyllables)}
+                                    onClick={handleWriteTab}
                                     className={cn(
-                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all mb-1 hover:brightness-110 active:scale-95",
-                                        showSyllables
-                                            ? "text-[var(--accent)] font-bold"
-                                            : "text-[var(--text-secondary)] hover:text-[var(--text-main)]"
+                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95",
+                                        studioMode === 'write'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
                                     )}
-                                    title="Toggle Syllables Editor"
                                 >
-                                    T
+                                    Write
+                                </button>
+                                <button
+                                    onClick={handleFlowTab}
+                                    className={cn(
+                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-2",
+                                        studioMode === 'flow'
+                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]',
+                                        showRecorder && 'text-red-400'
+                                    )}
+                                >
+                                    {showRecorder && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    )}
+                                    Flow
                                 </button>
                             </div>
+                        </div>
 
+                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
-                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-6 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
-                                    <div className="max-w-2xl mx-auto space-y-12">
+                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                    <div className="max-w-3xl mx-auto space-y-12">
                                         <>
-                                            <AnimatePresence mode="wait">
-                                                     {sections.length === 0 && showTour ? (
-                                                            <motion.div 
-                                                                key="flow-canvas"
-                                                                id="tour-lyric-card"
-                                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                                animate={{ opacity: 1, scale: 1 }}
-                                                                exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-                                                                className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
-                                                            >
-                                                                {/* Abstract Background Shapes */}
-                                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                                <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                                
-                                                                <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                                    <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
-                                                                    <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                                    
-                                                                    {/* Orbiting particles animation */}
-                                                                    <motion.div 
-                                                                        animate={{ rotate: 360 }}
-                                                                        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                        className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                                    />
-                                                                </div>
-
-                                                                <motion.h2 
-                                                                    initial={{ opacity: 0, y: 10 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.2 }}
-                                                                    className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
-                                                                >
-                                                                    Capture the Flow
-                                                                </motion.h2>
-                                                                
-                                                                <motion.p 
-                                                                    initial={{ opacity: 0, y: 10 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.3 }}
-                                                                    className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
-                                                                >
-                                                                    Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
-                                                                </motion.p>
-
-                                                                <motion.button
-                                                                    initial={{ opacity: 0, y: 20 }}
-                                                                    animate={{ opacity: 1, y: 0 }}
-                                                                    transition={{ delay: 0.4 }}
-                                                                    onClick={addSection}
-                                                                    className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
-                                                                >
-                                                                    <Plus size={20} strokeWidth={3} /> Start Writing
-                                                                </motion.button>
-                                                                
-                                                                {/* Optional quick start types */}
+                                            {editorLayout === 'open' && !(sections.length === 0 && showTour) ? (
+                                                <OpenEditor
+                                                    sections={sections}
+                                                    onUpdateSections={setSections}
+                                                />
+                                            ) : (
+                                                <AnimatePresence mode="wait">
+                                                         {sections.length === 0 && showTour ? (
                                                                 <motion.div 
-                                                                    initial={{ opacity: 0 }}
-                                                                    animate={{ opacity: 1 }}
-                                                                    transition={{ delay: 0.6 }}
-                                                                    className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                    key="flow-canvas"
+                                                                    id="tour-lyric-card"
+                                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+                                                                    className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                                 >
-                                                                    <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                                    <div className="flex gap-4">
-                                                                        {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                            <button 
-                                                                                key={type}
-                                                                                onClick={addSection}
-                                                                                className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                            >
-                                                                                {type}
-                                                                            </button>
-                                                                        ))}
+                                                                    {/* Abstract Background Shapes */}
+                                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
+                                                                    <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
+                                                                
+                                                                    <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
+                                                                        <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
+                                                                        <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
+                                                                        <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
+                                                                    
+                                                                        {/* Orbiting particles animation */}
+                                                                        <motion.div 
+                                                                            animate={{ rotate: 360 }}
+                                                                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                                                                            className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
+                                                                        />
                                                                     </div>
+
+                                                                    <motion.h2 
+                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.2 }}
+                                                                        className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
+                                                                    >
+                                                                        Capture the Flow
+                                                                    </motion.h2>
+                                                                
+                                                                    <motion.p 
+                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.3 }}
+                                                                        className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                    >
+                                                                        Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                                    </motion.p>
+
+                                                                    <motion.button
+                                                                        initial={{ opacity: 0, y: 20 }}
+                                                                        animate={{ opacity: 1, y: 0 }}
+                                                                        transition={{ delay: 0.4 }}
+                                                                        onClick={addSection}
+                                                                        className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                                                    >
+                                                                        <Plus size={20} strokeWidth={3} /> Start Writing
+                                                                    </motion.button>
+                                                                
+                                                                    {/* Optional quick start types */}
+                                                                    <motion.div 
+                                                                        initial={{ opacity: 0 }}
+                                                                        animate={{ opacity: 1 }}
+                                                                        transition={{ delay: 0.6 }}
+                                                                        className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
+                                                                    >
+                                                                        <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
+                                                                        <div className="flex gap-4">
+                                                                            {['Verse', 'Chorus', 'Idea'].map(type => (
+                                                                                <button 
+                                                                                    key={type}
+                                                                                    onClick={addSection}
+                                                                                    className="text-xs hover:text-[var(--accent)] transition-colors"
+                                                                                >
+                                                                                    {type}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </motion.div>
                                                                 </motion.div>
+                                                         ) : (
+                                                             <motion.div 
+                                                                 key="write-mode"
+                                                                 initial={{ opacity: 0 }}
+                                                                 animate={{ opacity: 1 }}
+                                                                 exit={{ opacity: 0 }}
+                                                                 className="space-y-12"
+                                                             >
+                                                                {sections.map((section, idx) => (
+                                                                    <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                                        <LyricCard
+                                                                            section={section}
+                                                                            onUpdate={updateSection}
+                                                                            onDelete={deleteSection}
+                                                                            onMove={moveSection}
+                                                                            showSyllables={showSyllables}
+                                                                        />
+                                                                    </motion.div>
+                                                                ))}
+                                                                <button
+                                                                    onClick={addSection}
+                                                                    className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
+                                                                >
+                                                                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                    <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
+                                                                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
+                                                                </button>
                                                             </motion.div>
-                                                     ) : (
-                                                         <motion.div 
-                                                             key="write-mode"
-                                                             initial={{ opacity: 0 }}
-                                                             animate={{ opacity: 1 }}
-                                                             exit={{ opacity: 0 }}
-                                                             className="space-y-12"
-                                                         >
-                                                            {sections.map((section, idx) => (
-                                                                <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                                                                    <LyricCard
-                                                                        section={section}
-                                                                        onUpdate={updateSection}
-                                                                        onDelete={deleteSection}
-                                                                        onMove={moveSection}
-                                                                        showSyllables={showSyllables}
-                                                                    />
-                                                                </motion.div>
-                                                            ))}
-                                                            <button
-                                                                onClick={addSection}
-                                                                className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                                            >
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                                <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
-                                                                <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                        )}
+                                                    </AnimatePresence>
+                                            )}
                                         </>
                                     </div>
                                 </div>
@@ -2405,7 +2741,7 @@ const StudioWorkspace: React.FC = () => {
 
                             {/* MiniPlayer pill — floats above lyrics, visible when beat or vocal loaded */}
                             <AnimatePresence>
-                                {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && (
+                                {(uploadedBeat || sessions.length > 0) && !showPlayerSheet && !(showRecorder && recorderMinimized) && (
                                     <MiniPlayer
                                         trackName={
                                             sessions.find(s => s.id === activeSessionId)?.name
@@ -2452,13 +2788,17 @@ const StudioWorkspace: React.FC = () => {
                                                 session={sessions.find(s => s.id === activeSessionId) ?? sessions[0] ?? null}
                                                 onOpenFX={() => setShowFXPanel(true)}
                                                 onDismiss={() => setShowPlayerSheet(false)}
-                                                sessions={sessions}
+                                                sessions={sessions.filter(s => s.kind !== 'muse')}
                                                 beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                                 beatSrc={uploadedBeat}
                                                 beatVolume={beatVolume}
                                                 beatMuted={beatMuted}
                                                 onVolumeChange={setBeatVolume}
                                                 onMuteChange={setBeatMuted}
+                                                vocalVolume={vocalVolume}
+                                                vocalMuted={vocalMuted}
+                                                onVocalVolumeChange={setVocalVolume}
+                                                onVocalMuteChange={setVocalMuted}
                                                 isBeatLooping={isBeatLooping}
                                                 beatLoopStart={beatLoopStart}
                                                 beatLoopEnd={beatLoopEnd}
@@ -2495,20 +2835,23 @@ const StudioWorkspace: React.FC = () => {
                             </AnimatePresence>
                         </div>
 
-                        {/* Floating Record Button for Studio view */}
-                        {!showRecorder && (
-                            <div className="absolute bottom-[92px] right-6 z-40 animate-in fade-in zoom-in duration-200">
-                                <button
-                                    id="tour-nav-record"
-                                    onClick={() => handleRecordStart()}
-                                    className="w-12 h-12 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer border border-red-500/20"
-                                    title="Record Vocal Take"
-                                >
-                                    <Mic size={20} />
-                                </button>
-                            </div>
-                        )}
+                        {/* Floating record button removed — use FLOW tab to record */}
                     </div>
+                );
+            case 'muse':
+                return (
+                    <MuseView
+                        sessions={sessions}
+                        activeSessionId={activeSessionId}
+                        isPlaying={isPlaying}
+                        currentTime={currentTime}
+                        onPlaySession={handleSelectSessionAndPlay}
+                        onPauseSession={handlePause}
+                        onDeleteSession={handleDeleteSession}
+                        onSaveMuseSession={handleSaveMuseSession}
+                        onRetryAnalysis={handleRetryMuseAnalysis}
+                        onRecoverSession={handleRecoverMuseSession}
+                    />
                 );
             default: return null;
         }
@@ -2521,7 +2864,17 @@ const StudioWorkspace: React.FC = () => {
                 className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
             >
                 {/* Persistent Studio Beat Audio */}
-                <audio ref={beatAudioRef} src={uploadedBeat || undefined} className="hidden" crossOrigin="anonymous" />
+                <audio
+                    ref={beatAudioRef}
+                    src={uploadedBeat || undefined}
+                    className="hidden"
+                    crossOrigin="anonymous"
+                    onLoadedMetadata={e => {
+                        if (sessions.length === 0) {
+                            setDuration(e.currentTarget.duration);
+                        }
+                    }}
+                />
 
                 {/* Persistent Vocal Session Audio */}
                 <audio
@@ -2553,8 +2906,19 @@ const StudioWorkspace: React.FC = () => {
                     className="hidden"
                 />
 
-                <div className="flex-1 overflow-hidden">
-                    {getActiveView()}
+                <div className="flex-1 overflow-hidden relative">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={viewMode}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className="h-full w-full"
+                        >
+                            {getActiveView()}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
 
             </main>
@@ -2602,31 +2966,97 @@ const StudioWorkspace: React.FC = () => {
                                 </button>
                             </div>
 
-                            <nav className="flex-1 py-6 space-y-1 overflow-y-auto">
-                                {[
-                                    { id: 'home', label: 'Home', icon: House },
-                                    { id: 'notebook', label: 'Notebook', icon: BookText },
-                                ].map((item) => {
-                                    const Icon = item.icon;
-                                    const isActive = viewMode === item.id;
-                                    return (
+                            <nav className="flex-1 py-6 space-y-6 overflow-y-auto">
+                                <div className="space-y-1">
+                                    {[
+                                        { id: 'home', label: 'Library', icon: Library },
+                                        { id: 'vault', label: 'Vault', icon: Archive },
+                                        { id: 'notebook', label: 'Notebook', icon: BookText },
+                                        { id: 'muse', label: 'Muse', icon: Sparkles }
+                                    ].map((item) => {
+                                        const Icon = item.icon;
+                                        const isActive = viewMode === item.id;
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => {
+                                                    setViewMode(item.id as ViewMode);
+                                                    setIsSidebarOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer font-medium text-sm ${
+                                                    isActive
+                                                        ? 'bg-[var(--accent)] text-[var(--bg-main)] shadow-lg shadow-[var(--accent)]/10 font-semibold'
+                                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
+                                                }`}
+                                            >
+                                                <Icon size={18} className={isActive ? 'text-[var(--bg-main)]' : 'text-[var(--text-secondary)]'} />
+                                                <span>{item.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Songs List Section */}
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between px-4 text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+                                        <span>Songs</span>
                                         <button
-                                            key={item.id}
                                             onClick={() => {
-                                                setViewMode(item.id as ViewMode);
                                                 setIsSidebarOpen(false);
+                                                handleNewProject();
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer font-medium text-sm ${
-                                                isActive
-                                                    ? 'bg-[var(--accent)] text-[var(--bg-main)] shadow-lg shadow-[var(--accent)]/10 font-semibold'
-                                                    : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
-                                            }`}
+                                            className="p-1 rounded hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all cursor-pointer"
+                                            title="New Song"
                                         >
-                                            <Icon size={18} className={isActive ? 'text-[var(--bg-main)]' : 'text-[var(--text-secondary)]'} />
-                                            <span>{item.label}</span>
+                                            <Plus size={14} />
                                         </button>
-                                    );
-                                })}
+                                    </div>
+                                    <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
+                                        {(() => {
+                                            const sortedProjects = [...savedProjects].sort((a, b) => {
+                                                const timeA = new Date(a.lastModified).getTime() || 0;
+                                                const timeB = new Date(b.lastModified).getTime() || 0;
+                                                return timeB - timeA;
+                                            });
+
+                                            if (sortedProjects.length === 0) {
+                                                return (
+                                                    <div className="px-4 py-3 text-xs italic text-[var(--text-tertiary)]">
+                                                        No saved songs
+                                                    </div>
+                                                );
+                                            }
+
+                                            return sortedProjects.map((p) => {
+                                                const isActive = viewMode === 'studio' && activeProjectId === p.id;
+                                                return (
+                                                    <button
+                                                        key={p.id}
+                                                        onClick={() => {
+                                                            loadProject(p);
+                                                            setIsSidebarOpen(false);
+                                                        }}
+                                                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-left cursor-pointer text-sm ${
+                                                            isActive
+                                                                ? 'bg-[var(--accent)]/10 text-[var(--accent)] font-semibold border-l-2 border-[var(--accent)]'
+                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <Music size={14} className={isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'} />
+                                                        <span className="truncate flex-1">{p.name || "Untitled"}</span>
+                                                        {isActive ? (
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse shrink-0" />
+                                                        ) : (
+                                                            <span className="text-[10px] text-[var(--text-tertiary)] shrink-0 font-normal">
+                                                                {p.lastModified.includes('/') ? `${p.lastModified.split('/')[0]}/${p.lastModified.split('/')[1]}` : p.lastModified}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
+                                </div>
                             </nav>
 
                             <div className="pt-4 border-t border-[var(--border-main)] bg-[var(--bg-secondary)]/30 rounded-2xl p-4 space-y-3">
@@ -2634,18 +3064,34 @@ const StudioWorkspace: React.FC = () => {
                                     <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
                                     <span>Quick Capture</span>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        setIsSidebarOpen(false);
-                                        setShowRecorder(true);
-                                        setRecorderMinimized(true);
-                                        setRecorderAutoStart(true);
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-98 font-semibold text-sm cursor-pointer"
-                                >
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                                    <span>Record Audio</span>
-                                </button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {/* Left Side: Record (Red Dot) */}
+                                    <button
+                                        onClick={() => {
+                                            setIsSidebarOpen(false);
+                                            setShowRecorder(true);
+                                            setRecorderMinimized(true);
+                                            setRecorderAutoStart(true);
+                                        }}
+                                        className="flex items-center justify-center py-3 bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-xl transition-all active:scale-95 cursor-pointer"
+                                        title="Quick Record Audio"
+                                    >
+                                        <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                                    </button>
+
+                                    {/* Right Side: Write (Pen Icon) */}
+                                    <button
+                                        onClick={() => {
+                                            setIsSidebarOpen(false);
+                                            setViewMode('studio');
+                                            setStudioMode('write');
+                                        }}
+                                        className="flex items-center justify-center py-3 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/20 rounded-xl transition-all active:scale-95 cursor-pointer"
+                                        title="Quick Write Lyrics"
+                                    >
+                                        <PenTool size={16} />
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>
@@ -2654,13 +3100,29 @@ const StudioWorkspace: React.FC = () => {
 
             {showRecorder && (
                 <RecorderDrawer
-                    onClose={() => { setShowRecorder(false); setRecorderAutoStart(false); setLayerModeSessionId(null); }}
+                    onClose={() => {
+                        setShowRecorder(false);
+                        setRecorderAutoStart(false);
+                        setLayerModeSessionId(null);
+                        setRecorderMinimized(false);
+                        setStudioMode('write');
+                        if (beatAudioRef.current) {
+                            beatAudioRef.current.pause();
+                        }
+                        setIsBeatPlaying(false);
+                    }}
                     onSave={handleSaveRecordingSession}
+                    projectName={projectTitle || 'New Recording'}
                     isMinimized={recorderMinimized}
-                    onMinimizeToggle={() => setRecorderMinimized(!recorderMinimized)}
+                    onMinimizeToggle={() => {
+                        const next = !recorderMinimized;
+                        setRecorderMinimized(next);
+                        setStudioMode(next ? 'write' : 'flow');
+                    }}
                     backingTrackSrc={uploadedBeat}
                     backingAudioRef={beatAudioRef}
                     onResumeBeatAudio={() => { beatAudioCtxRef.current?.resume(); setIsBeatPlaying(true); }}
+                    onPauseBeatAudio={() => setIsBeatPlaying(false)}
                     autoStart={recorderAutoStart}
                     latencyCompensation={latencyCompensation}
                     beatVolume={beatVolume}

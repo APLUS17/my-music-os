@@ -1,16 +1,33 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/db";
+import { createClient } from "@/lib/supabase/server";
 import { GoogleGenAI } from "@google/genai";
+
+// --- Auth helper ---
+
+async function getAuthenticatedClient() {
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) throw new Error("Unauthorized");
+    return { supabase, userId: user.id };
+}
 
 // --- Database Actions (Supabase) ---
 
-export async function createProject(title: string) {
+export async function createProject(title: string, opts?: { genre?: string; mood?: string; artist?: string }) {
     try {
-        const { data, error } = await (supabase
-            .from("projects") as any)
-            .insert([{ title, status: "draft" }])
+        const { supabase, userId } = await getAuthenticatedClient();
+        const { data, error } = await supabase
+            .from("projects")
+            .insert([{
+                title,
+                status: "draft",
+                user_id: userId,
+                genre: opts?.genre,
+                mood: opts?.mood,
+                artist: opts?.artist,
+            }])
             .select()
             .single();
 
@@ -26,9 +43,11 @@ export async function createProject(title: string) {
 
 export async function getProjects() {
     try {
+        const { supabase, userId } = await getAuthenticatedClient();
         const { data, error } = await supabase
             .from("projects")
             .select("*")
+            .eq("user_id", userId)
             .order("updated_at", { ascending: false });
 
         if (error) throw error;
@@ -41,10 +60,12 @@ export async function getProjects() {
 
 export async function getProject(id: string) {
     try {
+        const { supabase, userId } = await getAuthenticatedClient();
         const { data, error } = await supabase
             .from("projects")
             .select("*")
             .eq("id", id)
+            .eq("user_id", userId)
             .single();
 
         if (error) throw error;
@@ -57,10 +78,12 @@ export async function getProject(id: string) {
 
 export async function deleteProject(id: string) {
     try {
+        const { supabase, userId } = await getAuthenticatedClient();
         const { error } = await supabase
             .from("projects")
             .delete()
-            .eq("id", id);
+            .eq("id", id)
+            .eq("user_id", userId);
 
         if (error) throw error;
 
@@ -74,15 +97,76 @@ export async function deleteProject(id: string) {
 
 export async function updateProjectStudio(id: string, content: string) {
     try {
+        const { supabase, userId } = await getAuthenticatedClient();
         const { error } = await supabase
             .from("projects")
             .update({ description: content, updated_at: new Date().toISOString() })
-            .eq("id", id);
+            .eq("id", id)
+            .eq("user_id", userId);
 
         if (error) throw error;
         return { success: true };
     } catch (error) {
         console.error("Supabase Error:", error);
+        return { success: false };
+    }
+}
+
+export async function updateProject(id: string, updates: {
+    title?: string;
+    artist?: string;
+    genre?: string;
+    mood?: string;
+    bpm?: number;
+    key?: string;
+    status?: string;
+    local_data?: Record<string, unknown>;
+}) {
+    try {
+        const { supabase, userId } = await getAuthenticatedClient();
+        const { error } = await supabase
+            .from("projects")
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq("id", id)
+            .eq("user_id", userId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Supabase Error:", error);
+        return { success: false };
+    }
+}
+
+export async function upsertProjectLocalData(id: string, localData: Record<string, unknown>) {
+    try {
+        const { supabase, userId } = await getAuthenticatedClient();
+        const { error } = await supabase
+            .from("projects")
+            .update({ local_data: localData, updated_at: new Date().toISOString() })
+            .eq("id", id)
+            .eq("user_id", userId);
+
+        if (error) throw error;
+        return { success: true };
+    } catch (error) {
+        console.error("Supabase Error:", error);
+        return { success: false };
+    }
+}
+
+export async function joinBetaWaitlist(email: string, name?: string, howHeard?: string) {
+    try {
+        const supabase = await createClient();
+        const { error } = await supabase
+            .from("beta_waitlist")
+            .insert([{ email, name, how_heard: howHeard }]);
+
+        if (error && error.code === '23505') return { success: true, alreadyJoined: true };
+        if (error) throw error;
+        return { success: true, alreadyJoined: false };
+    } catch (error) {
+        console.error("Waitlist Error:", error);
         return { success: false };
     }
 }
@@ -158,7 +242,7 @@ Return the results ONLY as a JSON array of objects with this structure:
 [{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
 
         const result = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-flash-latest',
             contents: [
                 { text: prompt },
                 {
@@ -349,7 +433,7 @@ ${sessionsStr}
         const prompt = `Context:\n${contextString}\n\nUser: ${userPrompt}`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-flash-latest',
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,

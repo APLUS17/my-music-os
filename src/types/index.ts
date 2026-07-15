@@ -57,6 +57,40 @@ export interface RecordingLayer {
     lines?: TranscriptionLine[];
 }
 
+export type MuseSegmentType = 'freestyle' | 'take' | 'conversation' | 'idea'
+    | 'practicing' | 'playback' | 'planning' | 'downtime';
+
+export interface MuseSegment {
+    id: string;
+    startTime: number; // seconds
+    endTime: number;   // seconds
+    type: MuseSegmentType;
+    label: string;
+    emoji: string;
+    summary: string;
+    quote?: string;
+    isHighlight?: boolean;
+}
+
+export interface MuseRecap {
+    title: string;
+    summary: string;
+    highlights: { segmentId: string; startTime: number; reason: string }[];
+    stats: Partial<Record<MuseSegmentType, number>>; // seconds/type, computed client-side
+    generatedAt: string;
+    model: string;
+}
+
+export type MuseStatus = 'recorded' | 'uploading' | 'analyzing' | 'complete' | 'failed';
+
+export interface MuseManifest {
+    id: string;
+    startedAt: string;
+    mimeType: string;
+    chunkCount: number;
+    status: 'recording' | 'stopped';
+}
+
 export interface RecordingSession {
     id: string;
     name?: string;
@@ -75,7 +109,13 @@ export interface RecordingSession {
     beatOffset?: number; // The currentTime of the beat when recording started
     layers?: RecordingLayer[]; // Additional vocal layers (harmonies, ad-libs, etc.)
     projectId?: string; // Links session to specific project; undefined for floating/legacy sessions
+    kind?: 'take' | 'muse';
+    museSegments?: MuseSegment[];
+    museRecap?: MuseRecap;
+    museStatus?: MuseStatus;
+    mimeType?: string; // real mime for Gemini (webm vs mp4)
 }
+
 
 export interface Beat {
     id: string;

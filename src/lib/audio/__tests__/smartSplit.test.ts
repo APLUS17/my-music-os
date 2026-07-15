@@ -27,6 +27,7 @@ function mockAudioBuffer(samples: Float32Array, sampleRate = 44100): AudioBuffer
 
 // Bun-specific mock (will be used by Bun)
 if (typeof process !== 'undefined' && process.versions && (process.versions as any).bun) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- bun:test must stay a runtime require so Vitest doesn't eager-load it
     const { mock } = require('bun:test');
     mock.module('@/lib/utils/id', () => ({
         randomId: () => `test-id-${++idCounter}`

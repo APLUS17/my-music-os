@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, X, RotateCcw, Repeat, Trash2, Music, Volume2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Repeat, Trash2, Music, Volume2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -72,7 +72,9 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
       audio.removeEventListener('timeupdate', handleTimeSync);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
     };
-  }, [audioRef.current]);
+    // audioSrc drives re-attachment when a new beat loads; audioRef itself is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioSrc]);
 
   // Marker Dragging Logic
   useEffect(() => {
