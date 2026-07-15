@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Initialize Gemini
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return NextResponse.json({ success: false, error: 'Gemini API Key missing on server' }, { status: 500 });
         }

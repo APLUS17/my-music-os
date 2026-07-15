@@ -44,7 +44,7 @@ Required in `.env.local` (not committed):
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-GOOGLE_API_KEY                  # Gemini API key (server-side; also checks NEXT_PUBLIC_GOOGLE_API_KEY or GEMINI_API_KEY)
+GOOGLE_API_KEY                  # Gemini API key (server-side; also checks GEMINI_API_KEY)
 GROQ_API_KEY                    # Groq Whisper key (server-side only, used by /api/transcribe)
 ```
 

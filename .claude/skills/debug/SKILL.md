@@ -44,7 +44,7 @@ Read the relevant file(s) before suggesting any fix.
 - Beat base64 missing data URL prefix — `analyzeInstrumentalWithGemini` uses `stripDataUrlPrefix`; confirm it's a full data URL.
 
 **Gemini AI Analysis**
-- `NEXT_PUBLIC_GOOGLE_API_KEY` not set — functions return `null` silently; check env vars.
+- `GOOGLE_API_KEY` or `GEMINI_API_KEY` not set — functions fail silently or throw; check server environment variables.
 - Model name typo — current model: `gemini-3.1-flash-lite-preview` for instrumentals, `gemini-1.5-flash` for vocals.
 - JSON parse error — Gemini sometimes returns markdown-fenced JSON; strip ` ```json ``` ` if present.
 
