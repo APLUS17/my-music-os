@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@/lib/supabase/server';
 import {
     buildMusePrompt,
     mapMuseResponse,
@@ -10,6 +11,12 @@ import {
 export const maxDuration = 300; // Vercel Fluid Compute timeout (5 min)
 
 export async function POST(request: NextRequest) {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     let uploadResponse: any = null;
     let ai: any = null;
 
