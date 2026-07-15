@@ -16,6 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/utils/time";
 
+import { Loader2 } from 'lucide-react';
+
 interface BeatUploaderProps {
   audioSrc: string | null;
   audioRef: React.RefObject<HTMLAudioElement | null>;
@@ -34,11 +36,13 @@ interface BeatUploaderProps {
   isLooping: boolean;
   setIsLooping: (val: boolean) => void;
   onSeek?: (time: number) => void;
+  isBeatLoading?: boolean;
 }
 
 export const BeatUploader: React.FC<BeatUploaderProps> = ({
   audioSrc, audioRef, beatName, onUpload, onClear,
-  isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping, onSeek
+  isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping, onSeek,
+  isBeatLoading = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -213,15 +217,17 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           accept="audio/*, .mp3, .wav, .m4a, .aac"
           className="absolute opacity-0 w-0 h-0 pointer-events-none"
           onChange={handleFileChange}
+          disabled={isBeatLoading}
         />
         <Button
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
+          disabled={isBeatLoading}
           className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
         >
-          <Music size={12} />
-          <span>Load Beat</span>
+          {isBeatLoading ? <Loader2 size={12} className="animate-spin" /> : <Music size={12} />}
+          <span>{isBeatLoading ? 'Loading...' : 'Load Beat'}</span>
         </Button>
       </>
     );
@@ -246,10 +252,17 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={(e) => { e.stopPropagation(); setIsPlaying(!isPlaying); }}
+            onClick={(e) => { e.stopPropagation(); if (!isBeatLoading) setIsPlaying(!isPlaying); }}
+            disabled={isBeatLoading}
             className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-main)] active:scale-90 transition-all rounded-none"
           >
-            {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+            {isBeatLoading ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : isPlaying ? (
+              <Pause size={12} fill="currentColor" />
+            ) : (
+              <Play size={12} fill="currentColor" />
+            )}
           </Button>
 
           <div className="w-[1px] h-3 bg-[var(--bg-hover)] relative z-10" />

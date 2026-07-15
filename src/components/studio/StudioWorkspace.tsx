@@ -362,6 +362,8 @@ const StudioWorkspace: React.FC = () => {
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
     const [uploadedBeatName, setUploadedBeatName] = useState<string>("");
     const [uploadedBeatId, setUploadedBeatId] = useState<string | null>(null);
+    const [isBeatLoading, setIsBeatLoading] = useState(false);
+    const [isUserRecording, setIsUserRecording] = useState(false);
     const [saveIndicator, setSaveIndicator] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     const [fabOpen, setFabOpen] = useState(false);
@@ -773,12 +775,23 @@ const StudioWorkspace: React.FC = () => {
     // React updates the <audio src> attribute via JSX, which triggers load() automatically.
     // Calling load() manually while playing causes a playback interrupt.
 
-    // Update Beat Volume
+    // Update Beat Volume smoothly to prevent glitches or digital clicks/cutouts
     useEffect(() => {
-        if (beatGainRef.current) {
-            beatGainRef.current.gain.value = beatMuted ? 0 : beatVolume;
+        const gainNode = beatGainRef.current;
+        const ctx = beatAudioCtxRef.current;
+        if (gainNode && ctx) {
+            const now = ctx.currentTime;
+            // When user is recording, we apply standard clean sub-mix ducking (0.55x volume scale)
+            // so they can hear themselves over headphones, otherwise standard target volume.
+            const targetScale = isUserRecording ? 0.55 : 1.0;
+            const targetVolume = beatMuted ? 0 : (beatVolume * targetScale);
+
+            // Cancel scheduled changes and smoothly ramp the gain to prevent volume clicks/cutouts
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.linearRampToValueAtTime(targetVolume, now + 0.1); // 100ms smooth ramp
         }
-    }, [beatVolume, beatMuted]);
+    }, [beatVolume, beatMuted, isUserRecording]);
 
     // Update Recording (vocal) Volume
     useEffect(() => {
@@ -2557,7 +2570,9 @@ const StudioWorkspace: React.FC = () => {
                                             isLooping={isBeatLooping}
                                             setIsLooping={setIsBeatLooping}
                                             onSeek={handleBeatSeek}
+                                            isBeatLoading={isBeatLoading || isUserRecording}
                                             onUpload={async (file) => {
+                                                setIsBeatLoading(true);
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
                                                 const name = file.name.replace(/\.\w+$/, '');
@@ -2887,10 +2902,22 @@ const StudioWorkspace: React.FC = () => {
                     src={uploadedBeat || undefined}
                     className="hidden"
                     crossOrigin="anonymous"
+                    onLoadStart={() => {
+                        if (uploadedBeat) {
+                            setIsBeatLoading(true);
+                        }
+                    }}
+                    onCanPlay={() => {
+                        setIsBeatLoading(false);
+                    }}
                     onLoadedMetadata={e => {
+                        setIsBeatLoading(false);
                         if (sessions.length === 0) {
                             setDuration(e.currentTarget.duration);
                         }
+                    }}
+                    onError={() => {
+                        setIsBeatLoading(false);
                     }}
                 />
 
@@ -3150,6 +3177,8 @@ const StudioWorkspace: React.FC = () => {
                     layerMode={!!layerModeSessionId}
                     existingLayers={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.layers || [] : []}
                     parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
+                    isBeatLoading={isBeatLoading}
+                    onRecordingStateChange={setIsUserRecording}
                 />
             )}
 
