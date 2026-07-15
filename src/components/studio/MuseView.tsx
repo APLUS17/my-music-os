@@ -407,8 +407,11 @@ export function MuseView({
                         >
                             <AlertTriangle className="w-12 h-12 text-[var(--studio-red)] mb-4" />
                             <h3 className="text-lg font-bold text-[var(--text-main)] mb-2">Recap Failed</h3>
-                            <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-xs">
-                                Analysis timed out. Your audio is safe on device.
+                            <p className="text-[var(--text-secondary)] text-sm mb-2 max-w-xs">
+                                {selectedSession.museError || 'Analysis failed.'}
+                            </p>
+                            <p className="text-[var(--text-tertiary)] text-xs mb-6 max-w-xs">
+                                Your audio is safe on device.
                             </p>
 
                             <div className="flex flex-col gap-3 w-full">
