@@ -802,6 +802,20 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const startRecording = async () => {
     try {
+      // 1. Immediately pause backing audio if playing to prevent sync drift and device driver sample-rate glitches
+      const backingAudio = backingAudioRef?.current;
+      const wasPlaying = backingAudio && !backingAudio.paused;
+      let targetOffset = 0;
+
+      if (backingAudio && backingTrackSrc) {
+        targetOffset = backingAudio.currentTime;
+        if (wasPlaying) {
+          backingAudio.pause();
+          onPauseBeatAudio?.();
+        }
+      }
+
+      // 2. Initialize the mic and audio context nodes while audio is paused to prevent pops/clicks on shared audio threads
       const micResult = await initializeMic();
 
       if (!streamRef.current) return;
@@ -833,9 +847,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         }
       };
 
-      if (backingAudioRef?.current && backingTrackSrc) {
-        const backingAudio = backingAudioRef.current;
-        recordingStartOffsetRef.current = backingAudio.currentTime;
+      // 3. Resume the beat in sync with MediaRecorder starting
+      if (backingAudio && backingTrackSrc) {
+        backingAudio.currentTime = targetOffset;
+        recordingStartOffsetRef.current = targetOffset;
         loopPassCountRef.current = 0;
         onResumeBeatAudio?.();
         backingAudio.play().catch(console.error);

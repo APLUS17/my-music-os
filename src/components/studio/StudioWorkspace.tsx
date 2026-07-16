@@ -508,8 +508,14 @@ const StudioWorkspace: React.FC = () => {
     const animFrameRef = useRef<number | null>(null);
     const sessionsRef = useRef(sessions);
     const activeSessionIdRef = useRef(activeSessionId);
+    const isBeatLoopingRef = useRef(isBeatLooping);
+    const beatLoopStartRef = useRef(beatLoopStart);
+    const beatLoopEndRef = useRef(beatLoopEnd);
     useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
     useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+    useEffect(() => { isBeatLoopingRef.current = isBeatLooping; }, [isBeatLooping]);
+    useEffect(() => { beatLoopStartRef.current = beatLoopStart; }, [beatLoopStart]);
+    useEffect(() => { beatLoopEndRef.current = beatLoopEnd; }, [beatLoopEnd]);
 
     // Pending resume after session switch — consumed by onLoadedMetadata
     const pendingPlayRef = useRef(false);
@@ -714,10 +720,31 @@ const StudioWorkspace: React.FC = () => {
             // Update currentTime state at ~16fps
             if (timestamp - lastTimeUpdate >= TIME_INTERVAL) {
                 lastTimeUpdate = timestamp;
-                const vocalTime = vocalAudioRef.current?.currentTime;
-                const beatTime = beatAudioRef.current?.currentTime;
+                const vocal = vocalAudioRef.current;
+                const vocalTime = vocal?.currentTime;
+                const beat = beatAudioRef.current;
+                const beatTime = beat?.currentTime;
                 
-                if (vocalTime !== undefined && sessions.length > 0) {
+                // Synchronized loop checking when playing vocals over a beat
+                if (vocal && !vocal.paused && isBeatLoopingRef.current && beatLoopStartRef.current !== null && beatLoopEndRef.current !== null) {
+                    const session = sessionsRef.current.find(s => s.id === activeSessionIdRef.current);
+                    if (session) {
+                        const offset = session.beatOffset ?? 0;
+                        const expectedBeatTime = vocal.currentTime + offset;
+                        if (expectedBeatTime >= beatLoopEndRef.current) {
+                            const nextVocalTime = Math.max(0, beatLoopStartRef.current - offset);
+                            vocal.currentTime = nextVocalTime;
+                            if (beat) {
+                                beat.currentTime = beatLoopStartRef.current;
+                            }
+                            setCurrentTime(nextVocalTime);
+                        } else {
+                            setCurrentTime(vocal.currentTime);
+                        }
+                    } else {
+                        setCurrentTime(vocal.currentTime);
+                    }
+                } else if (vocalTime !== undefined && sessions.length > 0) {
                     setCurrentTime(vocalTime);
                 } else if (beatTime !== undefined) {
                     setCurrentTime(beatTime);
@@ -1476,7 +1503,9 @@ const StudioWorkspace: React.FC = () => {
 
         const handleTimeUpdate = () => {
             if (!audio) return;
-            if (isBeatLooping && beatLoopEnd && beatLoopStart !== null) {
+            // Only perform standalone loop checking if we are NOT playing vocal tracks
+            const isPlayingVocal = vocalAudioRef.current && !vocalAudioRef.current.paused;
+            if (isBeatLooping && beatLoopEnd && beatLoopStart !== null && !isPlayingVocal) {
                 // Only seek if we've actually exceeded the end by a significant margin (more than 10ms)
                 // This prevents excessive seeking that causes dropouts
                 if (audio.currentTime >= beatLoopEnd + 0.01) {
@@ -1521,7 +1550,7 @@ const StudioWorkspace: React.FC = () => {
             audio.removeEventListener('timeupdate', handleTimeUpdate);
             audio.removeEventListener('ended', onEnded);
         };
-    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd]);
+    }, [isBeatPlaying, isBeatLooping, beatLoopStart, beatLoopEnd, uploadedBeat]);
 
     const archiveCurrentProject = () => {
         // Only archive if there's actual content or a title
