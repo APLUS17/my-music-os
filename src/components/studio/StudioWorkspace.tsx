@@ -2917,6 +2917,7 @@ const StudioWorkspace: React.FC = () => {
                         onSaveMuseSession={handleSaveMuseSession}
                         onRetryAnalysis={handleRetryMuseAnalysis}
                         onRecoverSession={handleRecoverMuseSession}
+                        onOpenMenu={() => setIsSidebarOpen(true)}
                     />
                 );
             default: return null;

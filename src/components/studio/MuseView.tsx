@@ -16,7 +16,8 @@ import {
     Clock,
     Calendar,
     FileAudio,
-    Upload
+    Upload,
+    Menu
 } from 'lucide-react';
 import { RecordingSession, MuseSegmentType, MuseManifest } from '@/types';
 import { generateId } from '@/lib/utils/id';
@@ -46,6 +47,7 @@ interface MuseViewProps {
     onSaveMuseSession: (recording: { id: string; blob: Blob; duration: number; mimeType: string }) => Promise<string>;
     onRetryAnalysis: (sessionId: string) => Promise<void>;
     onRecoverSession: (manifest: MuseManifest) => Promise<void>;
+    onOpenMenu?: () => void;
 }
 
 export function MuseView({
@@ -58,7 +60,8 @@ export function MuseView({
     onDeleteSession,
     onSaveMuseSession,
     onRetryAnalysis,
-    onRecoverSession
+    onRecoverSession,
+    onOpenMenu
 }: MuseViewProps) {
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [recoveryManifests, setRecoveryManifests] = useState<MuseManifest[]>([]);
@@ -228,6 +231,76 @@ export function MuseView({
         } catch (e) {
             console.error('Discard recovery failed:', e);
         }
+    };
+
+    // Interactive timeline calculation
+    const renderInteractiveTimeline = (session: RecordingSession) => {
+        const segments = session.museSegments || [];
+        const totalDuration = session.duration || 0;
+        if (totalDuration === 0 || segments.length === 0) return null;
+
+        const isCurrent = activeSessionId === session.id;
+        const currentPosPct = isCurrent ? (currentTime / totalDuration) * 100 : 0;
+
+        const handleScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clientX = e.clientX;
+            const clickX = clientX - rect.left;
+            const pct = Math.max(0, Math.min(1, clickX / rect.width));
+            const seekTime = pct * totalDuration;
+            onPlaySession(session.id, seekTime);
+        };
+
+        const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            handleScrub(e);
+        };
+
+        const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+            if (e.buttons === 1) { // Left click / dragging active
+                handleScrub(e);
+            }
+        };
+
+        return (
+            <div className="flex flex-col gap-2 mt-3">
+                <div 
+                    className="h-4 w-full rounded-full overflow-hidden flex bg-[var(--bg-hover)] cursor-pointer select-none relative border border-[var(--border-subtle)] hover:border-[var(--border-main)] transition-colors"
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                >
+                    {segments.map((seg, idx) => {
+                        const duration = seg.endTime - seg.startTime;
+                        const pct = (duration / totalDuration) * 100;
+                        return (
+                            <div
+                                key={seg.id || idx}
+                                style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: MUSE_TYPE_META[seg.type]?.color || '#ffffff',
+                                    opacity: 0.85
+                                }}
+                                className="h-full border-r border-black/10 last:border-r-0 transition-opacity hover:opacity-100"
+                                title={`${MUSE_TYPE_META[seg.type]?.name}: ${formatTime(seg.startTime)} - ${formatTime(seg.endTime)}`}
+                            />
+                        );
+                    })}
+
+                    {/* Playhead needle indicator */}
+                    {isCurrent && (
+                        <div 
+                            className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_8px_rgba(255,255,255,1)] pointer-events-none transition-all duration-75"
+                            style={{ left: `${currentPosPct}%`, transform: 'translateX(-50%)' }}
+                        />
+                    )}
+                </div>
+
+                <div className="flex justify-between text-[10px] font-mono text-[var(--text-tertiary)] px-1">
+                    <span>{formatTime(isCurrent ? currentTime : 0)}</span>
+                    <span>{formatTime(totalDuration)}</span>
+                </div>
+            </div>
+        );
     };
 
     // Proportional bar calculation
@@ -498,9 +571,15 @@ export function MuseView({
                         </button>
                     </div>
 
-                    {/* Proportional Duration Bar */}
+                    {/* Interactive Timeline */}
                     <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
-                        <h4 className="text-xs font-bold text-[var(--text-tertiary)] mb-2 uppercase tracking-wide">Timeline breakdown</h4>
+                        <h4 className="text-xs font-bold text-[var(--text-tertiary)] mb-2 uppercase tracking-wide">Interactive Timeline</h4>
+                        {renderInteractiveTimeline(selectedSession)}
+                    </div>
+
+                    {/* Proportional Duration Bar */}
+                    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                        <h4 className="text-xs font-bold text-[var(--text-tertiary)] mb-2 uppercase tracking-wide">Category breakdown</h4>
                         {renderProportionalBar(selectedSession)}
                         
                         {/* Legend */}
@@ -705,8 +784,17 @@ export function MuseView({
             <div className="flex flex-wrap justify-between items-center gap-4 bg-[var(--bg-card)] border border-[var(--border-subtle)] p-6 rounded-3xl backdrop-blur-xl">
                 <div>
                     <h2 className="text-2xl font-extrabold text-[var(--text-main)] flex items-center gap-2">
+                        {onOpenMenu && (
+                            <button
+                                onClick={onOpenMenu}
+                                className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95 transition-all cursor-pointer border-none bg-transparent"
+                                title="Open Menu"
+                            >
+                                <Menu size={20} className="text-[var(--text-secondary)]" />
+                            </button>
+                        )}
                         <Sparkles className="w-6 h-6 text-[var(--accent)] animate-pulse" />
-                        <span>Muse Logger</span>
+                        <span>Muse</span>
                     </h2>
                     <p className="text-[var(--text-secondary)] text-xs mt-1 max-w-sm leading-relaxed">
                         Always-on capture. AI maps your whole session automatically.
