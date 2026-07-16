@@ -557,8 +557,12 @@ const StudioWorkspace: React.FC = () => {
         // already-playing session (e.g. clicking a different highlight/segment) needs
         // this fast path instead.
         if (id === activeSessionId && vocalAudioRef.current && vocalAudioRef.current.readyState >= 1) {
-            if (seekTime !== undefined) seekTo(seekTime);
-            togglePlayback(true);
+            if (seekTime !== undefined) {
+                seekTo(seekTime);
+                togglePlayback(true);
+            } else {
+                togglePlayback();
+            }
             return;
         }
 
