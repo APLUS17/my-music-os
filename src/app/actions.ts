@@ -221,7 +221,7 @@ export interface GeminiSection {
 export async function analyzeAudioStructure(audioBase64: string, lyricsContext?: string) {
     try {
 await getAuthenticatedClient();
-    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) throw new Error("API Key missing");
 
         const ai = new GoogleGenAI({ apiKey });
@@ -291,7 +291,7 @@ export type FacilitatorContext = {
 export async function chatWithFacilitator(userPrompt: string, context: FacilitatorContext) {
     try {
 await getAuthenticatedClient();
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) {
             console.warn("GOOGLE_API_KEY is not set. Using fallback response.");
             return {
