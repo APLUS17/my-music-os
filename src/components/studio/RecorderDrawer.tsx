@@ -789,7 +789,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       setInterimTranscript(interim);
     };
 
-    recognition.onerror = () => { /* silent */ };
+    recognition.onerror = (e: any) => {
+      if (e.error !== 'aborted') console.warn('[SpeechRecognition] Error:', e.error);
+    };
     recognition.start();
     speechRef.current = recognition;
   };
@@ -811,7 +813,17 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       const streamToRecord = recordingStreamRef.current ?? micResult?.recordingStream;
       if (!streamToRecord) return;
 
-      const mediaRecorder = new MediaRecorder(streamToRecord);
+      // Negotiate best supported audio MIME type (iOS Safari doesn't support WebM)
+      const mimePreference = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+        'audio/aac',
+      ];
+      const supportedMime = mimePreference.find(m => MediaRecorder.isTypeSupported(m));
+      const recorderOptions: MediaRecorderOptions = supportedMime ? { mimeType: supportedMime } : {};
+      const mediaRecorder = new MediaRecorder(streamToRecord, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       peaksRef.current = [];
