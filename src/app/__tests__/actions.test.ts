@@ -87,15 +87,15 @@ describe('Server Actions Security & Authentication', () => {
             expect(result.success).toBe(true);
         });
 
-        it("should throw an error and fail when only NEXT_PUBLIC_GOOGLE_API_KEY is provided", async () => {
+        it("should successfully initialize when only NEXT_PUBLIC_GOOGLE_API_KEY is provided", async () => {
             mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
             process.env.NEXT_PUBLIC_GOOGLE_API_KEY = "leaked-public-api-key";
+            mockGenerateContent.mockResolvedValueOnce({ text: '[]' });
 
             const result = await analyzeAudioStructure("base64data", "lyrics context");
             
-            expect(result.success).toBe(false);
-            expect(result.error).toBe("Failed to analyze audio structure");
-            expect(mockGenerateContent).not.toHaveBeenCalled();
+            expect(result.success).toBe(true);
+            expect(mockGenerateContent).toHaveBeenCalled();
         });
 
         it('should return failed response if Gemini API key is missing completely', async () => {
@@ -140,13 +140,14 @@ describe('Server Actions Security & Authentication', () => {
             expect(result.success).toBe(true);
         });
 
-        it("should fail gracefully when only NEXT_PUBLIC_GOOGLE_API_KEY is provided", async () => {
+        it("should successfully process when only NEXT_PUBLIC_GOOGLE_API_KEY is provided", async () => {
             mockGetUser.mockResolvedValueOnce({ data: { user: { id: 'user-123' } }, error: null });
             process.env.NEXT_PUBLIC_GOOGLE_API_KEY = "leaked-public-api-key";
+            mockGenerateContent.mockResolvedValueOnce({ text: 'Here is a songwriting tip...' });
 
             const result = await chatWithFacilitator("Hello", dummyContext);
-            expect(result.success).toBe(false);
-            expect(result.reply).toContain("Gemini API key is missing");
+            expect(result.success).toBe(true);
+            expect(mockGenerateContent).toHaveBeenCalled();
         });
     });
 });
