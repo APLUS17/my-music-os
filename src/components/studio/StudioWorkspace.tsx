@@ -508,14 +508,8 @@ const StudioWorkspace: React.FC = () => {
     const animFrameRef = useRef<number | null>(null);
     const sessionsRef = useRef(sessions);
     const activeSessionIdRef = useRef(activeSessionId);
-    const isBeatLoopingRef = useRef(isBeatLooping);
-    const beatLoopStartRef = useRef(beatLoopStart);
-    const beatLoopEndRef = useRef(beatLoopEnd);
     useEffect(() => { sessionsRef.current = sessions; }, [sessions]);
     useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
-    useEffect(() => { isBeatLoopingRef.current = isBeatLooping; }, [isBeatLooping]);
-    useEffect(() => { beatLoopStartRef.current = beatLoopStart; }, [beatLoopStart]);
-    useEffect(() => { beatLoopEndRef.current = beatLoopEnd; }, [beatLoopEnd]);
 
     // Pending resume after session switch — consumed by onLoadedMetadata
     const pendingPlayRef = useRef(false);
@@ -536,6 +530,13 @@ const StudioWorkspace: React.FC = () => {
     const [analyzingVocalCount, setAnalyzingVocalCount] = useState(0);
     const isAnalyzingVocal = analyzingVocalCount > 0;
     const [isAnalyzingBeat, setIsAnalyzingBeat] = useState(false);
+
+    const isBeatLoopingRef = useRef(isBeatLooping);
+    const beatLoopStartRef = useRef(beatLoopStart);
+    const beatLoopEndRef = useRef(beatLoopEnd);
+    useEffect(() => { isBeatLoopingRef.current = isBeatLooping; }, [isBeatLooping]);
+    useEffect(() => { beatLoopStartRef.current = beatLoopStart; }, [beatLoopStart]);
+    useEffect(() => { beatLoopEndRef.current = beatLoopEnd; }, [beatLoopEnd]);
 
     const [showTour, setShowTour] = useState(false);
 
