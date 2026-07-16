@@ -221,7 +221,7 @@ export interface GeminiSection {
 export async function analyzeAudioStructure(audioBase64: string, lyricsContext?: string) {
     try {
 await getAuthenticatedClient();
-    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
         if (!apiKey) throw new Error("API Key missing");
 
         const ai = new GoogleGenAI({ apiKey });
@@ -230,6 +230,10 @@ await getAuthenticatedClient();
         const base64Data = audioBase64.includes('base64,')
             ? audioBase64.split('base64,')[1]
             : audioBase64;
+
+        // Detect MIME type from data URL prefix, fallback to audio/webm
+        const mimeMatch = audioBase64.match(/^data:([^;]+);/);
+        const detectedMime = mimeMatch?.[1] || 'audio/webm';
 
         const prompt = `Analyze this audio recording. It is a songwriting take.
 Identify the logical sections of the song (e.g., Intro, Verse, Chorus, Bridge, Outro, or just "Idea" if it's informal).
@@ -243,12 +247,12 @@ Return the results ONLY as a JSON array of objects with this structure:
 [{ "startTime": number, "endTime": number, "label": string, "type": "vocal" | "instrumental" | "speech" | "silence", "emoji": string, "summary": string }]`;
 
         const result = await ai.models.generateContent({
-            model: 'gemini-flash-latest',
+            model: 'gemini-2.0-flash',
             contents: [
                 { text: prompt },
                 {
                     inlineData: {
-                        mimeType: "audio/webm",
+                        mimeType: detectedMime,
                         data: base64Data
                     }
                 }
@@ -287,7 +291,7 @@ export type FacilitatorContext = {
 export async function chatWithFacilitator(userPrompt: string, context: FacilitatorContext) {
     try {
 await getAuthenticatedClient();
-        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
         if (!apiKey) {
             console.warn("GOOGLE_API_KEY is not set. Using fallback response.");
             return {
@@ -438,7 +442,7 @@ ${sessionsStr}
         const prompt = `Context:\n${contextString}\n\nUser: ${userPrompt}`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-flash-latest',
+            model: 'gemini-2.0-flash',
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,

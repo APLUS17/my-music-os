@@ -43,6 +43,13 @@ export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysi
     // Convert data URL → Blob for multipart upload
     const blob = await fetch(audioBase64).then(r => r.blob());
 
+    // Pre-flight size check — Groq Whisper has a 25 MB limit
+    const MAX_GROQ_BYTES = 25 * 1024 * 1024; // 25 MB
+    if (blob.size > MAX_GROQ_BYTES) {
+        const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+        throw new Error(`Recording is ${sizeMB} MB — exceeds Groq's 25 MB limit. Try a shorter take.`);
+    }
+
     const formData = new FormData();
     formData.append('file', blob, `recording.${mimeToExt(mimeType)}`);
     formData.append('model', 'whisper-large-v3-turbo');
