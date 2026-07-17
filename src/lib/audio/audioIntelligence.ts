@@ -43,11 +43,14 @@ export const transcribeAudio = async (audioBase64: string): Promise<AudioAnalysi
     // Convert data URL → Blob for multipart upload
     const blob = await fetch(audioBase64).then(r => r.blob());
 
-    // Pre-flight size check — Groq Whisper has a 25 MB limit
-    const MAX_GROQ_BYTES = 25 * 1024 * 1024; // 25 MB
-    if (blob.size > MAX_GROQ_BYTES) {
+    // Pre-flight size check — Groq Whisper itself allows up to 25 MB, but the
+    // /api/transcribe route runs as a Vercel Function, which hard-caps every
+    // request body at 4.5 MB regardless of Groq's own limit. Leave headroom
+    // for multipart overhead.
+    const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB
+    if (blob.size > MAX_UPLOAD_BYTES) {
         const sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
-        throw new Error(`Recording is ${sizeMB} MB — exceeds Groq's 25 MB limit. Try a shorter take.`);
+        throw new Error(`Recording is ${sizeMB} MB — too large to auto-transcribe. Try a shorter take.`);
     }
 
     const formData = new FormData();

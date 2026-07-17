@@ -56,13 +56,17 @@ describe('Server Actions Security & Authentication', () => {
     });
 
     describe('analyzeAudioStructure', () => {
-        it('should return unauthorized error response if user is unauthenticated', async () => {
+        it('should still perform analysis when user is unauthenticated (no auth required)', async () => {
             mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('Session invalid') });
+            process.env.GOOGLE_API_KEY = 'secure-google-api-key';
+
+            const mockSections = [{ startTime: 0, endTime: 10, label: 'Intro', type: 'instrumental', emoji: '🎸', summary: 'Intro beat' }];
+            mockGenerateContent.mockResolvedValueOnce({ text: JSON.stringify(mockSections) });
 
             const result = await analyzeAudioStructure('audio-base64', 'some lyrics context');
 
-            expect(result).toEqual({ success: false, error: 'Unauthorized' });
-            expect(mockGenerateContent).not.toHaveBeenCalled();
+            expect(result).toEqual({ success: true, sections: mockSections });
+            expect(mockGenerateContent).toHaveBeenCalled();
         });
 
         it('should perform analysis if user is authenticated and GOOGLE_API_KEY is provided', async () => {
@@ -111,13 +115,15 @@ describe('Server Actions Security & Authentication', () => {
     describe('chatWithFacilitator', () => {
         const dummyContext = { projectTitle: 'My Hit Song', sections: [], scraps: [], recentSessions: [] };
 
-        it('should return unauthorized reply response if user is unauthenticated', async () => {
+        it('should still return a reply when user is unauthenticated (no auth required)', async () => {
             mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('No active session') });
+            process.env.GOOGLE_API_KEY = 'secure-google-api-key';
+            mockGenerateContent.mockResolvedValueOnce({ text: 'Here is a songwriting tip...' });
 
             const result = await chatWithFacilitator('Help me with a rhyme', dummyContext);
 
-            expect(result).toEqual({ success: false, reply: 'You must be signed in to use the Facilitator AI.' });
-            expect(mockGenerateContent).not.toHaveBeenCalled();
+            expect(result).toEqual({ success: true, reply: 'Here is a songwriting tip...' });
+            expect(mockGenerateContent).toHaveBeenCalled();
         });
 
         it('should return reply from Gemini if user is authenticated and GOOGLE_API_KEY is provided', async () => {

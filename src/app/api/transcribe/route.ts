@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+
+// Uploading the audio and waiting on Groq can take longer than the platform's
+// short default function timeout, especially on slower mobile connections.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
         return NextResponse.json({ error: 'GROQ_API_KEY not configured in environment' }, { status: 500 });

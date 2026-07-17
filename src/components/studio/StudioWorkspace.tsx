@@ -1102,7 +1102,14 @@ const StudioWorkspace: React.FC = () => {
 
         const lyricsSections = categorySections['Lyrics'] || sections;
         const lyricsContextString = lyricsSections.map(s => `[${s.type}]: ${s.text}`).join('\n');
-        const structurePromise = analyzeAudioStructure(base64, lyricsContextString);
+        // analyzeAudioStructure is a Server Action carrying the base64 audio as its
+        // argument — Vercel's 4.5 MB request-body cap applies to that payload too,
+        // and base64 runs ~33% bigger than the raw recording. Skip the doomed call
+        // outright rather than let it fail server-side on oversized takes.
+        const MAX_STRUCTURE_BASE64_CHARS = 4 * 1024 * 1024;
+        const structurePromise: ReturnType<typeof analyzeAudioStructure> = base64.length > MAX_STRUCTURE_BASE64_CHARS
+            ? Promise.resolve({ success: false as const, error: 'Recording too large for structure analysis' })
+            : analyzeAudioStructure(base64, lyricsContextString);
 
         await saveAudioData(id, base64);
 
@@ -1224,16 +1231,29 @@ const StudioWorkspace: React.FC = () => {
             } else {
                 toast.success('Recording saved');
             }
-            // Wait for both Gemini structure and Groq transcription (runs silently)
-            Promise.all([transcriptionPromise, structurePromise]).then(([aiResult, structureResult]) => {
+            // Wait for both Gemini structure and Groq transcription — settled independently so a
+            // failure in one (e.g. a 413/timeout on the structure call) never discards a
+            // perfectly good transcript from the other.
+            Promise.allSettled([transcriptionPromise, structurePromise]).then(([transcriptionResult, structureSettled]) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
+
+                if (transcriptionResult.status === 'rejected') {
+                    console.error('Transcription failed:', transcriptionResult.reason);
+                    toast.error(`Transcription failed: ${transcriptionResult.reason?.message || transcriptionResult.reason}`);
+                }
+                if (structureSettled.status === 'rejected') {
+                    console.error('Audio structure analysis failed:', structureSettled.reason);
+                }
+
+                const aiResult = transcriptionResult.status === 'fulfilled' ? transcriptionResult.value : null;
+                const structureResult = structureSettled.status === 'fulfilled' ? structureSettled.value : null;
 
                 setSessions(prev => prev.map(s => {
                     if (s.id === id) {
                         let finalSections = s.sections;
                         let newName = s.name;
 
-                        if (structureResult.success && structureResult.sections && structureResult.sections.length > 0) {
+                        if (structureResult?.success && structureResult.sections && structureResult.sections.length > 0) {
                             finalSections = structureResult.sections.map(gs => ({
                                 id: randomId(),
                                 startTime: gs.startTime,
@@ -1263,9 +1283,6 @@ const StudioWorkspace: React.FC = () => {
                     }
                     return s;
                 }));
-            }).catch((err: Error) => {
-                setAnalyzingVocalCount(c => Math.max(0, c - 1));
-                console.error('Audio intelligence error:', err.message);
             });
         }
     };
