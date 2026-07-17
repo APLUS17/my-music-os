@@ -1266,6 +1266,7 @@ const StudioWorkspace: React.FC = () => {
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 console.error('Audio intelligence error:', err.message);
+                toast.error(`Transcription failed: ${err.message}`);
             });
         }
     };
