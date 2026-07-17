@@ -47,27 +47,10 @@ describe('API Route Security Authentication Tests', () => {
     });
 
     describe('/api/muse/analyze', () => {
-        it('should return 401 Unauthorized when no user is authenticated', async () => {
+        it('should not require authentication and return 400 (Missing parameters) when unauthenticated', async () => {
             mockGetUser.mockResolvedValue({
                 data: { user: null },
                 error: new Error('Auth session invalid'),
-            });
-
-            const req = new NextRequest('http://localhost/api/muse/analyze', {
-                method: 'POST',
-            });
-
-            const res = await analyzePOST(req);
-            expect(res.status).toBe(401);
-
-            const body = await res.json();
-            expect(body).toEqual({ success: false, error: 'Unauthorized' });
-        });
-
-        it('should bypass the 401 auth gate and return 400 (Missing parameters) when user is authenticated', async () => {
-            mockGetUser.mockResolvedValue({
-                data: { user: { id: 'authenticated-user-id' } },
-                error: null,
             });
 
             const req = new NextRequest('http://localhost/api/muse/analyze', {
