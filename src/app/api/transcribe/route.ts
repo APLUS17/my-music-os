@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Uploading the audio and waiting on Groq can take longer than the platform's
+// short default function timeout, especially on slower mobile connections.
+export const maxDuration = 300;
+
 export async function POST(req: NextRequest) {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
