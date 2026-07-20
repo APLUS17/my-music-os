@@ -21,6 +21,7 @@ import { formatTime } from '@/lib/utils/time';
 import { FXSettings, defaultFXSettings } from './FXPanel';
 import { createReverbImpulse } from '@/hooks/useVocalFX';
 import { VOCAL_PRESETS } from '@/lib/audio/vocalPresets';
+import { useSynchronizedCapture } from '@/hooks/useSynchronizedCapture';
 
 import { Loader2 } from 'lucide-react';
 
@@ -72,7 +73,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState(0);
 
@@ -104,8 +104,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const limiterRef = useRef<DynamicsCompressorNode | null>(null);
 
   // Refs for logic
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -123,18 +121,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const parentAudioRef = useRef<HTMLAudioElement | null>(null);
   const layerAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const [micSource, setMicSource] = useState<MediaStreamAudioSourceNode | null>(null);
   const monitorGainRef = useRef<GainNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recordingStreamRef = useRef<MediaStream | null>(null);
-  const isInitializingMicRef = useRef(false);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const peaksRef = useRef<number[]>([]);
   const isDraggingRef = useRef(false);
@@ -150,56 +143,94 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Ref to track state inside animation loop without stale closures
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
-  const isRecordingRef = useRef(false);
-  isRecordingRef.current = isRecording;
+
   // Pass live time into canvas without stale closure
   const displayTimeRef = useRef(0);
 
-  const stopMicStream = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  };
+  // Synchronized Recording Hook
+  const {
+    startTake,
+    stopTake,
+    isRecording, // Direct, single source of truth from high-performance hook!
+    ready: synchronizedReady,
+    audioCtxRef,
+    micStreamRef,
+  } = useSynchronizedCapture({
+    beatUrl: backingTrackSrc || null,
+    onTakeComplete: (blob, duration, beatOffset) => {
+      setRecordedBlob(blob);
+      setDuration(duration);
+      setProgress(0);
+      recordingStartOffsetRef.current = beatOffset;
 
-  audioContextRef.current = audioContext;
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        onSave(blob, duration, beatOffset, layerMode);
+        onClose();
+      }
+    },
+    onInterrupted: (blob, duration, beatOffset) => {
+      setRecordedBlob(blob);
+      setDuration(duration);
+      setProgress(0);
+      recordingStartOffsetRef.current = beatOffset;
 
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        onSave(blob, duration, beatOffset, layerMode);
+        onClose();
+      }
+    },
+  });
+
+  const isRecordingRef = useRef(false);
+  isRecordingRef.current = isRecording;
+
+  // Single React lifecycle observer that handles all recording start/stop transitions reactively
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      if (backingAudioRef?.current) {
-        backingAudioRef.current.pause();
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-      stopMicStream();
-      stopSpeechRecognition();
+    onRecordingStateChange?.(isRecording);
 
-      // Clear Vocal FX node refs
-      eqLowRef.current = null;
-      eqMidRef.current = null;
-      eqHighRef.current = null;
-      compRef.current = null;
-      delayRef.current = null;
-      delayDryRef.current = null;
-      delayWetRef.current = null;
-      convolverRef.current = null;
-      reverbWetRef.current = null;
-      masterGainRef.current = null;
-      limiterRef.current = null;
+    if (isRecording) {
+      setRecordedBlob(null);
+      setProgress(0);
+      setDuration(0);
+      setFinalTranscript('');
+      setInterimTranscript('');
+      startTimeRef.current = Date.now();
+      peaksRef.current = [];
+      liveWaveHistoryRef.current = [];
+      lastSampleTimeRef.current = 0;
+
+      // Connect real-time parallel low-latency monitoring feedback graph
+      if (audioCtxRef.current && micStreamRef.current) {
+        setupLiveFXMonitoring(audioCtxRef.current, micStreamRef.current);
+      }
+
+      timerRef.current = window.setInterval(() => {
+        setDuration((Date.now() - startTimeRef.current) / 1000);
+      }, 100);
+
+      startSpeechRecognition();
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      stopSpeechRecognition();
+      cleanupFXMonitoring();
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, []);
+  }, [isRecording]);
 
   // Synchronize Live Vocal FX settings with Web Audio Nodes
   useEffect(() => {
-    if (!audioContext || !eqLowRef.current) return;
+    if (!audioCtxRef.current || !eqLowRef.current) return;
 
     try {
       if (isFXActive) {
@@ -241,7 +272,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } catch (err) {
       console.warn('Error updating recording Vocal FX nodes:', err);
     }
-  }, [audioContext, isFXActive, fxSettings]);
+  }, [audioCtxRef, isFXActive, fxSettings]);
 
   // Synchronize Live Monitoring toggle with monitor Gain node
   useEffect(() => {
@@ -250,15 +281,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   }, [isMonitoringEnabled]);
 
-  // Auto-start recording when opened via nav button
+  // Auto-start recording when opened via nav button and backing track is fully ready (prevents preload race condition)
   useEffect(() => {
-    if (autoStart) {
+    if (autoStart && synchronizedReady) {
       startRecording();
-    } else {
-      initializeMic().catch(console.error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, synchronizedReady]);
 
   // Auto-scroll transcription to bottom
   useEffect(() => {
@@ -276,7 +305,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     if (!ctx) return;
 
     const accentColor = '#EF4444'; // always red for recording feel
-    const textColor = 'rgba(255,255,255,0.8)';
     const recordingColor = '#EF4444';
 
     const render = () => {
@@ -370,7 +398,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         const now = performance.now();
         const msPerBar = 50; // one bar every 50ms for a smooth scroll
         if (now - lastSampleTimeRef.current >= msPerBar) {
-          analyserRef.current.getByteFrequencyData(dataArrayRef.current);
+          analyserRef.current.getByteFrequencyData(dataArrayRef.current as any);
           const binCount = analyserRef.current.frequencyBinCount;
           // Compute a single peak value across all bins
           let peak = 0;
@@ -480,7 +508,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       window.removeEventListener('resize', resizeCanvas);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isRecording, recordedBlob, showTranscription]);
+  }, [recordedBlob, showTranscription]);
 
   const audioUrlRef = useRef<string | null>(null);
 
@@ -612,57 +640,40 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     });
   };
 
-  const initializeMic = async () => {
-    if (streamRef.current && audioContext) return;
-    if (isInitializingMicRef.current) return;
-
+  const setupLiveFXMonitoring = (ctx: AudioContext, stream: MediaStream) => {
     try {
-      isInitializingMicRef.current = true;
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: false, autoGainControl: false, noiseSuppression: false, channelCount: 1 },
-      });
-      streamRef.current = stream;
-
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioCtx = new AudioContextClass();
-      setAudioContext(audioCtx);
-
-      if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
-
-      const source = audioCtx.createMediaStreamSource(stream);
+      const source = ctx.createMediaStreamSource(stream);
       setMicSource(source);
 
-      const analyser = audioCtx.createAnalyser();
+      const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       source.connect(analyser);
 
       analyserRef.current = analyser;
-      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount) as Uint8Array<ArrayBuffer>;
+      dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
 
       // 1. EQ Nodes
-      const eqLow = audioCtx.createBiquadFilter();
+      const eqLow = ctx.createBiquadFilter();
       eqLow.type = 'lowshelf';
       eqLow.frequency.value = 250;
       eqLow.gain.value = isFXActive ? fxSettings.eqLow : 0;
       eqLowRef.current = eqLow;
 
-      const eqMid = audioCtx.createBiquadFilter();
+      const eqMid = ctx.createBiquadFilter();
       eqMid.type = 'peaking';
       eqMid.frequency.value = 1000;
       eqMid.Q.value = 1;
       eqMid.gain.value = isFXActive ? fxSettings.eqMid : 0;
       eqMidRef.current = eqMid;
 
-      const eqHigh = audioCtx.createBiquadFilter();
+      const eqHigh = ctx.createBiquadFilter();
       eqHigh.type = 'highshelf';
       eqHigh.frequency.value = 4000;
       eqHigh.gain.value = isFXActive ? fxSettings.eqHigh : 0;
       eqHighRef.current = eqHigh;
 
       // 2. Compressor Node (Punch)
-      const comp = audioCtx.createDynamicsCompressor();
+      const comp = ctx.createDynamicsCompressor();
       if (isFXActive) {
         const punchAmount = fxSettings.punch / 100;
         comp.threshold.value = -50 * punchAmount;
@@ -677,37 +688,37 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       compRef.current = comp;
 
       // 3. Delay Node (Echo)
-      const delay = audioCtx.createDelay(2.0);
+      const delay = ctx.createDelay(2.0);
       delay.delayTime.value = 0.4;
       delayRef.current = delay;
 
-      const delayDry = audioCtx.createGain();
+      const delayDry = ctx.createGain();
       delayDry.gain.value = 1;
       delayDryRef.current = delayDry;
 
-      const delayWet = audioCtx.createGain();
+      const delayWet = ctx.createGain();
       delayWet.gain.value = isFXActive ? (fxSettings.echo / 100) * 0.7 : 0;
       delayWetRef.current = delayWet;
 
       // 4. Reverb Node (Space)
-      const convolver = audioCtx.createConvolver();
+      const convolver = ctx.createConvolver();
       try {
-        convolver.buffer = createReverbImpulse(audioCtx, 2.5, 2.0);
+        convolver.buffer = createReverbImpulse(ctx, 2.5, 2.0);
       } catch (err) {
         console.warn('Could not set convolver buffer in recorder:', err);
       }
       convolverRef.current = convolver;
 
-      const reverbWet = audioCtx.createGain();
+      const reverbWet = ctx.createGain();
       reverbWet.gain.value = isFXActive ? (fxSettings.space / 100) * 1.0 : 0;
       reverbWetRef.current = reverbWet;
 
       // 5. Limiter / Master
-      const masterGain = audioCtx.createGain();
+      const masterGain = ctx.createGain();
       masterGain.gain.value = 1;
       masterGainRef.current = masterGain;
 
-      const limiter = audioCtx.createDynamicsCompressor();
+      const limiter = ctx.createDynamicsCompressor();
       limiter.threshold.value = -0.5;
       limiter.knee.value = 0;
       limiter.ratio.value = 20;
@@ -715,54 +726,57 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       limiter.release.value = 0.1;
       limiterRef.current = limiter;
 
-      // Graph Routing
+      // Routing
       analyser.connect(eqLow);
       eqLow.connect(eqMid);
       eqMid.connect(eqHigh);
       eqHigh.connect(comp);
 
-      // Dry path to master
       comp.connect(masterGain);
 
-      // Parallel Delay Path
       comp.connect(delay);
       delay.connect(delayDry);
       delayDry.connect(delayWet);
       delayWet.connect(masterGain);
 
-      // Parallel Reverb Path
       comp.connect(convolver);
       convolver.connect(reverbWet);
       reverbWet.connect(masterGain);
 
-      // Master to Limiter
       masterGain.connect(limiter);
 
-      // Merger for stereo channel matching
-      const merger = audioCtx.createChannelMerger(2);
+      const merger = ctx.createChannelMerger(2);
       limiter.connect(merger, 0, 0);
       limiter.connect(merger, 0, 1);
 
-      // Monitoring path (outputs to headphones)
-      const monitorGain = audioCtx.createGain();
+      // Monitoring path
+      const monitorGain = ctx.createGain();
       monitorGain.gain.value = isMonitoringEnabled ? 0.8 : 0;
       merger.connect(monitorGain);
-      monitorGain.connect(audioCtx.destination);
+      monitorGain.connect(ctx.destination);
       monitorGainRef.current = monitorGain;
 
-      // Recording path (outputs to MediaRecorder)
-      const destination = audioCtx.createMediaStreamDestination();
-      merger.connect(destination);
-      recordingStreamRef.current = destination.stream;
-
       setAudioCtxReady(true);
-      return { stream, audioCtx, source, monitorGain, recordingStream: destination.stream };
     } catch (err) {
-      console.error("Error accessing microphone:", err);
-      throw err;
-    } finally {
-      isInitializingMicRef.current = false;
+      console.error('Error setting up Vocal FX monitoring graph:', err);
     }
+  };
+
+  const cleanupFXMonitoring = () => {
+    eqLowRef.current = null;
+    eqMidRef.current = null;
+    eqHighRef.current = null;
+    compRef.current = null;
+    delayRef.current = null;
+    delayDryRef.current = null;
+    delayWetRef.current = null;
+    convolverRef.current = null;
+    reverbWetRef.current = null;
+    masterGainRef.current = null;
+    limiterRef.current = null;
+    monitorGainRef.current = null;
+    setMicSource(null);
+    setAudioCtxReady(false);
   };
 
   // --- Speech Recognition ---
@@ -817,78 +831,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         }
       }
 
-      // 2. Initialize the mic and audio context nodes while audio is paused to prevent pops/clicks on shared audio threads
-      const micResult = await initializeMic();
-
-      if (!streamRef.current) return;
-      const activeCtx = audioContext ?? micResult?.audioCtx;
-      if (!activeCtx) return;
-
-      const streamToRecord = recordingStreamRef.current ?? micResult?.recordingStream;
-      if (!streamToRecord) return;
-
-      // Negotiate best supported audio MIME type (iOS Safari doesn't support WebM)
-      const mimePreference = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/ogg;codecs=opus',
-        'audio/mp4',
-        'audio/aac',
-      ];
-      const supportedMime = mimePreference.find(m => MediaRecorder.isTypeSupported(m));
-      const recorderOptions: MediaRecorderOptions = supportedMime ? { mimeType: supportedMime } : {};
-      const mediaRecorder = new MediaRecorder(streamToRecord, recorderOptions);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-      peaksRef.current = [];
-      liveWaveHistoryRef.current = [];
-      lastSampleTimeRef.current = 0;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
-        setRecordedBlob(blob);
-
-        if (pendingSaveRef.current) {
-          pendingSaveRef.current = false;
-          onSave(blob, savedDurationRef.current, recordingStartOffsetRef.current, layerMode);
-          onClose();
-        }
-      };
-
-      // 3. Resume the beat in sync with MediaRecorder starting
-      if (backingAudio && backingTrackSrc) {
-        backingAudio.currentTime = targetOffset;
-        recordingStartOffsetRef.current = targetOffset;
-        loopPassCountRef.current = 0;
-        onResumeBeatAudio?.();
-        backingAudio.play().catch(console.error);
-      } else {
-        recordingStartOffsetRef.current = 0;
-        loopPassCountRef.current = 0;
-      }
+      // 2. Trigger high-performance synchronized start (AudioWorklet & Worker thread setup)
+      await startTake(targetOffset);
 
       if (layerMode) {
         startLayerPlayback();
       }
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordedBlob(null);
-      setProgress(0);
-      setDuration(0);
-      setFinalTranscript('');
-      setInterimTranscript('');
-      startTimeRef.current = Date.now();
-
-      timerRef.current = window.setInterval(() => {
-        setDuration((Date.now() - startTimeRef.current) / 1000);
-      }, 100);
-
-      startSpeechRecognition();
 
     } catch (err) {
       console.error("Start recording failed:", err);
@@ -896,14 +844,11 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
+    if (isRecording) {
+      stopTake();
       if (layerMode) {
         stopLayerPlayback();
       }
-      stopSpeechRecognition();
       if (backingAudioRef?.current) {
         backingAudioRef.current.pause();
       }
@@ -911,12 +856,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   };
 
-  useEffect(() => {
-    onRecordingStateChange?.(isRecording);
-  }, [isRecording, onRecordingStateChange]);
-
   const handleToggleRecord = () => {
-    if (isBeatLoading) return;
+    if (isBeatLoading || !synchronizedReady) return;
     if (isRecording) {
       stopRecording();
     } else {
@@ -1029,6 +970,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   displayTimeRef.current = currentDisplayTime;
 
   const canSave = isRecording || !!recordedBlob;
+  const isRecordDisabled = isBeatLoading || !synchronizedReady;
 
   return (
     <>
@@ -1319,7 +1261,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                               max="100"
                               value={fxSettings.space}
                               disabled={!isFXActive}
-                              onChange={(e) => handleUpdateCustomFX('space', parseInt(e.target.value))}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUpdateCustomFX('space', parseInt(e.target.value))}
                               className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
                             />
                           </div>
@@ -1336,7 +1278,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                               max="100"
                               value={fxSettings.echo}
                               disabled={!isFXActive}
-                              onChange={(e) => handleUpdateCustomFX('echo', parseInt(e.target.value))}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUpdateCustomFX('echo', parseInt(e.target.value))}
                               className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
                             />
                           </div>
@@ -1353,7 +1295,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                               max="100"
                               value={fxSettings.punch}
                               disabled={!isFXActive}
-                              onChange={(e) => handleUpdateCustomFX('punch', parseInt(e.target.value))}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUpdateCustomFX('punch', parseInt(e.target.value))}
                               className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
                             />
                           </div>
@@ -1431,17 +1373,17 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 )}
                 <button
                   onClick={handleToggleRecord}
-                  disabled={isBeatLoading}
+                  disabled={isRecordDisabled}
                   className={`w-20 h-20 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-2xl ${
-                    isBeatLoading
+                    isRecordDisabled
                       ? 'bg-gray-600 cursor-not-allowed opacity-50'
                       : isRecording
                         ? 'bg-red-500 hover:bg-red-400'
                         : 'bg-red-600 hover:bg-red-500'
                   }`}
-                  aria-label={isBeatLoading ? 'Loading beat...' : isRecording ? 'Stop recording' : 'Start recording'}
+                  aria-label={isRecordDisabled ? 'Loading beat...' : isRecording ? 'Stop recording' : 'Start recording'}
                 >
-                  {isBeatLoading ? (
+                  {isRecordDisabled ? (
                     <Loader2 size={32} className="text-white animate-spin" />
                   ) : isRecording ? (
                     <div className="w-7 h-7 bg-white rounded-[5px]" />
