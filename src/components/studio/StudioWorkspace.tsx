@@ -1900,6 +1900,33 @@ const StudioWorkspace: React.FC = () => {
         setSections(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
     };
 
+    const handleMoveFocus = (sectionId: string, direction: 'up' | 'down', caretPos: number) => {
+        const index = sections.findIndex(s => s.id === sectionId);
+        if (index === -1) return;
+
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= sections.length) return;
+
+        const targetSection = sections[targetIndex];
+        const targetLines = targetSection.text.split('\n');
+
+        // If moving up, focus the last line of the previous section.
+        // If moving down, focus the first line of the next section.
+        const lineIndex = direction === 'up' ? targetLines.length - 1 : 0;
+
+        // Wait for next tick so DOM is ready (though it should already be rendered)
+        setTimeout(() => {
+            const el = document.getElementById(`input-${targetSection.id}-${lineIndex}`) as HTMLTextAreaElement;
+            if (el) {
+                el.focus();
+                // Clamp selection index inside the target line's actual text length
+                const targetTextLen = (targetLines[lineIndex] || '').length;
+                const finalPos = Math.min(caretPos, targetTextLen);
+                el.setSelectionRange(finalPos, finalPos);
+            }
+        }, 0);
+    };
+
     const moveSection = (id: string, direction: 'up' | 'down') => {
         const index = sections.findIndex(s => s.id === id);
         if (index === -1) return;
@@ -1910,7 +1937,27 @@ const StudioWorkspace: React.FC = () => {
         setSections(newSections);
     };
 
-    const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
+    const deleteSection = (id: string) => {
+        const deletedIdx = sections.findIndex(s => s.id === id);
+        if (deletedIdx === -1) return;
+        const deletedSection = sections[deletedIdx];
+
+        setSections(prev => prev.filter(s => s.id !== id));
+
+        toast.success(`Deleted ${deletedSection.type || 'section'}`, {
+            action: {
+                label: 'Undo',
+                onClick: () => {
+                    setSections(prev => {
+                        const restored = [...prev];
+                        restored.splice(deletedIdx, 0, deletedSection);
+                        return restored;
+                    });
+                    toast.success('Section restored');
+                }
+            }
+        });
+    };
 
     const createDefaultSections = (): LyricSection[] => [
         { id: randomId(), type: 'verse', repeats: 1, text: "" }
@@ -2250,7 +2297,7 @@ const StudioWorkspace: React.FC = () => {
                                                     <div
                                                         key={p.id}
                                                         onClick={() => loadProject(p)}
-                                                        className="break-inside-avoid mb-4 w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-main)] hover:border-[var(--accent)] hover:bg-[var(--bg-hover)] p-4 flex flex-col justify-between shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] transition-all relative group"
+                                                        className="break-inside-avoid mb-4 w-full rounded-2xl bg-[var(--bg-card)] border border-[var(--border-main)] hover:border-[var(--accent)]/60 hover:bg-[var(--bg-hover)] p-4 flex flex-col justify-between shadow-md cursor-pointer hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(126,157,134,0.08)] active:scale-[0.98] transition-all duration-300 ease-out relative group"
                                                     >
                                                         <div className="flex items-start justify-between gap-2 mb-2">
                                                             <h3 className="text-xs font-bold text-[var(--text-main)] tracking-tight line-clamp-2 pr-4">{p.name || "Untitled Project"}</h3>
@@ -2418,7 +2465,18 @@ const StudioWorkspace: React.FC = () => {
 
                                 {/* Floating Action Menu Trigger */}
                                 <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
-                                    <div className="pointer-events-auto flex flex-col items-end gap-3">
+                                    <AnimatePresence>
+                                        {fabOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 0.5 }}
+                                                exit={{ opacity: 0 }}
+                                                onClick={() => setFabOpen(false)}
+                                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 pointer-events-auto"
+                                            />
+                                        )}
+                                    </AnimatePresence>
+                                    <div className="pointer-events-auto flex flex-col items-end gap-3 relative z-40">
                                         <AnimatePresence>
                                             {fabOpen && (
                                                 <motion.div
@@ -2525,7 +2583,7 @@ const StudioWorkspace: React.FC = () => {
                                         >
                                             <ChevronLeft size={20} />
                                         </button>
-                                        <div className="group relative flex items-center flex-1">
+                                        <div className="group relative flex items-center flex-1 border-b border-dashed border-transparent hover:border-[var(--text-tertiary)]/40 focus-within:border-solid focus-within:border-[var(--accent)] transition-all duration-300">
                                             <input
                                                 value={projectTitle}
                                                 onChange={(e) => setProjectTitle(e.target.value)}
@@ -2786,6 +2844,7 @@ const StudioWorkspace: React.FC = () => {
                                                                             onDelete={deleteSection}
                                                                             onMove={moveSection}
                                                                             showSyllables={showSyllables}
+                                                                            onMoveFocus={handleMoveFocus}
                                                                         />
                                                                     </motion.div>
                                                                 ))}

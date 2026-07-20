@@ -235,7 +235,7 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     const resizeCanvas = () => {
       const parent = canvas.parentElement;
       if (!parent) return;
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
       canvas.width = parent.clientWidth * dpr;
       canvas.height = parent.clientHeight * dpr;
       ctx2d.scale(dpr, dpr);
@@ -243,11 +243,13 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
       canvas.style.height = `${parent.clientHeight}px`;
     };
 
-    setTimeout(resizeCanvas, 50);
-    window.addEventListener('resize', resizeCanvas);
+    const timeoutId = setTimeout(resizeCanvas, 50);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', resizeCanvas);
+    }
 
     const render = () => {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
       const centerY = h / 2;
@@ -425,7 +427,10 @@ export const SpectralEQ: React.FC<SpectralEQProps> = ({
     render();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
+      clearTimeout(timeoutId);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', resizeCanvas);
+      }
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

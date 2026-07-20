@@ -10,6 +10,7 @@ interface LyricCardProps {
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
   showSyllables: boolean;
+  onMoveFocus?: (sectionId: string, direction: 'up' | 'down', caretPos: number) => void;
 }
 
 const AutoResizeRowTextarea = ({
@@ -71,7 +72,8 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   onUpdate,
   onDelete,
   onMove,
-  showSyllables
+  showSyllables,
+  onMoveFocus
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -132,11 +134,17 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       if (index > 0) {
         e.preventDefault();
         setPendingFocus({ index: index - 1, caretPos: selectionStart });
+      } else if (onMoveFocus) {
+        e.preventDefault();
+        onMoveFocus(section.id, 'up', selectionStart);
       }
     } else if (e.key === 'ArrowDown') {
       if (index < lines.length - 1) {
         e.preventDefault();
         setPendingFocus({ index: index + 1, caretPos: selectionStart });
+      } else if (onMoveFocus) {
+        e.preventDefault();
+        onMoveFocus(section.id, 'down', selectionStart);
       }
     }
   };
