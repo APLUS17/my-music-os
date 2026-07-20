@@ -73,7 +73,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [duration, setDuration] = useState(0);
 
@@ -144,8 +143,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Ref to track state inside animation loop without stale closures
   const visualizerProgressRef = useRef(0);
   visualizerProgressRef.current = progress;
-  const isRecordingRef = useRef(false);
-  isRecordingRef.current = isRecording;
+
   // Pass live time into canvas without stale closure
   const displayTimeRef = useRef(0);
 
@@ -153,6 +151,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const {
     startTake,
     stopTake,
+    isRecording, // Direct, single source of truth from high-performance hook!
     ready: synchronizedReady,
     audioCtxRef,
     micStreamRef,
@@ -163,7 +162,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       setDuration(duration);
       setProgress(0);
       recordingStartOffsetRef.current = beatOffset;
-      setIsRecording(false);
 
       if (pendingSaveRef.current) {
         pendingSaveRef.current = false;
@@ -176,7 +174,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       setDuration(duration);
       setProgress(0);
       recordingStartOffsetRef.current = beatOffset;
-      setIsRecording(false);
 
       if (pendingSaveRef.current) {
         pendingSaveRef.current = false;
@@ -186,16 +183,50 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     },
   });
 
+  const isRecordingRef = useRef(false);
+  isRecordingRef.current = isRecording;
+
+  // Single React lifecycle observer that handles all recording start/stop transitions reactively
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+    onRecordingStateChange?.(isRecording);
+
+    if (isRecording) {
+      setRecordedBlob(null);
+      setProgress(0);
+      setDuration(0);
+      setFinalTranscript('');
+      setInterimTranscript('');
+      startTimeRef.current = Date.now();
+      peaksRef.current = [];
+      liveWaveHistoryRef.current = [];
+      lastSampleTimeRef.current = 0;
+
+      // Connect real-time parallel low-latency monitoring feedback graph
+      if (audioCtxRef.current && micStreamRef.current) {
+        setupLiveFXMonitoring(audioCtxRef.current, micStreamRef.current);
+      }
+
+      timerRef.current = window.setInterval(() => {
+        setDuration((Date.now() - startTimeRef.current) / 1000);
+      }, 100);
+
+      startSpeechRecognition();
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
       stopSpeechRecognition();
       cleanupFXMonitoring();
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, []);
+  }, [isRecording]);
 
   // Synchronize Live Vocal FX settings with Web Audio Nodes
   useEffect(() => {
@@ -250,13 +281,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   }, [isMonitoringEnabled]);
 
-  // Auto-start recording when opened via nav button
+  // Auto-start recording when opened via nav button and backing track is fully ready (prevents preload race condition)
   useEffect(() => {
-    if (autoStart) {
+    if (autoStart && synchronizedReady) {
       startRecording();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart]);
+  }, [autoStart, synchronizedReady]);
 
   // Auto-scroll transcription to bottom
   useEffect(() => {
@@ -477,7 +508,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       window.removeEventListener('resize', resizeCanvas);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [isRecording, recordedBlob, showTranscription]);
+  }, [recordedBlob, showTranscription]);
 
   const audioUrlRef = useRef<string | null>(null);
 
@@ -803,31 +834,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       // 2. Trigger high-performance synchronized start (AudioWorklet & Worker thread setup)
       await startTake(targetOffset);
 
-      // 3. Connect real-time parallel low-latency monitoring feedback graph
-      if (audioCtxRef.current && micStreamRef.current) {
-        setupLiveFXMonitoring(audioCtxRef.current, micStreamRef.current);
-      }
-
       if (layerMode) {
         startLayerPlayback();
       }
-
-      setIsRecording(true);
-      setRecordedBlob(null);
-      setProgress(0);
-      setDuration(0);
-      setFinalTranscript('');
-      setInterimTranscript('');
-      startTimeRef.current = Date.now();
-      peaksRef.current = [];
-      liveWaveHistoryRef.current = [];
-      lastSampleTimeRef.current = 0;
-
-      timerRef.current = window.setInterval(() => {
-        setDuration((Date.now() - startTimeRef.current) / 1000);
-      }, 100);
-
-      startSpeechRecognition();
 
     } catch (err) {
       console.error("Start recording failed:", err);
@@ -837,23 +846,15 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const stopRecording = () => {
     if (isRecording) {
       stopTake();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
       if (layerMode) {
         stopLayerPlayback();
       }
-      stopSpeechRecognition();
-      cleanupFXMonitoring();
       if (backingAudioRef?.current) {
         backingAudioRef.current.pause();
       }
       onPauseBeatAudio?.();
     }
   };
-
-  useEffect(() => {
-    onRecordingStateChange?.(isRecording);
-  }, [isRecording, onRecordingStateChange]);
 
   const handleToggleRecord = () => {
     if (isBeatLoading || !synchronizedReady) return;
