@@ -19,8 +19,7 @@ import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
-import { transcribeAudio } from '@/lib/audio/audioIntelligence';
-import { analyzeAudioStructure } from '@/app/actions';
+import { transcribeAudio, transcribeAudioChunks } from '@/lib/audio/audioIntelligence';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Clock,
@@ -1043,7 +1042,10 @@ const StudioWorkspace: React.FC = () => {
                 activeCategory
             };
             try { localStorage.setItem('studio-pro-data-v2', JSON.stringify(dataToSave)); }
-            catch (e) { console.error("Storage full or error", e); }
+            catch (e) {
+                console.error("Storage full or error", e);
+                toast.error('Session notes failed to save — your audio is safe, but transcripts/lyrics may not survive a reload.');
+            }
             try { localStorage.setItem('lyriq_ritual_stats', JSON.stringify(ritualStats)); }
             catch (e) { console.error("Rituals Storage error", e); }
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -1081,10 +1083,21 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => {
+    // Long takes (the realistic shape of "record the whole session in one go")
+    // get a Granola-style recap automatically; shorter takes can trigger one
+    // manually later via handleRetryMuseAnalysis so a 5-second punch-in doesn't
+    // burn a full Gemini upload+analyze.
+    const MUSE_AUTO_ANALYZE_MIN_SEC = 180;
+
+    // Above this size, transcribe from the real recording-time chunks instead of
+    // pushing one giant multipart body through the transcribe route.
+    const CHUNKED_TRANSCRIBE_MIN_SEC = 180;
+    const CHUNK_TIMESLICE_SEC = 20; // matches RecorderDrawer's mediaRecorder.start(20000)
+
+    const handleSaveRecordingSession = async (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean, recordingId?: string, chunks?: Blob[]) => {
         const url = URL.createObjectURL(blob);
         const base64 = await blobToBase64(blob);
-        const id = randomId().substring(0, 6).toUpperCase();
+        const id = recordingId || randomId().substring(0, 6).toUpperCase();
 
         const compensatedOffset = beatOffset !== undefined ? Math.max(0, beatOffset - (latencyCompensation / 1000)) : undefined;
 
@@ -1096,17 +1109,39 @@ const StudioWorkspace: React.FC = () => {
         // Increment counter and kick off transcription immediately — runs in parallel with IndexedDB save and smartSplit
         setAnalyzingVocalCount(c => c + 1);
         // Transcription runs by default; set NEXT_PUBLIC_GROQ_ENABLED=false to explicitly disable it.
-        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED !== 'false'
-            ? transcribeAudio(base64)
-            : Promise.resolve(null);
-
-        const lyricsSections = categorySections['Lyrics'] || sections;
-        const lyricsContextString = lyricsSections.map(s => `[${s.type}]: ${s.text}`).join('\n');
-        const structurePromise = analyzeAudioStructure(base64, lyricsContextString);
-
-        await saveAudioData(id, base64);
+        // Long takes transcribe from their real recording-time chunks (avoids one huge
+        // upload); short takes/layers use the existing single-call path.
+        const transcriptionPromise = process.env.NEXT_PUBLIC_GROQ_ENABLED === 'false'
+            ? Promise.resolve(null)
+            : (duration >= CHUNKED_TRANSCRIBE_MIN_SEC && chunks && chunks.length > 1)
+                ? transcribeAudioChunks(
+                    chunks.map((chunkBlob, i) => ({ blob: chunkBlob, offsetSec: i * CHUNK_TIMESLICE_SEC })),
+                    blob.type || 'audio/webm'
+                )
+                : transcribeAudio(base64);
 
         const timestamp = new Date().toISOString();
+
+        // Persist audio locally, failing loud instead of silently dropping the take.
+        // Session state is created below regardless — playback still works from the
+        // in-memory blob URL even if durable storage fails.
+        const persistAudio = async () => {
+            try {
+                await saveAudioData(id, base64);
+                setSessions(prev => prev.map(s => s.id === id ? { ...s, persistFailed: false } : s));
+            } catch (err) {
+                console.error('Failed to persist audio to IndexedDB:', err);
+                setSessions(prev => prev.map(s => s.id === id ? { ...s, persistFailed: true } : s));
+                toast.error('Take not saved to device storage — it may be lost on reload.', {
+                    action: { label: 'Retry', onClick: () => { persistAudio(); } }
+                });
+            }
+        };
+
+        // Also stash the raw blob in the Muse audio store so the Granola-style recap
+        // (triggerMuseAnalysis / handleRetryMuseAnalysis) can always fetch it later,
+        // whether it runs automatically now or via a manual retry.
+        saveMuseAudio(id, blob).catch(err => console.warn('Failed to stash Muse audio copy:', err));
 
         let initialSections: AutoSection[] = [];
         try {
@@ -1157,6 +1192,7 @@ const StudioWorkspace: React.FC = () => {
 
             toast.success('Layer added');
             setLayerModeSessionId(null);
+            persistAudio();
             const layerToastId = toast.loading('Transcribing lyrics...');
             transcriptionPromise.then(aiResult => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
@@ -1200,6 +1236,7 @@ const StudioWorkspace: React.FC = () => {
 
             setSessions(prev => [newSession, ...prev]);
             setActiveSessionId(id); // Auto-select the latest take
+            persistAudio();
 
             if (recordingTargetLineId) {
                 setRecordingTargetLineId(null);
@@ -1224,49 +1261,27 @@ const StudioWorkspace: React.FC = () => {
             } else {
                 toast.success('Recording saved');
             }
-            // Wait for both Gemini structure and Groq transcription (runs silently)
-            Promise.all([transcriptionPromise, structurePromise]).then(([aiResult, structureResult]) => {
+            // Groq transcription (runs silently); acoustic section grouping already
+            // came from the free, local, synchronous smartSplit pass above.
+            transcriptionPromise.then((aiResult) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
-
-                setSessions(prev => prev.map(s => {
-                    if (s.id === id) {
-                        let finalSections = s.sections;
-                        let newName = s.name;
-
-                        if (structureResult.success && structureResult.sections && structureResult.sections.length > 0) {
-                            finalSections = structureResult.sections.map(gs => ({
-                                id: randomId(),
-                                startTime: gs.startTime,
-                                endTime: gs.endTime,
-                                type: gs.type,
-                                label: gs.label,
-                                emojiTag: gs.emoji,
-                                summary: gs.summary,
-                                isBest: false,
-                                isFavorited: false
-                            }));
-
-                            // Auto-name based on the first major section found
-                            const firstSection = structureResult.sections.find(sec => sec.type === 'vocal') || structureResult.sections[0];
-                            if (firstSection) {
-                                newName = `${firstSection.emoji} ${firstSection.label} Take`;
-                            }
-                        }
-
-                        return {
-                            ...s,
-                            name: newName,
-                            transcription: aiResult?.transcription || s.transcription,
-                            lines: aiResult?.lines || s.lines,
-                            sections: finalSections
-                        };
-                    }
-                    return s;
-                }));
+                if (aiResult) {
+                    setSessions(prev => prev.map(s => s.id === id ? {
+                        ...s,
+                        transcription: aiResult.transcription || s.transcription,
+                        lines: aiResult.lines || s.lines
+                    } : s));
+                }
             }).catch((err: Error) => {
                 setAnalyzingVocalCount(c => Math.max(0, c - 1));
                 console.error('Audio intelligence error:', err.message);
             });
+
+            // Granola-style session recap: auto-generate for takes long enough to be
+            // a real session (the shape a 45-min continuous recording will always match).
+            if (duration >= MUSE_AUTO_ANALYZE_MIN_SEC) {
+                triggerMuseAnalysis(id, blob, blob.type || 'audio/webm', duration);
+            }
         }
     };
 
@@ -2854,6 +2869,7 @@ const StudioWorkspace: React.FC = () => {
                                                 session={activeSession ?? null}
                                                 onOpenFX={() => setShowFXPanel(true)}
                                                 onDismiss={() => setShowPlayerSheet(false)}
+                                                onGenerateRecap={handleRetryMuseAnalysis}
                                                 sessions={sessions.filter(s => s.kind !== 'muse')}
                                                 beat={beats.find(b => b.id === uploadedBeatId) ?? null}
                                                 beatSrc={uploadedBeat}

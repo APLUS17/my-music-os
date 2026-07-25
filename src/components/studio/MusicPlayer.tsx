@@ -3,6 +3,7 @@ import { X, Play, Pause, Volume2, SkipBack, SkipForward } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession } from '@/types';
 import { formatTime } from '@/lib/utils/time';
+import { SyncedLyrics } from './SyncedLyrics';
 
 interface MusicPlayerProps {
   onClose: () => void;
@@ -202,6 +203,18 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             </p>
           )}
         </div>
+
+        {/* Synced transcript — scroll through the take instead of re-listening */}
+        {hasVocals && currentVocal?.lines && currentVocal.lines.length > 0 && (
+          <div className="w-full h-40 mb-6 relative">
+            <SyncedLyrics
+              lines={currentVocal.lines}
+              currentTime={progress}
+              onSeek={handleProgressChange}
+              className="h-40"
+            />
+          </div>
+        )}
 
         {/* Progress Bar */}
         <div className="w-full mb-6">

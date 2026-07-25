@@ -239,6 +239,14 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
         });
     }, [notes, searchQuery]);
 
+    // Recording transcripts aren't part of Note.title/.body, so search them
+    // separately — otherwise a lyric said in a take is unfindable from here.
+    const matchingSessions = useMemo(() => {
+        if (!searchQuery) return [];
+        const q = searchQuery.toLowerCase();
+        return sessions.filter(s => s.transcription?.toLowerCase().includes(q));
+    }, [sessions, searchQuery]);
+
     const groups = useMemo(() => groupNotesByTime(sortedNotes), [sortedNotes]);
 
     const deleteNote = useCallback((id: string) => {
@@ -340,6 +348,39 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                     )}
                 </AnimatePresence>
 
+                {/* Recordings section — take transcripts matching the search */}
+                {searchQuery && matchingSessions.length > 0 && (
+                    <div className="px-5 mb-2">
+                        <h2 className="text-[19px] font-bold mt-6 mb-2" style={{ color: 'var(--text-main)' }}>
+                            Recordings
+                        </h2>
+                        <div className="rounded-2xl overflow-hidden divide-y divide-white/5" style={{ background: 'var(--bg-card)' }}>
+                            {matchingSessions.map(s => {
+                                const q = searchQuery.toLowerCase();
+                                const idx = s.transcription?.toLowerCase().indexOf(q) ?? -1;
+                                const snippetStart = Math.max(0, idx - 30);
+                                const snippet = idx >= 0 ? `…${s.transcription!.slice(snippetStart, idx + 60)}…` : '';
+                                return (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => setShowAttachments(true)}
+                                        className="w-full text-left px-4 py-3 active:bg-white/5 transition-colors"
+                                    >
+                                        <p className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-main)' }}>
+                                            {s.name || 'Recording'}
+                                        </p>
+                                        {snippet && (
+                                            <p className="text-[10px] mt-0.5 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                                                {snippet}
+                                            </p>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {/* Notes list / gallery */}
                 <div className="px-5">
                     {notes.length === 0 ? (
@@ -350,12 +391,12 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                 Tap the compose button to get started
                             </p>
                         </div>
-                    ) : searchQuery && sortedNotes.length === 0 ? (
+                    ) : searchQuery && sortedNotes.length === 0 && matchingSessions.length === 0 ? (
                         <div className="flex flex-col items-center justify-center pt-24 text-center">
                             <Search size={48} className="mb-4 opacity-20" style={{ color: 'var(--text-secondary)' }} />
                             <p style={{ color: 'var(--text-secondary)' }}>No results for &ldquo;{searchQuery}&rdquo;</p>
                         </div>
-                    ) : viewStyle === 'list' ? (
+                    ) : searchQuery && sortedNotes.length === 0 ? null : viewStyle === 'list' ? (
                         groups.map(group => (
                              <div key={group.label}>
                                 <h2 className="text-[19px] font-bold mt-6 mb-2" style={{ color: 'var(--text-main)' }}>

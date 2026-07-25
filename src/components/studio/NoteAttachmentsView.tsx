@@ -2,8 +2,9 @@
 
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Play, Pause, Music2, Mic } from 'lucide-react';
+import { X, Play, Pause, Music2, Mic, ChevronDown, ChevronUp } from 'lucide-react';
 import { RecordingSession, Beat } from '../../types';
+import { SyncedLyrics } from './SyncedLyrics';
 
 interface NoteAttachmentsViewProps {
     sessions: RecordingSession[];
@@ -27,6 +28,8 @@ export function NoteAttachmentsView({ sessions, beats, onClose }: NoteAttachment
     const [showAllAudio, setShowAllAudio] = useState(false);
     const [showAllBeats, setShowAllBeats] = useState(false);
     const [playingId, setPlayingId] = useState<string | null>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [expandedTranscriptId, setExpandedTranscriptId] = useState<string | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     const displayedSessions = showAllAudio ? sessions : sessions.slice(0, 3);
@@ -41,10 +44,27 @@ export function NoteAttachmentsView({ sessions, beats, onClose }: NoteAttachment
             if (session.audioUrl) {
                 const a = new Audio(session.audioUrl);
                 a.play().catch(() => {});
-                a.onended = () => setPlayingId(null);
+                a.ontimeupdate = () => setCurrentTime(a.currentTime);
+                a.onended = () => { setPlayingId(null); setCurrentTime(0); };
                 audioRef.current = a;
                 setPlayingId(session.id);
+                setCurrentTime(0);
             }
+        }
+    };
+
+    // Seeking from the transcript starts playback at that line if this take
+    // isn't already the one playing.
+    const handleSeekTranscript = (session: RecordingSession, time: number) => {
+        if (playingId !== session.id) {
+            handleTogglePlay(session);
+            // Wait a tick for the new Audio element to be assigned before seeking.
+            setTimeout(() => {
+                if (audioRef.current) audioRef.current.currentTime = time;
+            }, 0);
+        } else if (audioRef.current) {
+            audioRef.current.currentTime = time;
+            setCurrentTime(time);
         }
     };
 
@@ -98,33 +118,58 @@ export function NoteAttachmentsView({ sessions, beats, onClose }: NoteAttachment
                             )}
                         </div>
                         <div className="flex flex-col gap-2">
-                            {displayedSessions.map(session => (
+                            {displayedSessions.map(session => {
+                                const hasTranscript = !!session.lines?.length;
+                                const isExpanded = expandedTranscriptId === session.id;
+                                return (
                                 <div
                                     key={session.id}
-                                    className="rounded-2xl p-4 flex items-center gap-3"
+                                    className="rounded-2xl p-4"
                                     style={{ background: 'var(--bg-card)' }}
                                 >
-                                    <button
-                                        onClick={() => handleTogglePlay(session)}
-                                        className="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-lg"
-                                    >
-                                        {playingId === session.id
-                                            ? <Pause size={16} className="text-white" fill="white" />
-                                            : <Play size={16} className="text-white" fill="white" style={{ marginLeft: 2 }} />
-                                        }
-                                    </button>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-[var(--text-main)] truncate">
-                                            {session.name || 'New Recording'}
-                                        </p>
-                                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                            Audio Recording
-                                            {session.duration ? ` · ${formatDuration(session.duration)}` : ''}
-                                            {' · '}{formatSessionDate(session.timestamp)}
-                                        </p>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleTogglePlay(session)}
+                                            className="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform shadow-lg"
+                                        >
+                                            {playingId === session.id
+                                                ? <Pause size={16} className="text-white" fill="white" />
+                                                : <Play size={16} className="text-white" fill="white" style={{ marginLeft: 2 }} />
+                                            }
+                                        </button>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-[var(--text-main)] truncate">
+                                                {session.name || 'New Recording'}
+                                            </p>
+                                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                                                Audio Recording
+                                                {session.duration ? ` · ${formatDuration(session.duration)}` : ''}
+                                                {' · '}{formatSessionDate(session.timestamp)}
+                                            </p>
+                                        </div>
+                                        {hasTranscript && (
+                                            <button
+                                                onClick={() => setExpandedTranscriptId(isExpanded ? null : session.id)}
+                                                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors"
+                                                aria-label={isExpanded ? 'Hide lyrics' : 'Show lyrics'}
+                                            >
+                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                            </button>
+                                        )}
                                     </div>
+                                    {hasTranscript && isExpanded && (
+                                        <div className="h-40 mt-3 -mx-4 border-t border-white/8 pt-2">
+                                            <SyncedLyrics
+                                                lines={session.lines!}
+                                                currentTime={playingId === session.id ? currentTime : 0}
+                                                onSeek={(time) => handleSeekTranscript(session, time)}
+                                                className="h-40"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
