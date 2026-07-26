@@ -1,9 +1,23 @@
 import { MuseSegment, MuseRecap } from '@/types';
 
-// Client-side pipeline: browser uploads the audio blob directly to Gemini's
-// Files API via a resumable URL minted by our server, then calls the
-// analyze route with just the fileUri. This bypasses Vercel's 4.5 MB
-// API-route body limit and keeps the analyze function's request small.
+// Chunk size for the client -> our server leg of the upload. Must be a
+// multiple of 256 KiB per Google's resumable-upload alignment requirement.
+// 3 MiB keeps every request comfortably under Vercel's 4.5 MB body limit.
+const UPLOAD_CHUNK_BYTES = 12 * 262144; // 3 MiB
+
+// Client-side pipeline: our server starts a resumable upload session with
+// Gemini's Files API, then the browser relays the audio to Google THROUGH
+// our own server in small pieces (never directly to Google) before calling
+// the analyze route with just the resulting fileUri.
+//
+// This two-hop shape is required, not just a size workaround: Google's
+// resumable-upload CORS policy only trusts the origin that started the
+// session. That's always this server (since it holds the API key), so a
+// browser PUT straight to Google's upload URL gets blocked by CORS no
+// matter what headers we send — the origins never match. Routing every
+// Google-facing byte through our server sidesteps that entirely (CORS only
+// applies to browser requests), while chunking the client -> server leg
+// keeps each request under Vercel's 4.5 MB body limit.
 export async function processMuseSession(args: {
     sessionId: string;
     blob: Blob;
@@ -15,7 +29,9 @@ export async function processMuseSession(args: {
 
     onProgress?.({ stage: 'uploading' });
 
-    // 1. Ask our server for a resumable upload URL.
+    // 1. Ask our server to start a resumable upload session with Google.
+    // We only ever get back an opaque upload_id — never the full upload URL,
+    // which embeds the raw API key.
     const initRes = await fetch('/api/muse/upload-init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,29 +45,42 @@ export async function processMuseSession(args: {
         const msg = await safeErr(initRes);
         throw new Error(`Could not start upload: ${msg}`);
     }
-    const { uploadUrl } = await initRes.json();
-    if (!uploadUrl) throw new Error('Could not start upload: missing upload URL');
+    const { uploadId } = await initRes.json();
+    if (!uploadId) throw new Error('Could not start upload: missing upload id');
 
-    // 2. Upload the bytes straight to Google. Long-running mobile connections
-    // are the norm here, so we let this run without our own AbortController —
-    // the browser and platform will surface network failures.
-    const uploadRes = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-            'X-Goog-Upload-Command': 'upload, finalize',
-            'X-Goog-Upload-Offset': '0',
-            'Content-Length': String(blob.size)
-        },
-        body: blob
-    });
-    if (!uploadRes.ok) {
-        const msg = await safeErr(uploadRes);
-        throw new Error(`Upload to Gemini failed: ${msg}`);
+    // 2. Relay the audio to Google through our own server, in chunks small
+    // enough for Vercel's body limit. Sequential, not parallel — Google's
+    // resumable protocol is a single ordered byte stream per session.
+    let offset = 0;
+    let fileUri: string | undefined;
+    let fileName: string | undefined;
+    let uploadedMime: string = mimeType;
+
+    while (offset < blob.size) {
+        const end = Math.min(offset + UPLOAD_CHUNK_BYTES, blob.size);
+        const chunk = blob.slice(offset, end);
+        const isFinal = end >= blob.size;
+
+        const chunkRes = await fetch(
+            `/api/muse/upload-chunk?uploadId=${encodeURIComponent(uploadId)}&offset=${offset}&isFinal=${isFinal}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: chunk
+            }
+        );
+        if (!chunkRes.ok) {
+            const msg = await safeErr(chunkRes);
+            throw new Error(`Upload to Gemini failed: ${msg}`);
+        }
+        const chunkJson = await chunkRes.json();
+        if (isFinal) {
+            fileUri = chunkJson?.fileUri;
+            fileName = chunkJson?.fileName;
+            uploadedMime = chunkJson?.mimeType || mimeType;
+        }
+        offset = end;
     }
-    const uploadJson = await uploadRes.json();
-    const fileUri: string | undefined = uploadJson?.file?.uri;
-    const fileName: string | undefined = uploadJson?.file?.name;
-    const uploadedMime: string = uploadJson?.file?.mimeType || mimeType;
     if (!fileUri) throw new Error('Upload to Gemini failed: missing file URI');
 
     // 3. Kick off analysis. Give it up to 4 minutes before we give up on the
