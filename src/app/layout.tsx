@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ClientErrorLogger } from "@/components/ClientErrorLogger";
 
 export default function RootLayout({
   children,
@@ -35,6 +36,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased min-h-screen">
         <AuthProvider>
+          <ClientErrorLogger />
           <TooltipProvider>
             {children}
           </TooltipProvider>

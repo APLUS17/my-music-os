@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+const PUBLIC_PATHS = ['/auth', '/privacy', '/terms'];
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -25,7 +27,24 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // AUTH DISABLED FOR LOCAL DEV — re-enable by restoring the redirect logic below
+  const { data: { user } } = await supabase.auth.getUser();
+  const { pathname } = request.nextUrl;
+  const isPublic =
+    pathname.startsWith('/api/') ||
+    PUBLIC_PATHS.some(p => pathname === p || pathname.startsWith(`${p}/`));
+
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth';
+    return NextResponse.redirect(url);
+  }
+
+  if (user && pathname === '/auth') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }
 

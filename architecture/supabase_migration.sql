@@ -188,3 +188,28 @@ CREATE POLICY "Users manage own muse uploads" ON storage.objects
   FOR ALL USING (
     bucket_id = 'muse-uploads' AND auth.uid()::text = (storage.foldername(name))[1]
   );
+
+-- ============================================================
+-- ERROR LOGS (client + server crash reporting)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS error_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  message TEXT NOT NULL,
+  stack TEXT,
+  url TEXT,
+  user_agent TEXT,
+  context JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE error_logs ENABLE ROW LEVEL SECURITY;
+
+-- Anyone (including pre-login visitors) can report an error, but no
+-- policy grants SELECT/UPDATE/DELETE — so no client, anonymous or
+-- authenticated, can ever read error logs back out. View them via the
+-- Supabase dashboard (Table Editor / SQL Editor), which uses the
+-- service role and bypasses RLS.
+DROP POLICY IF EXISTS "Anyone can report errors" ON error_logs;
+CREATE POLICY "Anyone can report errors" ON error_logs
+  FOR INSERT WITH CHECK (true);

@@ -11,10 +11,11 @@ export default function AuthGate() {
   const [step, setStep] = useState<'email' | 'verify'>('email');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || !agreed) return;
     setLoading(true);
     setError(null);
     const { error } = await signInWithEmail(email.trim());
@@ -22,6 +23,11 @@ export default function AuthGate() {
     if (error) {
       setError(error);
     } else {
+      try {
+        localStorage.setItem('lyriq_tos_accepted_at', new Date().toISOString());
+      } catch {
+        // best-effort only
+      }
       setStep('verify');
     }
   }
@@ -81,10 +87,29 @@ export default function AuthGate() {
                   autoFocus
                   className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[#7fff00]/60 focus:ring-1 focus:ring-[#7fff00]/30 transition"
                 />
+                <label className="flex items-start gap-2 text-xs text-white/50 leading-relaxed">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={e => setAgreed(e.target.checked)}
+                    className="mt-0.5 accent-[#7fff00]"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">
+                      Terms of Service
+                    </a>{' '}
+                    and{' '}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">
+                      Privacy Policy
+                    </a>
+                    .
+                  </span>
+                </label>
                 {error && <p className="text-xs text-red-400">{error}</p>}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !agreed}
                   className="w-full rounded-full bg-[#7fff00] text-black font-semibold py-3 text-sm active:scale-95 transition disabled:opacity-50"
                 >
                   {loading ? 'Sending…' : 'Send Code'}
