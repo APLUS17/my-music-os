@@ -2432,7 +2432,7 @@ const StudioWorkspace: React.FC = () => {
                                 </div>
 
                                 {/* Floating Action Menu Trigger */}
-                                <div className="absolute bottom-24 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+                                <div className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
                                     <div className="pointer-events-auto flex flex-col items-end gap-3">
                                         <AnimatePresence>
                                             {fabOpen && (
@@ -3267,7 +3267,7 @@ const StudioWorkspace: React.FC = () => {
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search songs, lyrics, recordings, beats..."
-                                    className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                                    className="w-full bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl py-4 pl-12 pr-4 text-base focus:outline-none focus:border-[var(--accent)] transition-all"
                                 />
                             </div>
                                 <button onClick={() => { setShowSearch(false); setSearchQuery(""); }} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/5 transition-colors text-[var(--text-secondary)]"><X size={20} /></button>

@@ -191,7 +191,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
     }
     if (typeof window !== 'undefined' && navigator.storage?.persist) {
-      try { await navigator.storage.persist(); } catch { /* best-effort */ }
+      try {
+        const persisted = await navigator.storage.persist();
+        if (!persisted) {
+          toast.warning("Storage isn't persisted — recordings may be cleared by the browser after a period of inactivity.", { id: 'storage-persist-warning' });
+        }
+      } catch { /* best-effort */ }
     }
     return true;
   };
@@ -1037,7 +1042,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
     } catch (err) {
       console.error("Start recording failed:", err);
-      toast.error('Could not start recording — check microphone permissions.');
+      const e = err as DOMException;
+      const message =
+        e.name === 'NotAllowedError' ? 'Microphone access denied — enable it in Settings.' :
+        e.name === 'NotFoundError' ? 'No microphone found on this device.' :
+        e.name === 'OverconstrainedError' ? "Microphone doesn't support the requested audio settings." :
+        'Could not start recording — check microphone permissions.';
+      toast.error(message);
     }
   };
 
@@ -1337,18 +1348,25 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     transition={{ duration: 0.15 }}
                     className="absolute inset-0"
                   >
-                    <div 
-                      ref={timelineRef} 
+                    <div
+                      ref={timelineRef}
                       className={`w-full h-full relative select-none ${recordedBlob && !isRecording ? 'cursor-ew-resize active:cursor-grabbing' : ''}`}
+                      style={{ touchAction: 'none' }}
                       onMouseDown={(e) => handleDragStart(e.clientX)}
                       onMouseMove={(e) => handleDragMove(e.clientX)}
                       onMouseUp={handleDragEnd}
                       onMouseLeave={handleDragEnd}
                       onTouchStart={(e) => {
-                        if (e.touches[0]) handleDragStart(e.touches[0].clientX);
+                        if (e.touches[0]) {
+                          e.preventDefault();
+                          handleDragStart(e.touches[0].clientX);
+                        }
                       }}
                       onTouchMove={(e) => {
-                        if (e.touches[0]) handleDragMove(e.touches[0].clientX);
+                        if (e.touches[0]) {
+                          e.preventDefault();
+                          handleDragMove(e.touches[0].clientX);
+                        }
                       }}
                       onTouchEnd={handleDragEnd}
                     >
@@ -1397,7 +1415,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         
                         <button
                           onClick={() => setShowFXPanel(false)}
-                          className="w-7 h-7 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                          className="w-11 h-11 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
                           aria-label="Close Vocal FX panel"
                         >
                           <X size={16} />

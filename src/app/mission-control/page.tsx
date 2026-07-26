@@ -672,7 +672,7 @@ export default function MissionControl() {
   const viewLabel = aw ? aw.label : view === "roadmap" ? "Roadmap" : view === "changelog" ? "Changelog" : "";
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#09090b", color: "#fafafa", fontFamily: "Inter,system-ui,sans-serif" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "#09090b", color: "#fafafa", fontFamily: "Inter,system-ui,sans-serif" }}>
 
       {/* TOP BAR */}
       <div style={{ height: 50, display: "flex", alignItems: "center", justifyItems: "space-between", justifyContent: "space-between", padding: "0 16px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, position: "sticky", top: 0, zIndex: 50, background: "#09090b" }}>

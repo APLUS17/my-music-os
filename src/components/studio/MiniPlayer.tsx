@@ -135,7 +135,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
                     transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                    className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40"
+                    className="absolute bottom-[calc(1.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40"
                     style={{ width: 'calc(100% - 48px)', maxWidth: '360px', touchAction: 'manipulation' }}
                 >
                     <div

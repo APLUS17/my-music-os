@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { generateId } from '@/lib/utils/id';
 import {
     putMuseChunk,
@@ -157,7 +158,10 @@ export function useMuseRecorder() {
         // Request persistence if possible
         if (typeof window !== 'undefined' && navigator.storage && navigator.storage.persist) {
             try {
-                await navigator.storage.persist();
+                const persisted = await navigator.storage.persist();
+                if (!persisted) {
+                    toast.warning("Storage isn't persisted — recordings may be cleared by the browser after a period of inactivity.", { id: 'storage-persist-warning' });
+                }
             } catch {}
         }
 
@@ -181,7 +185,10 @@ export function useMuseRecorder() {
             const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
             const audioCtx = new AudioContextClass();
             audioContextRef.current = audioCtx;
-            
+            if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+            }
+
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 256;
@@ -304,9 +311,14 @@ export function useMuseRecorder() {
             }, 200);
 
         } catch (e) {
-            const err = e as Error;
+            const err = e as DOMException;
             console.error('Error starting recording:', err);
-            setError(err.message || 'Microphone access denied or audio device error.');
+            const message =
+                err.name === 'NotAllowedError' ? 'Microphone access denied — enable it in Settings.' :
+                err.name === 'NotFoundError' ? 'No microphone found on this device.' :
+                err.name === 'OverconstrainedError' ? "Microphone doesn't support the requested audio settings." :
+                err.message || 'Microphone access denied or audio device error.';
+            setError(message);
             setStatus('error');
             await cleanupRecording();
         }

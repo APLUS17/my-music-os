@@ -335,7 +335,7 @@ export function NotesView({ notes, sessions, beats, onNotesChange, onOpenRecorde
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     placeholder="Search"
-                                    className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-[var(--text-tertiary)]"
+                                    className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-[var(--text-tertiary)]"
                                     style={{ color: 'var(--text-main)' }}
                                 />
                                 {searchQuery && (

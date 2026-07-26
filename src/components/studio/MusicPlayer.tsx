@@ -172,13 +172,13 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all z-10"
+        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all z-10"
       >
         <X size={20} />
       </button>
 
       {/* Content */}
-      <div className="w-full h-full flex flex-col items-center justify-center px-6 max-w-lg">
+      <div className="w-full h-full flex flex-col items-center justify-center px-6 max-w-lg" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Artwork / Visualization */}
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
@@ -241,7 +241,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileTap={{ scale: 0.95 }}
             onClick={handlePrevVocal}
             disabled={currentTrackIndex === 0 || !hasVocals}
-            className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <SkipBack size={18} />
           </motion.button>
@@ -263,7 +263,7 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
             whileTap={{ scale: 0.95 }}
             onClick={handleNextVocal}
             disabled={currentTrackIndex === vocalSessions.length - 1 || !hasVocals}
-            className="w-10 h-10 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
           >
             <SkipForward size={18} />
           </motion.button>

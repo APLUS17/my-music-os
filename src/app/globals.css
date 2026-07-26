@@ -286,6 +286,12 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease;
 }
 
+/* Stop nested scroll panels (Notes, lyrics view, search results, sidebar)
+   from chaining their overscroll into whatever sits behind them. */
+.overflow-y-auto {
+    overscroll-behavior-y: contain;
+}
+
 .serif {
     font-family: var(--font-instrument-serif), serif;
 }

@@ -79,7 +79,7 @@ export default function AuthGate() {
                   onChange={e => setEmail(e.target.value)}
                   required
                   autoFocus
-                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[#7fff00]/60 focus:ring-1 focus:ring-[#7fff00]/30 transition"
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-base text-white placeholder-white/30 outline-none focus:border-[#7fff00]/60 focus:ring-1 focus:ring-[#7fff00]/30 transition"
                 />
                 {error && <p className="text-xs text-red-400">{error}</p>}
                 <button
@@ -113,7 +113,7 @@ export default function AuthGate() {
                   onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   required
                   autoFocus
-                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 outline-none focus:border-[#7fff00]/60 focus:ring-1 focus:ring-[#7fff00]/30 transition tracking-[0.3em] text-center font-mono"
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-base text-white placeholder-white/30 outline-none focus:border-[#7fff00]/60 focus:ring-1 focus:ring-[#7fff00]/30 transition tracking-[0.3em] text-center font-mono"
                 />
                 {error && <p className="text-xs text-red-400">{error}</p>}
                 <button
