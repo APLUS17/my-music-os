@@ -118,6 +118,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Save-during-recording: flag + captured duration
   const pendingSaveRef = useRef(false);
   const savedDurationRef = useRef(0);
+  // Discard-during-recording: mirrors pendingSaveRef so cleanup in onstop can
+  // wait for the final chunk's write instead of racing it (see onstop below).
+  const pendingDiscardRef = useRef(false);
 
   // Chunked-write reliability: id/sequence for the in-progress recording's
   // IndexedDB chunk backup (crash recovery), and the Screen Wake Lock sentinel.
@@ -975,12 +978,28 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         setRecordedBlob(blob);
 
+        // mediaRecorder.stop() flushes one final ondataavailable (and its async
+        // IndexedDB write) before this handler runs — wait for every write we
+        // know about (including that final one, already pushed synchronously)
+        // before deleting, otherwise the last chunk's write can land AFTER the
+        // delete and resurrect a stale orphaned manifest entry.
+        const idToClean = recordingIdRef.current;
+        const writesSettled = Promise.all(chunkWritePromisesRef.current);
+
         if (pendingSaveRef.current) {
           pendingSaveRef.current = false;
-          onSave(blob, savedDurationRef.current, recordingStartOffsetRef.current, layerMode, recordingIdRef.current, chunksRef.current);
-          deleteMuseChunks(recordingIdRef.current).catch(() => {});
-          deleteMuseManifest(recordingIdRef.current).catch(() => {});
+          onSave(blob, savedDurationRef.current, recordingStartOffsetRef.current, layerMode, idToClean, chunksRef.current);
+          writesSettled.finally(() => {
+            deleteMuseChunks(idToClean).catch(() => {});
+            deleteMuseManifest(idToClean).catch(() => {});
+          });
           onClose();
+        } else if (pendingDiscardRef.current) {
+          pendingDiscardRef.current = false;
+          writesSettled.finally(() => {
+            deleteMuseChunks(idToClean).catch(() => {});
+            deleteMuseManifest(idToClean).catch(() => {});
+          });
         }
       };
 
@@ -1086,9 +1105,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
   const handleDiscard = () => {
     if (isRecording) {
+      // Still recording — defer cleanup to onstop, which waits for the final
+      // chunk's write instead of racing it (see mediaRecorder.onstop above).
+      pendingDiscardRef.current = true;
       stopRecording();
-    }
-    if (recordingIdRef.current) {
+    } else if (recordingIdRef.current) {
+      // Already stopped (reviewing a completed take) — onstop's writes settled
+      // long ago, safe to clean up immediately.
       deleteMuseChunks(recordingIdRef.current).catch(() => {});
       deleteMuseManifest(recordingIdRef.current).catch(() => {});
     }
