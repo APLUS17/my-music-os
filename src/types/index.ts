@@ -129,18 +129,6 @@ export interface Beat {
     sections?: AutoSection[];
 }
 
-export interface Note {
-    id: string;
-    title: string;
-    body: string;
-    createdAt: string;
-    modifiedAt: string;
-    isPinned?: boolean;
-    color?: string;
-    linkedSessionIds?: string[];
-    linkedBeatIds?: string[];
-}
-
 export interface SavedProject {
     id: string;
     name: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat, Note } from '../../types';
+import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { OpenEditor } from './OpenEditor';
@@ -9,7 +9,6 @@ import { countSyllables } from '@/lib/utils/syllable';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
 import { VaultView } from "./VaultView";
-import { NotesView } from "./NotesView";
 import { BeatUploader } from './BeatUploader';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
@@ -44,7 +43,6 @@ import {
     History,
     Sun,
     Moon,
-    BookText,
     Archive,
     Sparkles
 } from 'lucide-react';
@@ -68,7 +66,7 @@ import {
     getMuseChunks
 } from '@/lib/idb/studioDB';
 
-type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'notebook' | 'muse';
+type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'muse';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -380,7 +378,6 @@ const StudioWorkspace: React.FC = () => {
         { id: 'init-verse', type: 'verse', repeats: 1, text: '' }
     ]);
     const [scraps, setScraps] = useState<LyricScrap[]>([]);
-    const [notes, setNotes] = useState<Note[]>([]);
 
     const [activeCategory, setActiveCategory] = useState<string>('Notes');
     const [categorySections, setCategorySections] = useState<Record<string, LyricSection[]>>({});
@@ -948,7 +945,6 @@ const StudioWorkspace: React.FC = () => {
                     if (parsed.scraps) {
                         // Float scraps are not loaded to blank song, keep empty
                     }
-                    if (parsed.notes) setNotes(parsed.notes);
 
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
@@ -1034,7 +1030,7 @@ const StudioWorkspace: React.FC = () => {
             };
 
             const dataToSave = {
-                sections, scraps, notes, savedProjects: projectsToSave,
+                sections, scraps, savedProjects: projectsToSave,
                 projectTitle, projectBpm, projectKey,
                 sessions: sessionsToSave, beats: beatsToSave,
                 activeProjectId, uploadedBeatId,
@@ -1054,7 +1050,7 @@ const StudioWorkspace: React.FC = () => {
 
         const timeoutId = setTimeout(saveState, 1000); // Debounce by 1s
         return () => clearTimeout(timeoutId);
-    }, [sections, scraps, notes, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, uploadedBeatId, ritualStats, categorySections, activeCategory]);
+    }, [sections, scraps, savedProjects, projectTitle, projectBpm, projectKey, sessions, beats, activeProjectId, uploadedBeatId, ritualStats, categorySections, activeCategory]);
 
     const handleRecordStart = (lineId?: string) => {
         setRecordingTargetLineId(lineId || null);
@@ -2508,23 +2504,6 @@ const StudioWorkspace: React.FC = () => {
                         onOpenSidebar={() => setIsSidebarOpen(true)}
                     />
                 );
-            case 'notebook':
-                return (
-                    <NotesView
-                        notes={notes}
-                        sessions={sessions.filter(s => s.kind !== 'muse')}
-                        beats={beats}
-                        onNotesChange={setNotes}
-                        projectTitle={projectTitle}
-                        onOpenRecorder={() => {
-                            setShowRecorder(true);
-                            setRecorderMinimized(true);
-                            setRecorderAutoStart(true);
-                        }}
-                        onOpenSidebar={() => setIsSidebarOpen(true)}
-                        onOpenStudio={() => setViewMode('studio')}
-                    />
-                );
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
@@ -3067,7 +3046,6 @@ const StudioWorkspace: React.FC = () => {
                                     {[
                                         { id: 'home', label: 'Library', icon: Library },
                                         { id: 'vault', label: 'Vault', icon: Archive },
-                                        { id: 'notebook', label: 'Notebook', icon: BookText },
                                         { id: 'muse', label: 'Muse', icon: Sparkles }
                                     ].map((item) => {
                                         const Icon = item.icon;

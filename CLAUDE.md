@@ -79,11 +79,11 @@ src/
 │   │   ├── MiniPlayer.tsx              # Compact beat player
 │   │   ├── PlayerTab.tsx               # Beat library UI
 │   │   ├── RecordingThread.tsx         # Multi-take lane management
-│   │   ├── NotesView.tsx               # Notes/takes list grouped by time, with search + attachments
-│   │   ├── NoteAttachmentsView.tsx     # Attach recordings and beats to notes
 │   │   ├── VaultView.tsx               # Library view (grid/list) for scraps, takes, beats
-│   │   ├── PuzzleView.tsx              # Idea banking / scrap board  ← DELETED (use NotesView/VaultView)
-│   │   ├── VoiceMemoView.tsx           # Takes list + transcription UI  ← DELETED (use NotesView)
+│   │   ├── PuzzleView.tsx              # Idea banking / scrap board  ← DELETED (use VaultView)
+│   │   ├── VoiceMemoView.tsx           # Takes list + transcription UI  ← DELETED
+│   │   ├── NotesView.tsx               # Notebook (notes/takes list)  ← DELETED
+│   │   ├── NoteAttachmentsView.tsx     # Attach recordings/beats to notes  ← DELETED
 │   │   ├── MuseDrawer.tsx              # AI assistant  ← DELETED
 │   │   ├── GeminiPanel.tsx             # Empty placeholder (0 bytes)
 │   │   ├── AuthGate.tsx                # Email OTP auth form
@@ -191,7 +191,6 @@ Email OTP flow via Supabase Auth:
 | AI Audio Analysis | ✅ Shipped | Gemini 2.0 Flash structure analysis via `analyzeAudioStructure()` |
 | Studio Facilitator AI | ✅ Shipped | Conversational AI coach via Gemini in `actions.ts` |
 | Vocal FX (reverb/delay/EQ) | ✅ Shipped | Real Web Audio API via `useVocalFX` hook |
-| Notes view (takes + ideas) | ✅ Shipped | `NotesView` — time-grouped, searchable, with attachments |
 | Vault library view | ✅ Shipped | `VaultView` — grid/list layout for all content |
 | Auth (email OTP) | ✅ Shipped | Supabase email magic link, `AuthContext` + `AuthGate` |
 | Mission Control | ✅ Shipped | `/mission-control` — business strategy & growth dashboard |
