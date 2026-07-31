@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Starts a resumable upload with the Gemini Files API and returns the
-// upload URL to the browser, so the client can PUT the audio bytes
-// directly to Google — bypassing Vercel's 4.5 MB API-route body limit
-// and freeing this function to return in milliseconds.
+// Starts a resumable upload session with the Gemini Files API. The audio
+// bytes themselves are relayed through /api/muse/upload-chunk (server to
+// server, in pieces small enough for Vercel's 4.5 MB body limit) rather
+// than handed to the browser to PUT directly — Google's resumable-upload
+// CORS policy only trusts the origin that started the session, and that's
+// always this server, never the browser. We return only the opaque
+// upload_id, never the full URL (which embeds the raw API key).
 export async function POST(request: NextRequest) {
     try {
         const { sessionId, mimeType, sizeBytes } = await request.json();
@@ -15,10 +18,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const apiKey =
-            process.env.GOOGLE_API_KEY ||
-            process.env.NEXT_PUBLIC_GOOGLE_API_KEY ||
-            process.env.GEMINI_API_KEY;
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return NextResponse.json(
                 { success: false, error: 'Gemini API key missing on server' },
@@ -60,7 +60,15 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        return NextResponse.json({ success: true, uploadUrl });
+        const uploadId = new URL(uploadUrl).searchParams.get('upload_id');
+        if (!uploadId) {
+            return NextResponse.json(
+                { success: false, error: 'Gemini upload URL missing upload_id' },
+                { status: 502 }
+            );
+        }
+
+        return NextResponse.json({ success: true, uploadId });
     } catch (e: any) {
         console.error('upload-init route error:', e);
         return NextResponse.json(

@@ -44,11 +44,23 @@ const transformSessionsToThreadItems = (sessions: RecordingSession[]): ThreadIte
     );
 
     for (const session of sortedSessions) {
-        if (!session.sections || session.sections.length === 0) continue;
+        // A session with no sections (e.g. smartSplit failed) would otherwise be
+        // hidden entirely even though the take saved successfully — fall back to
+        // a single section spanning the whole take so it always renders.
+        const sessionSections = session.sections && session.sections.length > 0
+            ? session.sections
+            : [{
+                id: `${session.id}-full`,
+                startTime: 0,
+                endTime: session.duration || 0,
+                type: 'vocal' as const,
+                isBest: false,
+                isFavorited: false
+            }];
 
         // Group sections by type for hierarchical display
         const groupedByType: Record<string, AutoSection[]> = {};
-        for (const section of session.sections) {
+        for (const section of sessionSections) {
             if (!groupedByType[section.type]) {
                 groupedByType[section.type] = [];
             }

@@ -7,6 +7,7 @@ import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types
 import { cn } from '@/lib/utils';
 import { useActiveBeatSection } from './useActiveBeatSection';
 import { formatTime } from '@/lib/utils/time';
+import { SyncedLyrics } from './SyncedLyrics';
 
 interface PlayerTabProps {
     projectTitle: string;
@@ -35,6 +36,7 @@ interface PlayerTabProps {
     isAnalyzingBeat?: boolean;
     onOpenFX?: () => void;
     onDismiss?: () => void;
+    onGenerateRecap?: (sessionId: string) => void;
 
     // Lifted State Props
     isPlaying: boolean;
@@ -113,6 +115,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     isAnalyzingBeat,
     onOpenFX,
     onDismiss,
+    onGenerateRecap,
 
     // Lifted
     isPlaying,
@@ -122,7 +125,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     onSeek,
 }) => {
     const pillRefs = useRef<(HTMLDivElement | null)[]>([]);
-    const lyricRefs = useRef<(HTMLParagraphElement | null)[]>([]);
     const [showTakeList, setShowTakeList] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -167,21 +169,7 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
         }));
     }, [activeSession?.lines, lyrics, duration]);
 
-    const activeLyricIdx = useMemo(() => {
-        if (displayLines.length === 0) return -1;
-        const lookaheadTime = currentTime + 0.03; // ~half of the 60ms RAF interval
-        const idx = displayLines.findIndex(l => lookaheadTime >= l.startTime && lookaheadTime < l.endTime);
-        if (idx !== -1) return idx;
-        if (lookaheadTime >= displayLines[displayLines.length - 1].endTime) {
-            return displayLines.length - 1;
-        }
-        return -1;
-    }, [displayLines, currentTime]);
-
     const horizontalScrollRaf = useRef<number | null>(null);
-    const lyricContainerRef = useRef<HTMLDivElement>(null);
-    const lyricListRef = useRef<HTMLDivElement>(null);
-    const [lyricTranslateY, setLyricTranslateY] = useState(0);
 
     const smoothScroll = useCallback((
         element: HTMLElement,
@@ -250,25 +238,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
         }
     }, [activeSectionIdx, smoothScroll]);
 
-    // Reset list position when a new session's lyrics load
-    useEffect(() => {
-        setLyricTranslateY(0);
-    }, [displayLines]);
-
-    // Spring-based lyric centering — Framer Motion drives the animation, no style mutation
-    useEffect(() => {
-        if (activeLyricIdx < 0) return;
-        const container = lyricContainerRef.current;
-        const activeEl = lyricRefs.current[activeLyricIdx];
-        if (!container || !activeEl) return;
-
-        const containerRect = container.getBoundingClientRect();
-        const activeRect = activeEl.getBoundingClientRect();
-        const delta = (containerRect.top + containerRect.height / 2) - (activeRect.top + activeRect.height / 2);
-
-        setLyricTranslateY(prev => prev + delta);
-    }, [activeLyricIdx]);
-
     return (
         <div className="flex flex-col h-full bg-[var(--bg-main)] select-none">
             {/* ── Header ───────────────────────────────────── */}
@@ -290,7 +259,17 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                     <h2 className="text-sm font-semibold text-[var(--text-main)] tracking-tight truncate max-w-[160px]">{projectTitle}</h2>
                 )}
 
-                {/* Right: takes dropdown — always visible when sessions exist */}
+                {/* Right: Generate Recap (short takes without an auto-generated one yet) + takes dropdown */}
+                <div className="flex items-center gap-2">
+                {activeSession && onGenerateRecap && !activeSession.museRecap && activeSession.kind !== 'muse'
+                    && activeSession.museStatus !== 'uploading' && activeSession.museStatus !== 'analyzing' && (
+                    <button
+                        onClick={() => onGenerateRecap(activeSession.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] hover:bg-[var(--bg-hover)] transition-all active:scale-95 text-[10px] font-bold text-[var(--text-secondary)] hover:text-[var(--text-main)] uppercase tracking-wider"
+                    >
+                        {activeSession.museStatus === 'failed' ? 'Retry Recap' : 'Generate Recap'}
+                    </button>
+                )}
                 {sessions && sessions.length > 0 ? (
                     <div className="relative">
                         <button
@@ -369,53 +348,11 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
                 ) : (
                     <div className="w-8" />
                 )}
+                </div>
             </div>
 
             {/* ── Lyrics display ─────────────────────────────────────── */}
-            <div ref={lyricContainerRef} className="flex-1 overflow-hidden px-6 pt-2 pb-4 flex flex-col relative mask-fade-edges" style={{ overscrollBehaviorY: 'contain' }}>
-                <motion.div
-                        ref={lyricListRef}
-                        className="flex flex-col gap-8 py-[50vh] shrink-0"
-                        animate={{ y: lyricTranslateY }}
-                        transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
-                    >
-                        {displayLines.map((line, i) => {
-                            const isActive = i === activeLyricIdx;
-                            const isPast = i < activeLyricIdx;
-                            const isFuture = i > activeLyricIdx;
-                            const distance = Math.abs(i - activeLyricIdx);
-                            
-                            let opacity = 0.15; let scale = 0.96; let blur = 2;
-
-                            if (isActive) { opacity = 1; scale = 1; blur = 0; }
-                            else if (isPast) {
-                                if (distance === 1) { opacity = 0.45; scale = 0.98; blur = 1; }
-                                else { opacity = 0.25; scale = 0.96; blur = 2; }
-                            } else if (isFuture) {
-                                if (distance === 1) { opacity = 0.4; scale = 1; blur = 1; }
-                                else if (distance === 2) { opacity = 0.2; scale = 0.98; blur = 2; }
-                                else { opacity = 0.12; scale = 0.95; blur = 0; }
-                            }
-                            if (activeLyricIdx === -1 && i === 0) { opacity = 0.25; blur = 1; }
-
-                            return (
-                                <motion.div
-                                    key={`line-${i}`}
-                                    ref={el => { lyricRefs.current[i] = el; }}
-                                    className={cn("text-left cursor-pointer", isActive ? "text-[var(--text-main)]" : "text-[var(--text-secondary)]")}
-                                    initial={false}
-                                    animate={{ opacity, scale, filter: `blur(${blur}px)` }}
-                                    transition={{ type: "spring", stiffness: 150, damping: 30, mass: 0.8 }}
-                                    onClick={() => onSeek(line.startTime)}
-                                >
-                                    <p className={cn("text-2xl md:text-3xl font-bold leading-[1.15] tracking-tight", isActive ? "drop-shadow-[0_0_20px_var(--accent-dim)]" : "")}>
-                                        {line.text}
-                                    </p>
-                                </motion.div>
-                            );
-                        })}
-                    </motion.div>
-            </div>
+            <SyncedLyrics lines={displayLines} currentTime={currentTime} onSeek={onSeek} />
 
             {/* ── Section pills — beat only (hidden in full-screen mode) ── */}
             {beat && !onDismiss && (

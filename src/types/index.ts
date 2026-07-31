@@ -115,6 +115,7 @@ export interface RecordingSession {
     museStatus?: MuseStatus;
     museError?: string; // last analysis-failure reason shown to the user
     mimeType?: string; // real mime for Gemini (webm vs mp4)
+    persistFailed?: boolean; // true if the audio failed to persist to IndexedDB
 }
 
 

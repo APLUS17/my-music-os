@@ -15,18 +15,21 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { Slider } from "@/components/ui/slider";
 import { RecordingLayer } from '@/types';
 import { formatTime } from '@/lib/utils/time';
 import { FXSettings, defaultFXSettings } from './FXPanel';
 import { createReverbImpulse } from '@/hooks/useVocalFX';
 import { VOCAL_PRESETS } from '@/lib/audio/vocalPresets';
+import { randomId } from '@/lib/utils/id';
+import { putMuseChunk, putMuseManifest, deleteMuseChunks, deleteMuseManifest } from '@/lib/idb/studioDB';
 
 import { Loader2 } from 'lucide-react';
 
 interface RecorderDrawerProps {
   onClose: () => void;
-  onSave: (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean) => void;
+  onSave: (blob: Blob, duration: number, beatOffset?: number, isLayer?: boolean, recordingId?: string, chunks?: Blob[]) => void;
   projectName?: string;
   backingTrackSrc?: string | null;
   backingAudioRef?: React.RefObject<HTMLAudioElement | null>;
@@ -115,6 +118,16 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Save-during-recording: flag + captured duration
   const pendingSaveRef = useRef(false);
   const savedDurationRef = useRef(0);
+  // Discard-during-recording: mirrors pendingSaveRef so cleanup in onstop can
+  // wait for the final chunk's write instead of racing it (see onstop below).
+  const pendingDiscardRef = useRef(false);
+
+  // Chunked-write reliability: id/sequence for the in-progress recording's
+  // IndexedDB chunk backup (crash recovery), and the Screen Wake Lock sentinel.
+  const recordingIdRef = useRef<string>('');
+  const chunkSeqRef = useRef<number>(0);
+  const chunkWritePromisesRef = useRef<Promise<void>[]>([]);
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
 
   // Speech recognition ref
   const speechRef = useRef<any>(null);
@@ -162,7 +175,76 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     }
   };
 
+  // Storage quota preflight — refuse to start a take we likely can't persist,
+  // and request durable storage so the browser is less likely to evict it.
+  const checkStorageAndPersist = async (): Promise<boolean> => {
+    if (typeof window !== 'undefined' && navigator.storage?.estimate) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        const freeBytes = (estimate.quota || 0) - (estimate.usage || 0);
+        if (freeBytes < 100 * 1024 * 1024) {
+          toast.error('Low on device storage — free up space before recording.');
+          return false;
+        }
+      } catch (err) {
+        console.warn('Storage estimate check failed:', err);
+      }
+    }
+    if (typeof window !== 'undefined' && navigator.storage?.persist) {
+      try {
+        const persisted = await navigator.storage.persist();
+        if (!persisted) {
+          toast.warning("Storage isn't persisted — recordings may be cleared by the browser after a period of inactivity.", { id: 'storage-persist-warning' });
+        }
+      } catch { /* best-effort */ }
+    }
+    return true;
+  };
+
+  const requestWakeLock = async () => {
+    if (typeof window !== 'undefined' && 'wakeLock' in navigator) {
+      try {
+        const sentinel = await (navigator as unknown as { wakeLock: { request: (type: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock.request('screen');
+        wakeLockRef.current = sentinel;
+      } catch (err) {
+        console.warn('Wake Lock request failed:', err);
+      }
+    }
+  };
+
+  const releaseWakeLock = async () => {
+    if (wakeLockRef.current) {
+      try { await wakeLockRef.current.release(); } catch { /* ignore */ }
+      wakeLockRef.current = null;
+    }
+  };
+
   audioContextRef.current = audioContext;
+
+  // Re-acquire the wake lock if the tab regains visibility mid-recording
+  // (the OS releases it automatically when the tab is backgrounded).
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (isRecordingRef.current && document.visibilityState === 'visible' && !wakeLockRef.current) {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Warn before an accidental tab close while recording or mid-save.
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isRecordingRef.current || pendingSaveRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -181,6 +263,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       }
       stopMicStream();
       stopSpeechRecognition();
+      releaseWakeLock();
 
       // Clear Vocal FX node refs
       eqLowRef.current = null;
@@ -803,6 +886,9 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   };
 
   const startRecording = async () => {
+    const storageOk = await checkStorageAndPersist();
+    if (!storageOk) return;
+
     try {
       // 1. Immediately pause backing audio if playing to prevent sync drift and device driver sample-rate glitches
       const backingAudio = backingAudioRef?.current;
@@ -827,6 +913,16 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       const streamToRecord = recordingStreamRef.current ?? micResult?.recordingStream;
       if (!streamToRecord) return;
 
+      // Surface a mid-take mic disconnect (Bluetooth drop, device unplug) instead of
+      // silently losing capture — stop gracefully so whatever was captured is saved.
+      const micTrack = streamRef.current.getAudioTracks()[0];
+      if (micTrack) {
+        micTrack.onended = () => {
+          toast.error('Microphone disconnected — recording stopped.');
+          if (isRecordingRef.current) stopRecording();
+        };
+      }
+
       // Negotiate best supported audio MIME type (iOS Safari doesn't support WebM)
       const mimePreference = [
         'audio/webm;codecs=opus',
@@ -844,18 +940,71 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       liveWaveHistoryRef.current = [];
       lastSampleTimeRef.current = 0;
 
+      // Fresh recording id + chunk backup bookkeeping for this take. Chunks are
+      // written to IndexedDB as they arrive so a crash mid-take leaves recoverable
+      // audio (surfaced automatically by MuseView's orphan-recovery scan).
+      const recId = randomId().substring(0, 6).toUpperCase();
+      recordingIdRef.current = recId;
+      chunkSeqRef.current = 0;
+      chunkWritePromisesRef.current = [];
+      const recStartedAt = new Date().toISOString();
+      const recMimeType = supportedMime || mediaRecorder.mimeType || 'audio/webm';
+      putMuseManifest({ id: recId, startedAt: recStartedAt, mimeType: recMimeType, chunkCount: 0, status: 'recording' })
+        .catch(err => console.warn('Failed to write recording manifest:', err));
+
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          const seq = chunkSeqRef.current++;
+          const p = putMuseChunk(recId, seq, e.data)
+            .then(() => putMuseManifest({ id: recId, startedAt: recStartedAt, mimeType: recMimeType, chunkCount: seq + 1, status: 'recording' }))
+            .catch(err => console.warn('Chunk write failed:', err));
+          chunkWritePromisesRef.current.push(p);
+        }
+      };
+
+      mediaRecorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+        toast.error('Recording error — check your microphone connection.');
+        try {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+          }
+        } catch (stopErr) {
+          console.error('Failed to stop after recorder error:', stopErr);
+        }
+        setIsRecording(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+        stopSpeechRecognition();
+        releaseWakeLock();
       };
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
         setRecordedBlob(blob);
 
+        // mediaRecorder.stop() flushes one final ondataavailable (and its async
+        // IndexedDB write) before this handler runs — wait for every write we
+        // know about (including that final one, already pushed synchronously)
+        // before deleting, otherwise the last chunk's write can land AFTER the
+        // delete and resurrect a stale orphaned manifest entry.
+        const idToClean = recordingIdRef.current;
+        const writesSettled = Promise.all(chunkWritePromisesRef.current);
+
         if (pendingSaveRef.current) {
           pendingSaveRef.current = false;
-          onSave(blob, savedDurationRef.current, recordingStartOffsetRef.current, layerMode);
+          onSave(blob, savedDurationRef.current, recordingStartOffsetRef.current, layerMode, idToClean, chunksRef.current);
+          writesSettled.finally(() => {
+            deleteMuseChunks(idToClean).catch(() => {});
+            deleteMuseManifest(idToClean).catch(() => {});
+          });
           onClose();
+        } else if (pendingDiscardRef.current) {
+          pendingDiscardRef.current = false;
+          writesSettled.finally(() => {
+            deleteMuseChunks(idToClean).catch(() => {});
+            deleteMuseManifest(idToClean).catch(() => {});
+          });
         }
       };
 
@@ -875,7 +1024,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         startLayerPlayback();
       }
 
-      mediaRecorder.start();
+      mediaRecorder.start(20000); // 20s timeslices — incremental capture instead of one giant in-memory buffer
       setIsRecording(true);
       setRecordedBlob(null);
       setProgress(0);
@@ -883,6 +1032,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       setFinalTranscript('');
       setInterimTranscript('');
       startTimeRef.current = Date.now();
+      requestWakeLock();
 
       timerRef.current = window.setInterval(() => {
         setDuration((Date.now() - startTimeRef.current) / 1000);
@@ -892,6 +1042,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
     } catch (err) {
       console.error("Start recording failed:", err);
+      const e = err as DOMException;
+      const message =
+        e.name === 'NotAllowedError' ? 'Microphone access denied — enable it in Settings.' :
+        e.name === 'NotFoundError' ? 'No microphone found on this device.' :
+        e.name === 'OverconstrainedError' ? "Microphone doesn't support the requested audio settings." :
+        'Could not start recording — check microphone permissions.';
+      toast.error(message);
     }
   };
 
@@ -904,6 +1061,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
         stopLayerPlayback();
       }
       stopSpeechRecognition();
+      releaseWakeLock();
       if (backingAudioRef?.current) {
         backingAudioRef.current.pause();
       }
@@ -949,14 +1107,24 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       savedDurationRef.current = duration;
       stopRecording();
     } else if (recordedBlob) {
-      onSave(recordedBlob, duration, recordingStartOffsetRef.current, layerMode);
+      onSave(recordedBlob, duration, recordingStartOffsetRef.current, layerMode, recordingIdRef.current, chunksRef.current);
+      deleteMuseChunks(recordingIdRef.current).catch(() => {});
+      deleteMuseManifest(recordingIdRef.current).catch(() => {});
       onClose();
     }
   };
 
   const handleDiscard = () => {
     if (isRecording) {
+      // Still recording — defer cleanup to onstop, which waits for the final
+      // chunk's write instead of racing it (see mediaRecorder.onstop above).
+      pendingDiscardRef.current = true;
       stopRecording();
+    } else if (recordingIdRef.current) {
+      // Already stopped (reviewing a completed take) — onstop's writes settled
+      // long ago, safe to clean up immediately.
+      deleteMuseChunks(recordingIdRef.current).catch(() => {});
+      deleteMuseManifest(recordingIdRef.current).catch(() => {});
     }
     setRecordedBlob(null);
     setDuration(0);
@@ -971,6 +1139,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       audioRef.current.pause();
     }
     setIsPlaying(false);
+    if (recordingIdRef.current) {
+      deleteMuseChunks(recordingIdRef.current).catch(() => {});
+      deleteMuseManifest(recordingIdRef.current).catch(() => {});
+    }
     setRecordedBlob(null);
     setDuration(0);
     setProgress(0);
@@ -1176,18 +1348,25 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                     transition={{ duration: 0.15 }}
                     className="absolute inset-0"
                   >
-                    <div 
-                      ref={timelineRef} 
+                    <div
+                      ref={timelineRef}
                       className={`w-full h-full relative select-none ${recordedBlob && !isRecording ? 'cursor-ew-resize active:cursor-grabbing' : ''}`}
+                      style={{ touchAction: 'none' }}
                       onMouseDown={(e) => handleDragStart(e.clientX)}
                       onMouseMove={(e) => handleDragMove(e.clientX)}
                       onMouseUp={handleDragEnd}
                       onMouseLeave={handleDragEnd}
                       onTouchStart={(e) => {
-                        if (e.touches[0]) handleDragStart(e.touches[0].clientX);
+                        if (e.touches[0]) {
+                          e.preventDefault();
+                          handleDragStart(e.touches[0].clientX);
+                        }
                       }}
                       onTouchMove={(e) => {
-                        if (e.touches[0]) handleDragMove(e.touches[0].clientX);
+                        if (e.touches[0]) {
+                          e.preventDefault();
+                          handleDragMove(e.touches[0].clientX);
+                        }
                       }}
                       onTouchEnd={handleDragEnd}
                     >
@@ -1236,7 +1415,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         
                         <button
                           onClick={() => setShowFXPanel(false)}
-                          className="w-7 h-7 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
+                          className="w-11 h-11 rounded-full hover:bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-colors cursor-pointer"
                           aria-label="Close Vocal FX panel"
                         >
                           <X size={16} />

@@ -73,7 +73,7 @@ export function MuseView({
 
     // Group Muse sessions
     const museSessions = useMemo(() => {
-        return sessions.filter(s => s.kind === 'muse');
+        return sessions.filter(s => s.kind === 'muse' || !!s.museRecap);
     }, [sessions]);
 
     // Currently viewed session in Recap mode
