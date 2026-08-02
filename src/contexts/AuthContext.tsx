@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [supabase]);
 
   const signInWithEmail = useCallback(async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { shouldCreateUser: true },
     });
     return { error: error?.message ?? null };
-  }, []);
+  }, [supabase]);
 
   const verifyOtp = useCallback(async (email: string, token: string) => {
     const { error } = await supabase.auth.verifyOtp({
@@ -64,11 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       type: 'email',
     });
     return { error: error?.message ?? null };
-  }, []);
+  }, [supabase]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  }, []);
+  }, [supabase]);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, signInWithEmail, verifyOtp, signOut }}>

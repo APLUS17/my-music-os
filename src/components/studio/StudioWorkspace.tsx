@@ -867,9 +867,12 @@ const StudioWorkspace: React.FC = () => {
     // Persistence Load
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        
+
         // Keep track of object URLs created to revoke them later
         const createdUrls: string[] = [];
+        // Guards against setState-after-unmount and orphaned object URLs if this
+        // effect's async work is still in flight when the component unmounts.
+        let cancelled = false;
 
         const loadState = async () => {
             const savedData = localStorage.getItem('studio-pro-data-v2');
@@ -927,6 +930,8 @@ const StudioWorkspace: React.FC = () => {
                         }
                     }
 
+                    if (cancelled) return;
+
                     // Save the updated project list
                     setSavedProjects(loadedProjects);
 
@@ -949,6 +954,17 @@ const StudioWorkspace: React.FC = () => {
                     if (parsed.projectBpm) setProjectBpm(parsed.projectBpm);
                     if (parsed.projectKey) setProjectKey(parsed.projectKey);
 
+                    // A URL created after the effect has already cleaned up (component
+                    // unmounted while this await was pending) has nobody left to revoke
+                    // it — release it immediately instead of leaking it forever.
+                    const trackUrl = (url: string) => {
+                        if (cancelled) {
+                            URL.revokeObjectURL(url);
+                        } else {
+                            createdUrls.push(url);
+                        }
+                    };
+
                     // Load all sessions from IndexedDB or storage globally
                     if (parsed.sessions) {
                         const loadedSessions = await Promise.all(parsed.sessions.map(async (t: RecordingSession) => {
@@ -959,21 +975,21 @@ const StudioWorkspace: React.FC = () => {
                                     const blob = await getMuseAudio(t.id);
                                     if (!blob) return t;
                                     const url = URL.createObjectURL(blob);
-                                    createdUrls.push(url);
+                                    trackUrl(url);
                                     return { ...t, audioUrl: url };
                                 }
                                 const b64 = await getAudioData(t.id);
                                 if (!b64) return t;
                                 const blob = await base64ToBlob(b64);
                                 const url = URL.createObjectURL(blob);
-                                createdUrls.push(url);
+                                trackUrl(url);
                                 return { ...t, base64: b64, audioUrl: url };
                             } catch (e) {
                                 console.error(`Failed to load audio for session ${t.id}`, e);
                                 return t;
                             }
                         }));
-                        setSessions(loadedSessions);
+                        if (!cancelled) setSessions(loadedSessions);
                     }
 
                     // Load beats globally so they are available
@@ -984,14 +1000,14 @@ const StudioWorkspace: React.FC = () => {
                                 if (!b64) return b;
                                 const blob = await base64ToBlob(b64);
                                 const url = URL.createObjectURL(blob);
-                                createdUrls.push(url);
+                                trackUrl(url);
                                 return { ...b, base64: b64, audioUrl: url };
                             } catch (e) {
                                 console.error(`Failed to load audio for beat ${b.id}`, e);
                                 return b;
                             }
                         }));
-                        setBeats(loadedBeats);
+                        if (!cancelled) setBeats(loadedBeats);
                     }
                 } catch (e) { console.error("Failed to load saved state", e); }
             }
@@ -999,6 +1015,7 @@ const StudioWorkspace: React.FC = () => {
         loadState();
 
         return () => {
+            cancelled = true;
             createdUrls.forEach(url => URL.revokeObjectURL(url));
         };
     }, []);
