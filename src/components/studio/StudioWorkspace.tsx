@@ -2121,7 +2121,9 @@ const StudioWorkspace: React.FC = () => {
                         <div className="px-6 mb-4">
                             <h1 className="text-2xl font-bold tracking-tight text-[var(--text-main)] animate-in fade-in slide-in-from-top-4 duration-300">My Library</h1>
                             <p className="text-xs text-[var(--text-secondary)] mt-1 animate-in fade-in duration-300">
-                                {savedProjects.length === 0 
+                                {isEmpty
+                                    ? "No songs saved yet. Write your first lyrics or record a take to get started."
+                                    : savedProjects.length === 0
                                     ? "No songs saved yet. Click the + or use Quick Capture to start creating."
                                     : `You have ${savedProjects.length} song${savedProjects.length === 1 ? '' : 's'} in your catalog.`
                                 }
@@ -2129,65 +2131,34 @@ const StudioWorkspace: React.FC = () => {
                         </div>
 
                         {isEmpty ? (
-                            // Blank Start / Option States
+                            // Blank Start / Write or Record
                             <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
-                                <AnimatePresence mode="wait">
-                                    {!showPillOptions ? (
-                                        <motion.div
-                                            key="start-state"
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="flex flex-col items-center gap-4 cursor-pointer"
-                                            onClick={() => setShowPillOptions(true)}
-                                        >
-                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
-                                                <Plus size={36} className="text-white" />
-                                            </div>
-                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="option-state"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 10 }}
-                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
-                                        >
-                                            <button
-                                                onClick={() => {
-                                                    fabInputRef.current?.click();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <Music size={16} />
-                                                <span>Import</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    handleNewProject();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <FilePlus size={16} />
-                                                <span>New Song</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    handleRecordStart();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <Mic size={16} />
-                                                <span>Record</span>
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
+                                >
+                                    <button
+                                        onClick={() => {
+                                            setViewMode('studio');
+                                            handleWriteTab();
+                                        }}
+                                        className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
+                                    >
+                                        <PenTool size={16} />
+                                        <span>Write</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setViewMode('studio');
+                                            handleFlowTab();
+                                        }}
+                                        className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
+                                    >
+                                        <Mic size={16} />
+                                        <span>Record</span>
+                                    </button>
+                                </motion.div>
                             </div>
                         ) : (
                             // Populated State (Packs Grid View)
