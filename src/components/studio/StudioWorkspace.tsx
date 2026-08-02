@@ -2519,6 +2519,12 @@ const StudioWorkspace: React.FC = () => {
                         duration={duration}
                         ritualStats={ritualStats}
                         onOpenSidebar={() => setIsSidebarOpen(true)}
+                        onWrite={() => setViewMode('studio')}
+                        onRecord={() => {
+                            setViewMode('studio');
+                            setShowRecorder(true);
+                            setRecorderMinimized(false);
+                        }}
                     />
                 );
             case 'studio':

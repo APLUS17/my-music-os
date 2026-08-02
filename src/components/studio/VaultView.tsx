@@ -241,13 +241,15 @@ interface VaultViewProps {
     duration: number;
     ritualStats: RitualStat[];
     onOpenSidebar?: () => void;
+    onWrite?: () => void;
+    onRecord?: () => void;
 }
 
 export const VaultView: React.FC<VaultViewProps> = ({
     sessions, scraps, beats,
     projectTitle, onPlaySession, playingSessionId, isSessionPlaying,
     onPlayBeat, playingBeatId,
-    currentTime, duration, onOpenSidebar
+    currentTime, duration, onOpenSidebar, onWrite, onRecord
 }) => {
     const [layoutMode, setLayoutMode] = useState<LayoutMode>('grid');
 
@@ -313,11 +315,26 @@ export const VaultView: React.FC<VaultViewProps> = ({
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="flex-1 flex flex-col items-center justify-center text-center p-10 bg-[var(--bg-main)]"
                     >
-                        <div className="w-20 h-20 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-tertiary)] mb-6 border border-[var(--border-main)]">
-                            <Library size={40} strokeWidth={1} />
+                        <div className="flex flex-col items-center gap-8 w-full max-w-xs">
+                            <div className="w-20 h-20 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-tertiary)] border border-[var(--border-main)]">
+                                <Library size={40} strokeWidth={1} />
+                            </div>
+                            <h3 className="text-[var(--text-main)] font-medium tracking-tight text-lg">Your vault is empty</h3>
+                            <div className="flex flex-col gap-3 w-full">
+                                <Button
+                                    onClick={onWrite}
+                                    className="w-full h-12 bg-[var(--text-main)] text-[var(--bg-main)] hover:bg-[var(--text-main)]/90 font-semibold rounded-xl"
+                                >
+                                    Write
+                                </Button>
+                                <Button
+                                    onClick={onRecord}
+                                    className="w-full h-12 bg-[var(--accent)] text-black hover:bg-[var(--accent)]/90 font-semibold rounded-xl"
+                                >
+                                    Record
+                                </Button>
+                            </div>
                         </div>
-                        <h3 className="text-[var(--text-main)] font-medium tracking-tight text-lg">Your vault is empty</h3>
-                        <p className="text-[10px] mono text-[var(--text-secondary)] mt-3 uppercase tracking-[0.3em]">Record, write, and experiment to fill it</p>
                     </motion.div>
                 ) : layoutMode === 'grid' ? (
                     <motion.div
