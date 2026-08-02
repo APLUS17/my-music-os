@@ -1,6 +1,6 @@
 import { MuseSegment, MuseRecap, MuseSegmentType } from '@/types';
 
-export const MUSE_MODEL = 'gemini-2.0-flash';
+export const MUSE_MODEL = 'gemini-2.5-flash';
 
 export const museResponseSchema = {
     type: 'OBJECT',
