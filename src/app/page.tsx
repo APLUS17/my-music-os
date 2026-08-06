@@ -1,3 +1,5 @@
+'use client';
+
 import StudioWorkspace from "@/components/studio/StudioWorkspace";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 

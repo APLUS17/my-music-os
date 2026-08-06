@@ -10,6 +10,8 @@ interface LyricCardProps {
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
   showSyllables: boolean;
+  onSectionFocus?: (id: string) => void;
+  onSectionBlur?: () => void;
 }
 
 const AutoResizeRowTextarea = ({
@@ -71,7 +73,9 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   onUpdate,
   onDelete,
   onMove,
-  showSyllables
+  showSyllables,
+  onSectionFocus,
+  onSectionBlur,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -237,8 +241,8 @@ export const LyricCard: React.FC<LyricCardProps> = ({
                 onChange={(e) => handleLineChange(idx, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
                 onPaste={(e) => handlePaste(e, idx)}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
+                onFocus={() => { setIsFocused(true); onSectionFocus?.(section.id); }}
+                onBlur={() => { setIsFocused(false); onSectionBlur?.(); }}
                 placeholder={idx === 0 && lines.length === 1 ? "Write your lyrics here..." : ""}
               />
             </div>

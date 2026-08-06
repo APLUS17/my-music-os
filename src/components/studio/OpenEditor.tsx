@@ -5,6 +5,8 @@ import { randomId } from '@/lib/utils/id';
 interface OpenEditorProps {
     sections: LyricSection[];
     onUpdateSections: (sections: LyricSection[]) => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
 }
 
 /**
@@ -14,7 +16,7 @@ interface OpenEditorProps {
  * Existing section metadata (type, repeats, pinned takes) is preserved by
  * position when text is round-tripped back into sections.
  */
-export const OpenEditor: React.FC<OpenEditorProps> = ({ sections, onUpdateSections }) => {
+export const OpenEditor: React.FC<OpenEditorProps> = ({ sections, onUpdateSections, onFocus, onBlur }) => {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const value = sections.map(s => s.text).join('\n\n');
@@ -54,6 +56,8 @@ export const OpenEditor: React.FC<OpenEditorProps> = ({ sections, onUpdateSectio
                 rows={1}
                 placeholder="Start writing... every idea has a home here. Leave a blank line to start a new section."
                 spellCheck={false}
+                onFocus={onFocus}
+                onBlur={onBlur}
                 className="w-full bg-transparent border-none focus:outline-none text-[var(--text-main)] text-lg leading-loose font-sans placeholder:text-[var(--text-tertiary)] resize-none overflow-hidden whitespace-pre-wrap break-words block min-h-[60vh]"
             />
         </div>

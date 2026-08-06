@@ -139,6 +139,8 @@ export interface SavedProject {
     beats: Beat[];
     categorySections?: Record<string, LyricSection[]>;
     activeCategory?: string;
+    genre?: string;
+    mood?: string;
 }
 
 // Removed 'tag' and 'idea' from this list so they don't appear in the LyricCard dropdown

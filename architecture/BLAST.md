@@ -85,18 +85,26 @@ This framework ensures that every feature in My Music OS is Deterministic, Secur
 ---
 
 ### Phase 5: Trigger (T) 🚧 IN PROGRESS
+> **Updated August 2026** — Auth is shipped. The remaining Trigger work is launch/distribution-focused, not infrastructure-focused.
+
 - **Deployment Target**: Vercel (Frontend) + Supabase (Backend).
 - **Tasks**:
-  - [x] Vercel Deployment Configuration ([vercel_deployment.md](file:///Users/ayo_o/.gemini/antigravity/brain/986ae167-0dfe-466c-9854-44b5db3bca0a/vercel_deployment.md))
-  - [ ] Supabase Auth Integration (Secure Access)
+  - [x] Vercel Deployment Configuration
+  - [x] Supabase Auth Integration — email OTP fully shipped via `AuthContext` + `AuthGate` + `/auth` page
+  - [ ] P0 Feature Gaps (see `MVP_GAP_ANALYSIS.md`): Export, AI Suggestions UI, Genre/Mood
+  - [ ] Distribution Launch — Reddit community embedding, producer partnerships, Founding 50 memberships
+  - [ ] Email capture + onboarding sequence (Resend or Loops.so)
+  - [ ] Security Audit (RLS, API Key Protection) — GROQ_API_KEY and GOOGLE_API_KEY are server-side only ✅
   - [ ] End-to-End Functionality Testing on Live Environment
-  - [ ] Security Audit (RLS, API Key Protection)
-  - [ ] User & Developer Documentation
-  - [ ] Final Handover
 
+**Note on outdated component references (Phase 3 Architecture):**
+- `TextEditor.tsx` → does not exist. Writing surfaces are `SandboxView.tsx` (Flow) and `LyricCard.tsx` (Write).
+- `AudioPlayer.tsx` → does not exist. Beat playback is `BeatUploader.tsx` + `MusicPlayer.tsx`.
+- `CreativeSidebar.tsx` → does not exist. AI is `GeminiPanel.tsx` (placeholder) + `chatWithFacilitator` in `actions.ts`.
+- `MuseDrawer.tsx` → DELETED. Replaced by nothing yet — new AI UI is P0.
 
 ---
 
 ## Current Status: Phase 5 (Trigger)
 
-We have completed the **Stylize** phase and are ready for the final **Trigger** (Deployment) phase.
+Infrastructure is done. Auth is done. The remaining work is three P0 product gaps + distribution. See `MVP_GAP_ANALYSIS.md` for the full order of operations.

@@ -466,3 +466,77 @@ ${sessionsStr}
         };
     }
 }
+
+
+// --- Lyric Suggestions (inline AI strip) ---
+
+export async function suggestLyricLine(params: {
+    sectionType: string;
+    sectionText: string;
+    projectTitle: string;
+    genre?: string;
+    mood?: string;
+    allSections: { type: string; text: string }[];
+}): Promise<{ suggestions: string[]; success: boolean; error?: string }> {
+    try {
+        await getAuthenticatedClient();
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+        if (!apiKey) return { suggestions: [], success: false, error: 'API key missing' };
+
+        const ai = new GoogleGenAI({ apiKey });
+
+        const isEmpty = !params.sectionText || params.sectionText.trim() === '';
+        const prompt = isEmpty
+            ? `You are a world-class hip-hop and R&B lyric co-writer.
+Write exactly 2 strong opening lines for a ${params.sectionType} in a song called "${params.projectTitle || 'Untitled'}".
+${params.genre ? `Genre: ${params.genre}` : ''}
+${params.mood ? `Mood: ${params.mood}` : ''}
+Rules: max 14 syllables per line, no filler words, vivid and specific language, avoid clichés.
+Return ONLY the 2 lines, one per line, no numbers, no labels, no explanation.`
+            : `You are a world-class hip-hop and R&B lyric co-writer.
+Continue this ${params.sectionType} with exactly 2 next-line options.
+${params.genre ? `Genre: ${params.genre}` : ''}
+${params.mood ? `Mood: ${params.mood}` : ''}
+Rules: max 14 syllables per line, match the existing rhyme scheme if there is one, same energy and POV, no explanation.
+
+Current ${params.sectionType}:
+${params.sectionText}
+
+Return ONLY the 2 next lines, one per line, no numbers, no labels.`;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: prompt,
+        });
+
+        const text = (response.text || '').trim();
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 2);
+
+        if (lines.length === 0) return { suggestions: [], success: false, error: 'No suggestions returned' };
+
+        return { suggestions: lines, success: true };
+    } catch (error: any) {
+        console.error('suggestLyricLine error:', error);
+        return { suggestions: [], success: false, error: error?.message ?? 'Unknown error' };
+    }
+}
+
+
+// --- Email capture (lead magnet / Beat Drop) ---
+
+export async function saveEmailCapture(email: string, source?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const supabase = await createClient();
+        const { error } = await supabase
+            .from('email_captures')
+            .insert([{ email: email.toLowerCase().trim(), source: source ?? 'landing_page', created_at: new Date().toISOString() }]);
+
+        if (error && error.code !== '23505') {
+            console.error('Email capture error:', error);
+            return { success: false, error: error.message };
+        }
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error?.message ?? 'Unknown error' };
+    }
+}

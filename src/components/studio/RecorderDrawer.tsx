@@ -88,7 +88,6 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   // Vocal FX state
   const [showFXPanel, setShowFXPanel] = useState(false);
   const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
-  const [isFXActive, setIsFXActive] = useState(false);
   const [isMonitoringEnabled, setIsMonitoringEnabled] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string>('dry');
   const [fxViewMode, setFxViewMode] = useState<'presets' | 'custom'>('presets');
@@ -143,6 +142,16 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const isInitializingMicRef = useRef(false);
+
+  // Playback FX refs (separate context — applied when listening back to a recorded take)
+  const playbackCtxRef = useRef<AudioContext | null>(null);
+  const pbEqLowRef = useRef<BiquadFilterNode | null>(null);
+  const pbEqMidRef = useRef<BiquadFilterNode | null>(null);
+  const pbEqHighRef = useRef<BiquadFilterNode | null>(null);
+  const pbCompRef = useRef<DynamicsCompressorNode | null>(null);
+  const pbDelayWetRef = useRef<GainNode | null>(null);
+  const pbReverbWetRef = useRef<GainNode | null>(null);
+  const pbSourceConnectedRef = useRef(false);
 
   // Visualizer Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -261,6 +270,10 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
+      if (playbackCtxRef.current) {
+        playbackCtxRef.current.close();
+        playbackCtxRef.current = null;
+      }
       stopMicStream();
       stopSpeechRecognition();
       releaseWakeLock();
@@ -280,51 +293,41 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     };
   }, []);
 
-  // Synchronize Live Vocal FX settings with Web Audio Nodes
-  useEffect(() => {
-    if (!audioContext || !eqLowRef.current) return;
-
+  // Synchronize FX settings to a set of audio nodes
+  const applyFXToNodes = (
+    eqLow: BiquadFilterNode | null,
+    eqMid: BiquadFilterNode | null,
+    eqHigh: BiquadFilterNode | null,
+    comp: DynamicsCompressorNode | null,
+    delayWet: GainNode | null,
+    reverbWet: GainNode | null,
+  ) => {
     try {
-      if (isFXActive) {
-        // Apply EQ settings
-        if (eqLowRef.current) eqLowRef.current.gain.value = fxSettings.eqLow;
-        if (eqMidRef.current) eqMidRef.current.gain.value = fxSettings.eqMid;
-        if (eqHighRef.current) eqHighRef.current.gain.value = fxSettings.eqHigh;
-
-        // Apply Punch (Compression)
-        if (compRef.current) {
-          const punchAmount = fxSettings.punch / 100;
-          compRef.current.threshold.value = -50 * punchAmount;
-          compRef.current.ratio.value = 1 + (19 * punchAmount);
-        }
-
-        // Apply Delay (Echo)
-        if (delayWetRef.current) {
-          delayWetRef.current.gain.value = (fxSettings.echo / 100) * 0.7;
-        }
-
-        // Apply Reverb (Space)
-        if (reverbWetRef.current) {
-          reverbWetRef.current.gain.value = (fxSettings.space / 100) * 1.0;
-        }
-      } else {
-        // Flat/Bypass settings
-        if (eqLowRef.current) eqLowRef.current.gain.value = 0;
-        if (eqMidRef.current) eqMidRef.current.gain.value = 0;
-        if (eqHighRef.current) eqHighRef.current.gain.value = 0;
-
-        if (compRef.current) {
-          compRef.current.threshold.value = 0;
-          compRef.current.ratio.value = 1;
-        }
-
-        if (delayWetRef.current) delayWetRef.current.gain.value = 0;
-        if (reverbWetRef.current) reverbWetRef.current.gain.value = 0;
+      if (eqLow) eqLow.gain.value = fxSettings.eqLow;
+      if (eqMid) eqMid.gain.value = fxSettings.eqMid;
+      if (eqHigh) eqHigh.gain.value = fxSettings.eqHigh;
+      if (comp) {
+        const punchAmount = fxSettings.punch / 100;
+        comp.threshold.value = -50 * punchAmount;
+        comp.ratio.value = 1 + (19 * punchAmount);
       }
+      if (delayWet) delayWet.gain.value = (fxSettings.echo / 100) * 0.7;
+      if (reverbWet) reverbWet.gain.value = (fxSettings.space / 100) * 1.0;
     } catch (err) {
-      console.warn('Error updating recording Vocal FX nodes:', err);
+      console.warn('Error updating Vocal FX nodes:', err);
     }
-  }, [audioContext, isFXActive, fxSettings]);
+  };
+
+  // Synchronize Live Vocal FX settings with Web Audio Nodes (recording + playback chains)
+  useEffect(() => {
+    if (audioContext && eqLowRef.current) {
+      applyFXToNodes(eqLowRef.current, eqMidRef.current, eqHighRef.current, compRef.current, delayWetRef.current, reverbWetRef.current);
+    }
+    if (pbSourceConnectedRef.current) {
+      applyFXToNodes(pbEqLowRef.current, pbEqMidRef.current, pbEqHighRef.current, pbCompRef.current, pbDelayWetRef.current, pbReverbWetRef.current);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioContext, fxSettings]);
 
   // Synchronize Live Monitoring toggle with monitor Gain node
   useEffect(() => {
@@ -592,6 +595,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
           setProgress(audioRef.current.currentTime / audioRef.current.duration);
         }
       };
+
+      setupPlaybackFX();
     }
 
     return () => {
@@ -728,32 +733,27 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       const eqLow = audioCtx.createBiquadFilter();
       eqLow.type = 'lowshelf';
       eqLow.frequency.value = 250;
-      eqLow.gain.value = isFXActive ? fxSettings.eqLow : 0;
+      eqLow.gain.value = fxSettings.eqLow;
       eqLowRef.current = eqLow;
 
       const eqMid = audioCtx.createBiquadFilter();
       eqMid.type = 'peaking';
       eqMid.frequency.value = 1000;
       eqMid.Q.value = 1;
-      eqMid.gain.value = isFXActive ? fxSettings.eqMid : 0;
+      eqMid.gain.value = fxSettings.eqMid;
       eqMidRef.current = eqMid;
 
       const eqHigh = audioCtx.createBiquadFilter();
       eqHigh.type = 'highshelf';
       eqHigh.frequency.value = 4000;
-      eqHigh.gain.value = isFXActive ? fxSettings.eqHigh : 0;
+      eqHigh.gain.value = fxSettings.eqHigh;
       eqHighRef.current = eqHigh;
 
       // 2. Compressor Node (Punch)
       const comp = audioCtx.createDynamicsCompressor();
-      if (isFXActive) {
-        const punchAmount = fxSettings.punch / 100;
-        comp.threshold.value = -50 * punchAmount;
-        comp.ratio.value = 1 + (19 * punchAmount);
-      } else {
-        comp.threshold.value = 0;
-        comp.ratio.value = 1;
-      }
+      const punchAmount = fxSettings.punch / 100;
+      comp.threshold.value = -50 * punchAmount;
+      comp.ratio.value = 1 + (19 * punchAmount);
       comp.knee.value = 30;
       comp.attack.value = 0.003;
       comp.release.value = 0.25;
@@ -769,7 +769,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       delayDryRef.current = delayDry;
 
       const delayWet = audioCtx.createGain();
-      delayWet.gain.value = isFXActive ? (fxSettings.echo / 100) * 0.7 : 0;
+      delayWet.gain.value = (fxSettings.echo / 100) * 0.7;
       delayWetRef.current = delayWet;
 
       // 4. Reverb Node (Space)
@@ -782,7 +782,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
       convolverRef.current = convolver;
 
       const reverbWet = audioCtx.createGain();
-      reverbWet.gain.value = isFXActive ? (fxSettings.space / 100) * 1.0 : 0;
+      reverbWet.gain.value = (fxSettings.space / 100) * 1.0;
       reverbWetRef.current = reverbWet;
 
       // 5. Limiter / Master
@@ -846,6 +846,67 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     } finally {
       isInitializingMicRef.current = false;
     }
+  };
+
+  // Wire the playback <audio> element through the FX chain for post-processing
+  const setupPlaybackFX = () => {
+    if (!audioRef.current || pbSourceConnectedRef.current) return;
+
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const ctx = playbackCtxRef.current ?? new AudioContextClass();
+    playbackCtxRef.current = ctx;
+
+    const source = ctx.createMediaElementSource(audioRef.current);
+    pbSourceConnectedRef.current = true;
+
+    const eqLow = ctx.createBiquadFilter();
+    eqLow.type = 'lowshelf'; eqLow.frequency.value = 250; eqLow.gain.value = fxSettings.eqLow;
+    pbEqLowRef.current = eqLow;
+
+    const eqMid = ctx.createBiquadFilter();
+    eqMid.type = 'peaking'; eqMid.frequency.value = 1000; eqMid.Q.value = 1; eqMid.gain.value = fxSettings.eqMid;
+    pbEqMidRef.current = eqMid;
+
+    const eqHigh = ctx.createBiquadFilter();
+    eqHigh.type = 'highshelf'; eqHigh.frequency.value = 4000; eqHigh.gain.value = fxSettings.eqHigh;
+    pbEqHighRef.current = eqHigh;
+
+    const comp = ctx.createDynamicsCompressor();
+    const punchAmount = fxSettings.punch / 100;
+    comp.threshold.value = -50 * punchAmount;
+    comp.ratio.value = 1 + (19 * punchAmount);
+    comp.knee.value = 30; comp.attack.value = 0.003; comp.release.value = 0.25;
+    pbCompRef.current = comp;
+
+    const delay = ctx.createDelay(2.0);
+    delay.delayTime.value = 0.4;
+    const delayWet = ctx.createGain();
+    delayWet.gain.value = (fxSettings.echo / 100) * 0.7;
+    pbDelayWetRef.current = delayWet;
+
+    const convolver = ctx.createConvolver();
+    try { convolver.buffer = createReverbImpulse(ctx, 2.5, 2.0); } catch (_) {}
+    const reverbWet = ctx.createGain();
+    reverbWet.gain.value = (fxSettings.space / 100) * 1.0;
+    pbReverbWetRef.current = reverbWet;
+
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 1;
+
+    source.connect(eqLow);
+    eqLow.connect(eqMid);
+    eqMid.connect(eqHigh);
+    eqHigh.connect(comp);
+    comp.connect(masterGain);
+    comp.connect(delay);
+    delay.connect(delayWet);
+    delayWet.connect(masterGain);
+    comp.connect(convolver);
+    convolver.connect(reverbWet);
+    reverbWet.connect(masterGain);
+    masterGain.connect(ctx.destination);
   };
 
   // --- Speech Recognition ---
@@ -1087,18 +1148,12 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
     const selected = VOCAL_PRESETS.find(p => p.id === presetId);
     if (selected) {
       setFxSettings(selected.settings);
-      if (presetId === 'dry') {
-        setIsFXActive(false);
-      } else {
-        setIsFXActive(true);
-      }
     }
   };
 
   const handleUpdateCustomFX = (key: keyof FXSettings, value: number) => {
     setFxSettings(prev => ({ ...prev, [key]: value }));
     setActivePresetId('custom');
-    setIsFXActive(true);
   };
 
   const handleSave = () => {
@@ -1454,7 +1509,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                                 default: return Mic;
                               }
                             })();
-                            const isSelected = activePresetId === preset.id && (preset.id === 'dry' ? !isFXActive : isFXActive);
+                            const isSelected = activePresetId === preset.id;
                             return (
                               <button
                                 key={preset.id}
@@ -1473,33 +1528,19 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                         </div>
                       ) : (
                         <div className="h-full overflow-y-auto pr-0.5 space-y-3 pb-2 pt-1 scrollbar-thin">
-                          {/* Enable Custom FX Toggle */}
-                          <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border-main)]">
-                            <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">Enable Custom FX</span>
-                            <button
-                              onClick={() => setIsFXActive(!isFXActive)}
-                              className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer outline-none ${isFXActive ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-[var(--bg-secondary)] border border-[var(--border-main)]'}`}
-                            >
-                              <span 
-                                className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${isFXActive ? 'translate-x-4' : 'translate-x-0'}`} 
-                              />
-                            </button>
-                          </div>
-
                           {/* Reverb Space Slider */}
                           <div className="space-y-0.5">
                             <div className="flex items-center justify-between text-[9px] text-[var(--text-secondary)] font-bold">
                               <span>REVERB (SPACE)</span>
                               <span className="tabular-nums">{fxSettings.space}%</span>
                             </div>
-                            <input 
+                            <input
                               type="range"
                               min="0"
                               max="100"
                               value={fxSettings.space}
-                              disabled={!isFXActive}
                               onChange={(e) => handleUpdateCustomFX('space', parseInt(e.target.value))}
-                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                              className="w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)]"
                             />
                           </div>
 
@@ -1509,14 +1550,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                               <span>ECHO (DELAY)</span>
                               <span className="tabular-nums">{fxSettings.echo}%</span>
                             </div>
-                            <input 
+                            <input
                               type="range"
                               min="0"
                               max="100"
                               value={fxSettings.echo}
-                              disabled={!isFXActive}
                               onChange={(e) => handleUpdateCustomFX('echo', parseInt(e.target.value))}
-                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                              className="w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)]"
                             />
                           </div>
 
@@ -1526,14 +1566,13 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                               <span>PUNCH (COMPRESSOR)</span>
                               <span className="tabular-nums">{fxSettings.punch}%</span>
                             </div>
-                            <input 
+                            <input
                               type="range"
                               min="0"
                               max="100"
                               value={fxSettings.punch}
-                              disabled={!isFXActive}
                               onChange={(e) => handleUpdateCustomFX('punch', parseInt(e.target.value))}
-                              className={`w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)] ${!isFXActive && 'opacity-30 cursor-not-allowed'}`}
+                              className="w-full h-1 bg-[var(--bg-secondary)] rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--text-main)]"
                             />
                           </div>
                         </div>
@@ -1593,7 +1632,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 <button
                   onClick={() => setShowFXPanel(!showFXPanel)}
                   className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
-                    isFXActive
+                    showFXPanel || fxSettings.space > 0 || fxSettings.echo > 0 || fxSettings.punch > 0 || fxSettings.eqLow !== 0 || fxSettings.eqMid !== 0 || fxSettings.eqHigh !== 0
                       ? 'bg-[var(--accent)] text-white shadow-[0_0_20px_var(--accent-dim)]'
                       : 'bg-[var(--bg-card)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'
                   }`}

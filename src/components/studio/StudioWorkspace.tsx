@@ -19,6 +19,9 @@ import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio, transcribeAudioChunks } from '@/lib/audio/audioIntelligence';
+import { analyzeAudioStructure } from '@/app/actions';
+import { AISuggestBar } from './AISuggestBar';
+import { NewProjectModal } from './NewProjectModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Clock,
@@ -31,6 +34,7 @@ import {
     Plus,
     Music,
     FilePlus,
+    FileText,
     Play,
     Pause,
     Trash2,
@@ -354,6 +358,10 @@ const StudioWorkspace: React.FC = () => {
     const [showPlayerSheet, setShowPlayerSheet] = useState(false);
     const [showFXPanel, setShowFXPanel] = useState(false);
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
+    const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+    const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+    const [projectGenre, setProjectGenre] = useState<string>('');
+    const [projectMood, setProjectMood] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -1690,34 +1698,34 @@ const StudioWorkspace: React.FC = () => {
     };
 
     const handleNewProject = () => {
-        if (window.confirm("Start a new project? Current work will be archived.")) {
-            // Stop all audio playback before clearing
-            vocalAudioRef.current?.pause();
-            beatAudioRef.current?.pause();
-            setIsPlaying(false);
-            setIsBeatPlaying(false);
+        setShowNewProjectModal(true);
+    };
 
-            archiveCurrentProject();
-            
-            // Reset workspace
-            setSections(createDefaultSections()); // Start with an empty section ready to write in
-            setScraps([]);
-            setSessions([]);
-            setActiveSessionId(null);
-            setPlayingSessionId(null);
-            setProjectTitle("");
-            setUploadedBeat(null);
-            setUploadedBeatName("");
-            setActiveProjectId(null);
-            
-            setActiveCategory('Notes');
-            setCategorySections({});
-            setIsCategoryDropdownOpen(false);
-
-            setViewMode('studio');
-            setStudioMode('flow');
-            setFabOpen(false);
-        }
+    const confirmNewProject = (name: string, genre?: string, mood?: string) => {
+        setShowNewProjectModal(false);
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
+        archiveCurrentProject();
+        setSections(createDefaultSections());
+        setScraps([]);
+        setSessions([]);
+        setActiveSessionId(null);
+        setPlayingSessionId(null);
+        setProjectTitle(name === 'Untitled Project' ? '' : name);
+        setProjectGenre(genre ?? '');
+        setProjectMood(mood ?? '');
+        setUploadedBeat(null);
+        setUploadedBeatName("");
+        setActiveProjectId(null);
+        setActiveCategory('Notes');
+        setCategorySections({});
+        setIsCategoryDropdownOpen(false);
+        setViewMode('studio');
+        setStudioMode('flow');
+        setFabOpen(false);
+        setActiveSectionId(null);
     };
 
     const loadProject = (p: SavedProject) => {
@@ -1767,6 +1775,52 @@ const StudioWorkspace: React.FC = () => {
             setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
             setShowSearch(false);
         }
+    };
+
+    const handleAISuggestInsert = (sectionId: string, line: string) => {
+        setSections(prev => prev.map(s => {
+            if (s.id !== sectionId) return s;
+            const trimmed = s.text.trimEnd();
+            return { ...s, text: trimmed ? `${trimmed}\n${line}` : line };
+        }));
+    };
+
+    const handleExportTXT = () => {
+        const content = sections
+            .map(s => `[${s.type.toUpperCase()}]\n${s.text}`)
+            .join('\n\n');
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${projectTitle || 'lyrics'}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportPDF = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        const html = `<!DOCTYPE html><html><head><title>${projectTitle || 'Lyrics'}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 600px; margin: 40px auto; color: #111; line-height: 1.8; }
+  h1 { font-size: 1.6rem; margin-bottom: 8px; }
+  .meta { color: #666; font-size: 0.8rem; margin-bottom: 32px; }
+  .section { margin-bottom: 28px; }
+  .label { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.15em; text-transform: uppercase; color: #999; margin-bottom: 8px; }
+  .text { white-space: pre-wrap; font-size: 1rem; }
+  @media print { body { margin: 20px; } }
+</style></head><body>
+<h1>${projectTitle || 'Untitled'}</h1>
+<div class="meta">${projectGenre ? `Genre: ${projectGenre}` : ''} ${projectMood ? `· Mood: ${projectMood}` : ''}</div>
+${sections.filter(s => s.text.trim()).map(s =>
+    `<div class="section"><div class="label">${s.type}</div><div class="text">${s.text}</div></div>`
+).join('')}
+</body></html>`;
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 400);
     };
 
     const handleStartProjectFromBeat = (beat: Beat) => {
@@ -2703,6 +2757,8 @@ const StudioWorkspace: React.FC = () => {
                                                 <OpenEditor
                                                     sections={sections}
                                                     onUpdateSections={setSections}
+                                                    onFocus={() => setActiveSectionId('__open__')}
+                                                    onBlur={() => setActiveSectionId(null)}
                                                 />
                                             ) : (
                                                 <AnimatePresence mode="wait">
@@ -2797,6 +2853,8 @@ const StudioWorkspace: React.FC = () => {
                                                                             onDelete={deleteSection}
                                                                             onMove={moveSection}
                                                                             showSyllables={showSyllables}
+                                                                            onSectionFocus={setActiveSectionId}
+                                                                            onSectionBlur={() => setActiveSectionId(null)}
                                                                         />
                                                                     </motion.div>
                                                                 ))}
@@ -3184,6 +3242,27 @@ const StudioWorkspace: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+
+                            {/* Export */}
+                            {sections.some(s => s.text.trim()) && (
+                                <div className="pt-2 space-y-2">
+                                    <div className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)] px-1">Export</div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            onClick={() => { setIsSidebarOpen(false); handleExportTXT(); }}
+                                            className="flex items-center justify-center gap-2 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] rounded-xl text-xs font-medium transition-all active:scale-95 cursor-pointer"
+                                        >
+                                            <FileText size={13} /> TXT
+                                        </button>
+                                        <button
+                                            onClick={() => { setIsSidebarOpen(false); handleExportPDF(); }}
+                                            className="flex items-center justify-center gap-2 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] rounded-xl text-xs font-medium transition-all active:scale-95 cursor-pointer"
+                                        >
+                                            <FileText size={13} /> PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </motion.div>
                     </>
                 )}
@@ -3316,6 +3395,30 @@ const StudioWorkspace: React.FC = () => {
                     viewMode={viewMode}
                 />
             )}
+
+            {/* AI Suggestion Strip */}
+            {viewMode === 'studio' && !showRecorder && !showFXPanel && (
+                <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[90] pointer-events-none">
+                    <div className="pointer-events-auto">
+                        <AISuggestBar
+                            activeSectionId={activeSectionId}
+                            sections={sections}
+                            projectTitle={projectTitle}
+                            genre={projectGenre}
+                            mood={projectMood}
+                            onInsert={handleAISuggestInsert}
+                            onDismiss={() => setActiveSectionId(null)}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* New Project Modal */}
+            <NewProjectModal
+                isOpen={showNewProjectModal}
+                onConfirm={confirmNewProject}
+                onCancel={() => setShowNewProjectModal(false)}
+            />
         </div>
     );
 };

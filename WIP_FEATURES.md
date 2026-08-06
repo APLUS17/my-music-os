@@ -1,67 +1,97 @@
-# Work In Progress (WIP) Features
+# Work In Progress & Feature Status
+### Updated: August 2026
 
-## 🧠 Muse (AI Assistant)
-The `MuseDrawer` component is fully functional but currently **disabled** for the Beta release.
-To re-enable it in `StudioWorkspace.tsx`, follow these steps:
-
-### 1. Import the Component
-Add this back to the top of `src/components/studio/StudioWorkspace.tsx`:
-```tsx
-import { MuseDrawer } from './MuseDrawer';
-```
-
-### 2. Add State Management
-Add this state variable inside the `StudioWorkspace` component:
-```tsx
-const [showMuse, setShowMuse] = useState(false);
-```
-
-### 3. Add the Trigger Button
-Add the "Zap" button back to the header (next to `BeatUploader`):
-```tsx
-<button
-    onClick={() => setShowMuse(true)}
-    className="w-10 h-10 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--accent)] hover:text-[var(--text-main)]"
->
-    <Zap size={18} fill="currentColor" />
-</button>
-```
-
-### 4. Render the Component
-Add the drawers back near the bottom of the return statement (before `FeedbackModal`):
-```tsx
-{showMuse && (
-    <MuseDrawer 
-        onClose={() => setShowMuse(false)} 
-        contextText={sections.map(s => s.text).join('\n')} 
-    />
-)}
-```
+> **Note:** This document has been updated to reflect the current state of the codebase after the August 2026 strategy session. Dead features are marked clearly. The build priority has shifted from features to distribution.
 
 ---
 
-## 🎙️ Studio Facilitator (AI Assistant)
-We have implemented the core backend for the **Studio Facilitator** in `src/app/actions.ts`:
-*   **Audio Structure Analysis**: Uses Gemini 2.0 Flash to identify Verse/Chorus/Bridge from uploaded audio.
-*   **Conversational Logic**: `chatWithFacilitator` action provides a high-velocity songwriting coach framework.
-*   **WIP Frontend**: The `FacilitatorView` component is currently being polished for better integration with the Studio tab.
+## 🔴 DEAD / REMOVED FEATURES (Do Not Resurrect Without User Evidence)
+
+### MuseDrawer — DELETED
+The `MuseDrawer` component has been deleted from the codebase. `GeminiPanel.tsx` is a 0-byte placeholder.
+**Status:** Gone. The Studio Facilitator AI in `actions.ts` is the replacement backend.
+**What's needed:** A new lightweight AI suggestion UI — not a full drawer. An inline suggestion panel or ghost-text style suggestions wired to `chatWithFacilitator`.
+
+### FX Panel — ✅ FULLY WIRED (Not a bug)
+`FXPanel.tsx` sliders → `setFxSettings` state → `useVocalFX` hook → real Web Audio processing chain.
+- **StudioWorkspace**: `useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime)` — active on vocal playback
+- **RecorderDrawer**: has its own parallel Web Audio graph built directly into the recorder, with live monitoring toggle (use headphones warning included)
+- Both EQ (lowshelf/peaking/highshelf), reverb (convolution), delay, compression, and limiter are all live.
+
+### Mission Control — DEPRIORITIZED
+`/mission-control` — the business strategy dashboard. Functional but irrelevant to users.
+**Status:** Keep in codebase, remove from any navigation or onboarding that surfaces it to users.
+**Why deprioritized:** This was a feature for the founder, not the ICP. Songwriters don't need a growth dashboard.
 
 ---
 
-## 🎹 Other Hidden Features
-*   **Share Button**: Currently removed from the header. Needs link-generation logic.
-*   **BPM & Key Display**: Needs connection to real project metadata.
-*   **Supabase Types**: Backend is connected but requires manual type casting (`as any`) until full schema generation is integrated.
+## 🟡 IN PROGRESS / PARTIAL
+
+### Studio Facilitator AI — SHIPPED (Backend), MISSING (Frontend UI)
+**Backend:** `chatWithFacilitator` in `src/app/actions.ts` — fully functional Gemini 2.0 Flash conversational coach.
+**Frontend:** No dedicated UI to expose this. `GeminiPanel.tsx` is 0 bytes. `MuseDrawer.tsx` was deleted.
+**What's needed:** A minimal AI panel — text input + response display — wired to `chatWithFacilitator`. This is P0 because it's the core product differentiator.
+
+### AI Lyric Suggestions — MOCKED
+`src/lib/services/ai.ts` has `isMock: true`. Returns hardcoded responses.
+**What's needed:** Wire to Gemini via `chatWithFacilitator` or a dedicated `suggestLyrics` server action. Include current section text + beat context + genre/mood as prompt context.
+**Priority: P0.** This is the promise the product makes. It's currently a lie.
+
+### Cloud Sync (Supabase) — PARTIAL
+Project CRUD works via `actions.ts`. Beat audio and recordings are IndexedDB-only (base64).
+**Risk:** iOS/Android aggressively purge IndexedDB under storage pressure. Users will lose beats silently.
+**What's needed:** Migrate beat audio to Supabase Storage. This is P1 (not blocking launch, but a retention risk).
+
+### Rhyme Tool — API READY, NO UI
+Datamuse API is integrated in `src/lib/services/creative.ts`. Returns rhymes/synonyms/near-rhymes.
+**What's needed:** Editor UI — tap a word → popover with rhyme suggestions → tap to replace. This is P1.
 
 ---
 
-## 🗄️ Archived & Hidden UI Elements
-The following elements have been archived or hidden to simplify layout clutter, clean up vertical space, or prevent navigation overlaps:
-*   **Repeats Indicator & Buttons (`x2 | + -`)**: Removed from the header of each `LyricCard.tsx` to clean up structured writing card space.
-*   **Category Selector Dropdown & Line/Syllable Summary Bar**: Removed from above the lyric card list in `StudioWorkspace.tsx` to maximize vertical space for mobile writing.
-*   **Empty State Centered Button**: Removed the centered "Add Lyric Section" button that appeared when the workspace had zero lyric cards. The app now directly displays the write-mode editor canvas and relies on the standard `+ Add Section` button at the bottom of the list.
-*   **Player Tab Action Buttons**: Removed the chat (`MessageSquare`), language translation (`Languages`), and menu list (`List`) icons from the bottom action bar of `PlayerTab.tsx` as they were overlapping with the centered floating bottom navigation pill. Replace with a `<div className="h-20" />` spacer.
-*   **Global Search Icon**: Replaced with the theme toggle in the main Studio header.
-*   **Borderless Syllable Toggle Button ("T")**: Removed the circle border ring, active background color, and active glow shadow from the syllable toggle button. It now remains completely transparent, toggling only the text color of the letter "T" itself to the active accent color.
-*   **"Capture the Flow" greeting, illustrator & quick start tags**: Hidden from normal blank states and moved exclusively inside the active onboarding tour sequence (`showTour === true`).
+## ✅ SHIPPED & STABLE
 
+| Feature | File | Notes |
+|---------|------|-------|
+| Flow Mode | `SandboxView.tsx` | Solid |
+| Write Mode | `LyricCard.tsx` | Solid |
+| Flow ↔ Write Sync | `StudioWorkspace.tsx` | Single `sections[]` source of truth |
+| Beat Upload + Playback | `BeatUploader.tsx` | Loop points, scrubbing, volume |
+| Beat Persistence | `services/storage.ts` | IndexedDB — cloud migration needed |
+| Voice Recording | `RecorderDrawer.tsx` | Waveform, scrub playback |
+| Multiple Takes | `RecordingThread.tsx` | Multi-take lane management |
+| Pin Take to Section | `LyricCard.tsx` | `pinnedTakeId` on `LyricSection` |
+| AI Transcription | `audioIntelligence.ts` | Groq Whisper via `/api/transcribe` |
+| AI Audio Analysis | `actions.ts` | Gemini 2.0 Flash `analyzeAudioStructure()` |
+| Auth (email OTP) | `AuthContext.tsx` | Supabase email magic link — fully deployed |
+| Notes View | `NotesView.tsx` | Time-grouped, searchable |
+| Vault View | `VaultView.tsx` | Grid/list layout |
+| 5 Themes | `globals.css` | CSS variables — working |
+| Onboarding Tour | `OnboardingTour.tsx` | 6-step, restartable |
+
+---
+
+## ❌ NOT BUILT YET (Priority Order)
+
+| Feature | Priority | Effort | Notes |
+|---------|----------|--------|-------|
+| Export (TXT + PDF) | 🔴 P0 | 4/10 | Biggest churn blocker |
+| AI Suggestion UI | 🔴 P0 | 5/10 | Wire `chatWithFacilitator` to inline panel |
+| Genre/Mood on project creation | 🔴 P0 | 3/10 | Required for contextual AI |
+| Email capture + welcome sequence | 🟡 P1 | 3/10 | Use Resend or Loops.so |
+| In-editor Rhyme Tool | 🟡 P1 | 4/10 | Datamuse API already integrated |
+| Beat cloud storage | 🟡 P1 | 6/10 | Supabase Storage migration |
+| Multi-device sync (full) | 🟡 P1 | 5/10 | Supabase CRUD partial, needs beats/recordings |
+
+---
+
+## 🗄️ ARCHIVED UI ELEMENTS (Intentionally Removed)
+
+These were removed to simplify layout. Do not re-add without a clear user request:
+
+- Repeats Indicator (`x2 | + -`) — removed from `LyricCard.tsx` header
+- Category Selector Dropdown — removed from `StudioWorkspace.tsx`
+- Line/Syllable Summary Bar — removed from above lyric card list
+- Empty State Centered Button — replaced by standard `+ Add Section`
+- Player Tab action icons (chat, translate, list) — overlapped with nav pill
+- Global Search Icon — replaced by theme toggle in header
+- "Capture the Flow" greeting — only shown inside onboarding tour
