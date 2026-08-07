@@ -2614,13 +2614,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         {/* ─── Quick action toolbar — sits directly above the writing surface ─── */}
                         <div className="flex-shrink-0 flex items-center gap-2 px-6 pt-3 pb-2">
                             <button
-                                onClick={() => setViewMode('muse')}
-                                title="Muse — AI assist"
-                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
-                            >
-                                <WandSparkles size={18} />
-                            </button>
-                            <button
                                 onClick={() => setEditorLayout(editorLayout === 'open' ? 'cards' : 'open')}
                                 title={editorLayout === 'open' ? 'Switch to structured sections' : 'Switch to open editor'}
                                 className={cn(
