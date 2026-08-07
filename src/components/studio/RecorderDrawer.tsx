@@ -49,6 +49,7 @@ interface RecorderDrawerProps {
   parentAudioUrl?: string | null;
   isBeatLoading?: boolean;
   onRecordingStateChange?: (isRecording: boolean) => void;
+  targetSection?: { type: string; text: string } | null;
 }
 
 export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
@@ -72,6 +73,7 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
   parentAudioUrl = null,
   isBeatLoading = false,
   onRecordingStateChange,
+  targetSection = null,
 }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1365,6 +1367,16 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
                 Done
               </button>
             </div>
+
+            {/* Section reference strip */}
+            {targetSection && !recordedBlob && (
+              <div className="mx-6 mb-3 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.07] flex-shrink-0">
+                <p className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)] mb-1.5">{targetSection.type}</p>
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-3 font-light">
+                  {targetSection.text.trim() || 'Empty section — freestyle it'}
+                </p>
+              </div>
+            )}
 
             {/* Content — Waveform or Transcription */}
             <div className="flex-1 relative overflow-hidden">

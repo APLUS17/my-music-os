@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { LyricSection, SECTION_TYPES } from '@/types';
-import { X, ChevronUp, ChevronDown } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Mic } from 'lucide-react';
 import { countSyllables } from '@/lib/utils/syllable';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ interface LyricCardProps {
   showSyllables: boolean;
   onSectionFocus?: (id: string) => void;
   onSectionBlur?: () => void;
+  onRecordSection?: (id: string) => void;
 }
 
 const AutoResizeRowTextarea = ({
@@ -76,6 +77,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   showSyllables,
   onSectionFocus,
   onSectionBlur,
+  onRecordSection,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [, setIsFocused] = useState(false);
@@ -214,8 +216,17 @@ export const LyricCard: React.FC<LyricCardProps> = ({
               <ChevronDown size={12} />
             </button>
           </div>
-          <button 
-            onClick={() => onDelete(section.id)} 
+          {onRecordSection && (
+            <button
+              onClick={() => onRecordSection(section.id)}
+              className="p-1 text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-md transition-all duration-200 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
+              title="Record this section"
+            >
+              <Mic size={12} />
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(section.id)}
             className="p-1 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-300 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
             title="Delete section"
           >

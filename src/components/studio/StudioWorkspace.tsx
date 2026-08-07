@@ -6,9 +6,9 @@ import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
 import { OpenEditor } from './OpenEditor';
 import { countSyllables } from '@/lib/utils/syllable';
+import { formatTime } from '@/lib/utils/time';
 import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
-import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
 import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
@@ -47,16 +47,19 @@ import {
     History,
     Sun,
     Moon,
-    Archive,
     Sparkles,
-    Copy
+    Copy,
+    WandSparkles,
+    Rows2,
+    Rocket,
+    ListPlus
 } from 'lucide-react';
 import { MuseView } from './MuseView';
 import { processMuseSession } from '@/lib/muse/processMuseSession';
 import { MuseManifest } from '@/types';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ChevronDown, CheckCircle2, Bookmark, Menu, ChevronLeft } from 'lucide-react';
+import { Bookmark, Menu, ChevronLeft } from 'lucide-react';
 
 import {
     saveAudioData,
@@ -71,7 +74,7 @@ import {
     getMuseChunks
 } from '@/lib/idb/studioDB';
 
-type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'muse';
+type ViewMode = 'home' | 'studio' | 'settings' | 'muse';
 type LibraryTab = 'songs' | 'beats';
 type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
@@ -394,6 +397,7 @@ const StudioWorkspace: React.FC = () => {
 
 
     const [recordingTargetLineId, setRecordingTargetLineId] = useState<string | null>(null);
+    const [recordingTargetSectionId, setRecordingTargetSectionId] = useState<string | null>(null);
     const [recordingCounter, setRecordingCounter] = useState<number>(() => {
         if (typeof window !== 'undefined') {
             return parseInt(localStorage.getItem('lyriq_recording_counter') || '1');
@@ -407,7 +411,6 @@ const StudioWorkspace: React.FC = () => {
 
     const [sessions, setSessions] = useState<RecordingSession[]>([]);
     const [studioMode, setStudioMode] = useState<'flow' | 'write'>('write');
-    const [isProjectSelectorOpen, setIsProjectSelectorOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'lyrics' | 'takes'>('lyrics');
     const [showSyllables, setShowSyllables] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
@@ -1105,6 +1108,12 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    const handleRecordSection = (sectionId: string) => {
+        setRecordingTargetSectionId(sectionId);
+        setStudioMode('flow');
+        handleRecordStart();
+    };
+
     // Long takes (the realistic shape of "record the whole session in one go")
     // get a Granola-style recap automatically; shorter takes can trigger one
     // manually later via handleRetryMuseAnalysis so a 5-second punch-in doesn't
@@ -1240,7 +1249,7 @@ const StudioWorkspace: React.FC = () => {
             });
         } else {
             // Create new session (original behavior)
-        const isStandalone = viewMode === 'home' || viewMode === 'vault';
+        const isStandalone = viewMode === 'home';
             const newSession: RecordingSession = {
             id,
             name: isStandalone ? `New Recording ${recordingCounter}` : `Recording ${sessions.length + 1}`,
@@ -1281,7 +1290,23 @@ const StudioWorkspace: React.FC = () => {
                     }
                 });
             } else {
-                toast.success('Recording saved');
+                toast.success('Take saved', {
+                    action: {
+                        label: 'Back to writing',
+                        onClick: () => {
+                            setShowRecorder(false);
+                            setRecorderMinimized(false);
+                            setRecordingTargetSectionId(null);
+                            setStudioMode('write');
+                        }
+                    }
+                });
+                if (recordingTargetSectionId) {
+                    setSections(prev => prev.map(s =>
+                        s.id === recordingTargetSectionId ? { ...s, pinnedTakeId: id } : s
+                    ));
+                    setRecordingTargetSectionId(null);
+                }
             }
             // Groq transcription (runs silently); acoustic section grouping already
             // came from the free, local, synchronous smartSplit pass above.
@@ -2498,24 +2523,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                     </div>
                 );
             }
-            case 'vault':
-                return (
-                    <VaultView
-                        sessions={sessions.filter(s => s.kind !== 'muse')}
-                        scraps={scraps}
-                        beats={beats}
-                        projectTitle={projectTitle}
-                        onPlaySession={handleSelectSessionAndPlay}
-                        playingSessionId={activeSessionId}
-                        isSessionPlaying={isPlaying}
-                        onPlayBeat={handlePlayBeat}
-                        playingBeatId={playingBeatId}
-                        currentTime={currentTime}
-                        duration={duration}
-                        ritualStats={ritualStats}
-                        onOpenSidebar={() => setIsSidebarOpen(true)}
-                    />
-                );
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
@@ -2535,66 +2542,17 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                             <input
                                                 value={projectTitle}
                                                 onChange={(e) => setProjectTitle(e.target.value)}
-                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate pr-8"
+                                                className="bg-transparent border-none text-xl font-bold text-[var(--text-main)] focus:outline-none w-full placeholder:text-[var(--text-tertiary)] truncate"
                                                 placeholder="Untitled Project"
                                             />
-                                            <button 
-                                                onClick={() => setIsProjectSelectorOpen(!isProjectSelectorOpen)}
-                                                className="absolute right-0 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors"
-                                            >
-                                                <ChevronDown size={18} className={cn("transition-transform", isProjectSelectorOpen && "rotate-180")} />
-                                            </button>
-
-                                            <AnimatePresence>
-                                                {isProjectSelectorOpen && (
-                                                    <motion.div 
-                                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                        className="absolute top-full left-0 mt-2 w-64 bg-[var(--bg-card)] border border-[var(--border-main)] rounded-xl shadow-2xl p-2 z-[60] backdrop-blur-xl"
-                                                    >
-                                                        <div className="max-h-60 overflow-y-auto scrollbar-hide py-1">
-                                                            <div className="px-3 py-2 text-[10px] mono uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-main)] mb-1">Your Projects</div>
-                                                            {savedProjects.length > 0 ? (
-                                                                savedProjects.map(p => (
-                                                                    <button
-                                                                        key={p.id}
-                                                                        onClick={() => {
-                                                                            loadProject(p);
-                                                                            setIsProjectSelectorOpen(false);
-                                                                        }}
-                                                                        className={cn(
-                                                                            "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between group",
-                                                                            activeProjectId === p.id ? "bg-[var(--accent)] text-black" : "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)]"
-                                                                        )}
-                                                                    >
-                                                                        <span className="truncate">{p.name || "Untitled"}</span>
-                                                                        {activeProjectId === p.id && <CheckCircle2 size={14} />}
-                                                                    </button>
-                                                                ))
-                                                            ) : (
-                                                                <div className="px-3 py-4 text-xs italic text-[var(--text-tertiary)] text-center">No saved projects</div>
-                                                            )}
-                                                            <button 
-                                                                onClick={() => {
-                                                                    handleNewProject();
-                                                                    setIsProjectSelectorOpen(false);
-                                                                }}
-                                                                className="w-full mt-2 flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black rounded-lg transition-all"
-                                                            >
-                                                                <Plus size={14} /> New Project
-                                                            </button>
-                                                        </div>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
                                         </div>
 
                                     </div>
 
-                                    {/* Right: Audio Controls */}
+                                    {/* Right: Audio Controls — reduced to a plain icon, no label */}
                                     <div id="tour-audio-controls" className="flex items-center gap-2">
                                         <BeatUploader
+                                            compact
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
                                             beatName={uploadedBeatName}
@@ -2656,36 +2614,48 @@ ${sections.filter(s => s.text.trim()).map(s =>
                             </div>
                         </div>
 
-                        {/* ─── WRITE | FLOW mode toggle ─── */}
-                        <div className="flex-shrink-0 flex items-center justify-center px-4 pt-3 pb-2 relative">
-                            <div className="flex bg-[var(--bg-secondary)] rounded-full p-1 border border-[var(--border-main)]">
-                                <button
-                                    onClick={handleWriteTab}
-                                    className={cn(
-                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95",
-                                        studioMode === 'write'
-                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                                    )}
-                                >
-                                    Write
-                                </button>
-                                <button
-                                    onClick={handleFlowTab}
-                                    className={cn(
-                                        "px-8 py-2 rounded-full text-xs font-bold tracking-widest uppercase transition-all duration-200 cursor-pointer active:scale-95 flex items-center gap-2",
-                                        studioMode === 'flow'
-                                            ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
-                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]',
-                                        showRecorder && 'text-red-400'
-                                    )}
-                                >
-                                    {showRecorder && (
-                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                    )}
-                                    Flow
-                                </button>
-                            </div>
+                        {/* ─── Quick action toolbar — sits directly above the writing surface ─── */}
+                        <div className="flex-shrink-0 flex items-center gap-2 px-6 pt-3 pb-2">
+                            <button
+                                onClick={() => setViewMode('muse')}
+                                title="Muse — AI assist"
+                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
+                            >
+                                <WandSparkles size={18} />
+                            </button>
+                            <button
+                                onClick={() => setEditorLayout(editorLayout === 'open' ? 'cards' : 'open')}
+                                title={editorLayout === 'open' ? 'Switch to structured sections' : 'Switch to open editor'}
+                                className={cn(
+                                    "w-11 h-11 rounded-full border flex items-center justify-center transition-all active:scale-90",
+                                    editorLayout === 'cards'
+                                        ? 'bg-[var(--accent)] border-[var(--accent)] text-black'
+                                        : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'
+                                )}
+                            >
+                                <Rows2 size={18} />
+                            </button>
+                            <button
+                                onClick={handleNewProject}
+                                title="New project"
+                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
+                            >
+                                <Rocket size={18} />
+                            </button>
+                            <button
+                                onClick={addSection}
+                                title="Add section"
+                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
+                            >
+                                <ListPlus size={18} />
+                            </button>
+                            <button
+                                onClick={handleCopyAll}
+                                title="Copy all lyrics"
+                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
+                            >
+                                <Copy size={18} />
+                            </button>
                         </div>
 
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
@@ -2796,6 +2766,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                             showSyllables={showSyllables}
                                                                             onSectionFocus={setActiveSectionId}
                                                                             onSectionBlur={() => setActiveSectionId(null)}
+                                                                            onRecordSection={handleRecordSection}
                                                                         />
                                                                     </motion.div>
                                                                 ))}
@@ -2812,6 +2783,39 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                     </AnimatePresence>
                                             )}
                                         </>
+
+                                        {/* Takes for this project */}
+                                        {viewMode === 'studio' && sessions.filter(s => s.projectId === activeProjectId || (!s.projectId && activeProjectId)).length > 0 && (
+                                            <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
+                                                <p className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)] mb-3 px-1">Takes ({sessions.filter(s => s.projectId === activeProjectId || (!s.projectId && activeProjectId)).length})</p>
+                                                <div className="space-y-2">
+                                                    {sessions
+                                                        .filter(s => s.projectId === activeProjectId || (!s.projectId && activeProjectId))
+                                                        .slice(0, 5)
+                                                        .map(s => (
+                                                            <button
+                                                                key={s.id}
+                                                                onClick={() => handlePlaySession(s.id)}
+                                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[var(--border-main)] transition-all text-left group active:scale-[0.99]"
+                                                            >
+                                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${playingSessionId === s.id ? 'bg-[var(--accent)]' : 'bg-[var(--bg-secondary)]'}`}>
+                                                                    {playingSessionId === s.id
+                                                                        ? <span className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                                                                        : <span className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-[var(--text-secondary)] ml-0.5" />
+                                                                    }
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-xs font-medium text-[var(--text-main)] truncate">{s.name || 'Untitled Take'}</p>
+                                                                    {s.transcription && (
+                                                                        <p className="text-[11px] text-[var(--text-tertiary)] truncate mt-0.5">{s.transcription.slice(0, 60)}</p>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[11px] mono text-[var(--text-tertiary)] flex-shrink-0">{formatTime(s.duration || 0)}</span>
+                                                            </button>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -3061,7 +3065,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                 <div className="space-y-1">
                                     {[
                                         { id: 'home', label: 'Library', icon: Library },
-                                        { id: 'vault', label: 'Vault', icon: Archive },
                                         { id: 'muse', label: 'Muse', icon: Sparkles }
                                     ].map((item) => {
                                         const Icon = item.icon;
@@ -3223,6 +3226,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         setLayerModeSessionId(null);
                         setRecorderMinimized(false);
                         setStudioMode('write');
+                        setRecordingTargetSectionId(null);
                         if (beatAudioRef.current) {
                             beatAudioRef.current.pause();
                         }
@@ -3251,6 +3255,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                     parentAudioUrl={layerModeSessionId ? sessions.find(s => s.id === layerModeSessionId)?.audioUrl || null : null}
                     isBeatLoading={isBeatLoading}
                     onRecordingStateChange={setIsUserRecording}
+                    targetSection={recordingTargetSectionId ? (() => { const s = sections.find(sec => sec.id === recordingTargetSectionId); return s ? { type: s.type, text: s.text } : null; })() : null}
                 />
             )}
 
