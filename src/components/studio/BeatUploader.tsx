@@ -37,12 +37,15 @@ interface BeatUploaderProps {
   setIsLooping: (val: boolean) => void;
   onSeek?: (time: number) => void;
   isBeatLoading?: boolean;
+  /** Icon-only trigger, no label/pill — used by the simplified Moises-view header. */
+  compact?: boolean;
 }
 
 export const BeatUploader: React.FC<BeatUploaderProps> = ({
   audioSrc, audioRef, beatName, onUpload, onClear,
   isPlaying, setIsPlaying, volume, setVolume, loopStart, setLoopStart, loopEnd, setLoopEnd, isLooping, setIsLooping, onSeek,
-  isBeatLoading = false
+  isBeatLoading = false,
+  compact = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -219,16 +222,33 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
           onChange={handleFileChange}
           disabled={isBeatLoading}
         />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isBeatLoading}
-          className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
-        >
-          {isBeatLoading ? <Loader2 size={12} className="animate-spin" /> : <Music size={12} />}
-          <span>{isBeatLoading ? 'Loading...' : 'Load Beat'}</span>
-        </Button>
+        {compact ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isBeatLoading}
+                className="h-10 w-10 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
+              >
+                {isBeatLoading ? <Loader2 size={16} className="animate-spin" /> : <Music size={16} />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Load beat</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isBeatLoading}
+            className="h-8 rounded-xl bg-[var(--bg-secondary)] border-[var(--border-main)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all uppercase tracking-wide text-xs font-mono gap-2"
+          >
+            {isBeatLoading ? <Loader2 size={12} className="animate-spin" /> : <Music size={12} />}
+            <span>{isBeatLoading ? 'Loading...' : 'Load Beat'}</span>
+          </Button>
+        )}
       </>
     );
   }
@@ -238,44 +258,66 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
   return (
     <div className="relative z-30">
       <Popover open={showControls} onOpenChange={setShowControls}>
-        <div className={cn(
-          "group relative h-9 rounded-xl border bg-[var(--bg-soft)] flex items-center overflow-hidden hover:border-[var(--border-strong)] transition-all shadow-sm",
-          isLooping && loopStart !== null && loopEnd !== null
-            ? "border-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
-            : "border-[var(--border-subtle)]"
-        )}>
-          <div
-            className="absolute inset-0 bg-white opacity-5 pointer-events-none transition-all duration-200 ease-linear origin-left"
-            style={{ transform: `scaleX(${progressPercent / 100})` }}
-          />
+        {compact ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 rounded-full transition-all active:scale-90",
+                    isPlaying
+                      ? "bg-[var(--accent)] text-black hover:bg-[var(--accent)]"
+                      : "text-[var(--text-main)] hover:bg-[var(--bg-hover)]"
+                  )}
+                >
+                  {isBeatLoading ? <Loader2 size={16} className="animate-spin" /> : <Music size={16} />}
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent>{beatName || 'Beat'}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <div className={cn(
+            "group relative h-9 rounded-xl border bg-[var(--bg-soft)] flex items-center overflow-hidden hover:border-[var(--border-strong)] transition-all shadow-sm",
+            isLooping && loopStart !== null && loopEnd !== null
+              ? "border-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
+              : "border-[var(--border-subtle)]"
+          )}>
+            <div
+              className="absolute inset-0 bg-white opacity-5 pointer-events-none transition-all duration-200 ease-linear origin-left"
+              style={{ transform: `scaleX(${progressPercent / 100})` }}
+            />
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => { e.stopPropagation(); if (!isBeatLoading) setIsPlaying(!isPlaying); }}
-            disabled={isBeatLoading}
-            className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-main)] active:scale-90 transition-all rounded-none"
-          >
-            {isBeatLoading ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : isPlaying ? (
-              <Pause size={12} fill="currentColor" />
-            ) : (
-              <Play size={12} fill="currentColor" />
-            )}
-          </Button>
-
-          <div className="w-[1px] h-3 bg-[var(--bg-hover)] relative z-10" />
-
-          <PopoverTrigger asChild>
-            <button
-              className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-[var(--bg-soft)] transition-colors text-left"
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => { e.stopPropagation(); if (!isBeatLoading) setIsPlaying(!isPlaying); }}
+              disabled={isBeatLoading}
+              className="relative z-20 h-full w-9 flex items-center justify-center hover:bg-[var(--bg-hover)] text-[var(--text-main)] active:scale-90 transition-all rounded-none"
             >
-              <span className="text-xs mono uppercase font-bold tracking-wide text-[var(--text-main)] max-w-[100px] truncate">{beatName || 'Beat'}</span>
-              <Badge variant="outline" className="h-4 px-1 text-[8px] border-[var(--border-subtle)] text-[var(--text-secondary)]">BEAT</Badge>
-            </button>
-          </PopoverTrigger>
-        </div>
+              {isBeatLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : isPlaying ? (
+                <Pause size={12} fill="currentColor" />
+              ) : (
+                <Play size={12} fill="currentColor" />
+              )}
+            </Button>
+
+            <div className="w-[1px] h-3 bg-[var(--bg-hover)] relative z-10" />
+
+            <PopoverTrigger asChild>
+              <button
+                className="relative z-10 h-full px-3 flex items-center gap-2 hover:bg-[var(--bg-soft)] transition-colors text-left"
+              >
+                <span className="text-xs mono uppercase font-bold tracking-wide text-[var(--text-main)] max-w-[100px] truncate">{beatName || 'Beat'}</span>
+                <Badge variant="outline" className="h-4 px-1 text-[8px] border-[var(--border-subtle)] text-[var(--text-secondary)]">BEAT</Badge>
+              </button>
+            </PopoverTrigger>
+          </div>
+        )}
 
         <PopoverContent align="end" className="w-80 p-4 bg-[var(--bg-card)] border-[var(--border-subtle)] shadow-2xl rounded-2xl flex flex-col gap-4">
           {/* Header */}
@@ -284,9 +326,22 @@ export const BeatUploader: React.FC<BeatUploaderProps> = ({
               <span className="text-xs mono uppercase tracking-wide text-[var(--text-tertiary)]">Backing Track</span>
               <span className="text-sm font-bold text-[var(--text-main)] truncate max-w-[200px]">{beatName || 'Untitled Beat'}</span>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
-              <Trash2 size={14} />
-            </Button>
+            <div className="flex items-center gap-1">
+              {compact && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => !isBeatLoading && setIsPlaying(!isPlaying)}
+                  disabled={isBeatLoading}
+                  className="text-[var(--text-main)] hover:bg-[var(--bg-soft)] rounded-full h-8 w-8"
+                >
+                  {isBeatLoading ? <Loader2 size={14} className="animate-spin" /> : isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={onClear} className="text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-400/10 rounded-full h-8 w-8">
+                <Trash2 size={14} />
+              </Button>
+            </div>
           </div>
 
           {/* Timeline / Scrubber */}

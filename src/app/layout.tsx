@@ -61,7 +61,7 @@ export default function RootLayout({
           <TooltipProvider>
             {children}
           </TooltipProvider>
-          <Toaster closeButton position="top-center" expand />
+          <Toaster position="bottom-right" duration={2000} visibleToasts={1} />
         </AuthProvider>
       </body>
     </html>

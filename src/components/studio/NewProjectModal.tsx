@@ -4,33 +4,26 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Music } from 'lucide-react';
 
-const GENRES = ['Hip-Hop', 'R&B', 'Pop', 'Afrobeats', 'Alternative', 'Soul', 'Other'];
-const MOODS = ['Dark', 'Hype', 'Chill', 'Emotional', 'Introspective', 'Triumphant', 'Raw'];
-
 interface NewProjectModalProps {
     isOpen: boolean;
-    onConfirm: (name: string, genre?: string, mood?: string) => void;
+    onConfirm: (name: string) => void;
     onCancel: () => void;
 }
 
 export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onConfirm, onCancel }) => {
     const [name, setName] = useState('');
-    const [genre, setGenre] = useState('');
-    const [mood, setMood] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (isOpen) {
             setName('');
-            setGenre('');
-            setMood('');
             setTimeout(() => inputRef.current?.focus(), 120);
         }
     }, [isOpen]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onConfirm(name.trim() || 'Untitled Project', genre || undefined, mood || undefined);
+        onConfirm(name.trim() || 'Untitled Project');
     };
 
     return (
@@ -55,7 +48,6 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onConf
                             onSubmit={handleSubmit}
                             className="bg-[var(--bg-card)] rounded-t-3xl sm:rounded-3xl border border-[var(--border-main)] p-6 flex flex-col gap-6"
                         >
-                            {/* Header */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center">
@@ -68,62 +60,15 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onConf
                                 </button>
                             </div>
 
-                            {/* Name */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)]">Song title</label>
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    placeholder="Untitled Project"
-                                    className="w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl px-4 py-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/40 transition-colors"
-                                />
-                            </div>
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                placeholder="Song title..."
+                                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-xl px-4 py-3 text-sm text-[var(--text-main)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]/40 transition-colors"
+                            />
 
-                            {/* Genre */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)]">Genre <span className="text-[var(--text-tertiary)]/50 normal-case">(optional — helps AI)</span></label>
-                                <div className="flex flex-wrap gap-2">
-                                    {GENRES.map(g => (
-                                        <button
-                                            key={g}
-                                            type="button"
-                                            onClick={() => setGenre(genre === g ? '' : g)}
-                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 border ${
-                                                genre === g
-                                                    ? 'bg-[var(--accent)]/15 border-[var(--accent)]/50 text-[var(--accent)]'
-                                                    : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                                            }`}
-                                        >
-                                            {g}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Mood */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)]">Mood <span className="text-[var(--text-tertiary)]/50 normal-case">(optional)</span></label>
-                                <div className="flex flex-wrap gap-2">
-                                    {MOODS.map(m => (
-                                        <button
-                                            key={m}
-                                            type="button"
-                                            onClick={() => setMood(mood === m ? '' : m)}
-                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all active:scale-95 border ${
-                                                mood === m
-                                                    ? 'bg-[var(--accent)]/15 border-[var(--accent)]/50 text-[var(--accent)]'
-                                                    : 'bg-[var(--bg-secondary)] border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)]'
-                                            }`}
-                                        >
-                                            {m}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Action */}
                             <button
                                 type="submit"
                                 className="w-full h-12 bg-[var(--text-main)] text-[var(--bg-main)] rounded-2xl text-sm font-bold tracking-wide hover:opacity-90 active:scale-[0.98] transition-all"

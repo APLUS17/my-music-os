@@ -51,8 +51,7 @@ import {
     Copy,
     WandSparkles,
     Rows2,
-    Rocket,
-    ListPlus
+    ListPlus,
 } from 'lucide-react';
 import { MuseView } from './MuseView';
 import { processMuseSession } from '@/lib/muse/processMuseSession';
@@ -365,8 +364,6 @@ const StudioWorkspace: React.FC = () => {
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
-    const [projectGenre, setProjectGenre] = useState<string>('');
-    const [projectMood, setProjectMood] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState("");
     const [searchFilter, setSearchFilter] = useState<SearchFilter>('all');
     const [uploadedBeat, setUploadedBeat] = useState<string | null>(null);
@@ -424,11 +421,12 @@ const StudioWorkspace: React.FC = () => {
     }, [showSyllables]);
 
     // Editor layout preference: 'cards' (structured section cards) or 'open' (blank notes page)
+    // Moises view defaults to the minimal open editor — a saved preference still wins.
     const [editorLayout, setEditorLayout] = useState<'cards' | 'open'>(() => {
         if (typeof window !== 'undefined') {
-            return localStorage.getItem('lyriq_editor_layout') === 'open' ? 'open' : 'cards';
+            return localStorage.getItem('lyriq_editor_layout') === 'cards' ? 'cards' : 'open';
         }
-        return 'cards';
+        return 'open';
     });
 
     useEffect(() => {
@@ -1422,7 +1420,7 @@ const StudioWorkspace: React.FC = () => {
             const msg = error?.message || 'Unknown error';
             console.error("Muse analysis failed:", error);
             setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed', museError: msg } : s));
-            toast.error(`AI recap failed: ${msg}. Your audio is safe on device.`);
+            toast.error(`AI recap failed. Your audio is safe on device.`);
         }
     };
 
@@ -1759,7 +1757,7 @@ const StudioWorkspace: React.FC = () => {
         confirmNewProject(`Untitled Project ${savedProjects.length + 1}`);
     };
 
-    const confirmNewProject = (name: string, genre?: string, mood?: string) => {
+    const confirmNewProject = (name: string) => {
         setShowNewProjectModal(false);
         vocalAudioRef.current?.pause();
         beatAudioRef.current?.pause();
@@ -1772,8 +1770,6 @@ const StudioWorkspace: React.FC = () => {
         setActiveSessionId(null);
         setPlayingSessionId(null);
         setProjectTitle(name === 'Untitled Project' ? '' : name);
-        setProjectGenre(genre ?? '');
-        setProjectMood(mood ?? '');
         setUploadedBeat(null);
         setUploadedBeatName("");
         setActiveProjectId(null);
@@ -1879,7 +1875,6 @@ const StudioWorkspace: React.FC = () => {
   @media print { body { margin: 20px; } }
 </style></head><body>
 <h1>${projectTitle || 'Untitled'}</h1>
-<div class="meta">${projectGenre ? `Genre: ${projectGenre}` : ''} ${projectMood ? `· Mood: ${projectMood}` : ''}</div>
 ${sections.filter(s => s.text.trim()).map(s =>
     `<div class="section"><div class="label">${s.type}</div><div class="text">${s.text}</div></div>`
 ).join('')}
@@ -2068,7 +2063,8 @@ ${sections.filter(s => s.text.trim()).map(s =>
             // Non-blocking undo toast instead of a confirm gate — section deletes are a
             // routine part of structuring a song, so we make them instantly reversible
             // rather than interrupting the writing flow with a dialog every time.
-            toast(`${removed.type.charAt(0).toUpperCase() + removed.type.slice(1)} deleted`, {
+            toast(`${removed.type} removed`, {
+                duration: 2000,
                 action: {
                     label: 'Undo',
                     onClick: () => setSections(current => {
@@ -2077,6 +2073,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         return restored;
                     }),
                 },
+                style: { fontSize: '12px' },
             });
             return next;
         });
@@ -2636,13 +2633,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                 <Rows2 size={18} />
                             </button>
                             <button
-                                onClick={handleNewProject}
-                                title="New project"
-                                className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
-                            >
-                                <Rocket size={18} />
-                            </button>
-                            <button
                                 onClick={addSection}
                                 title="Add section"
                                 className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-main)] hover:bg-[var(--bg-hover)] active:scale-90 transition-all"
@@ -2749,12 +2739,12 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                     </motion.div>
                                                                 </motion.div>
                                                          ) : (
-                                                             <motion.div 
+                                                             <motion.div
                                                                  key="write-mode"
                                                                  initial={{ opacity: 0 }}
                                                                  animate={{ opacity: 1 }}
                                                                  exit={{ opacity: 0 }}
-                                                                 className="space-y-12"
+                                                                 className="space-y-6"
                                                              >
                                                                 {sections.map((section, idx) => (
                                                                     <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -2770,14 +2760,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                         />
                                                                     </motion.div>
                                                                 ))}
-                                                                <button
-                                                                    onClick={addSection}
-                                                                    className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
-                                                                >
-                                                                    <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                                    <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
-                                                                    <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                                </button>
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>
