@@ -3239,6 +3239,10 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 {showMusicPlayer && (
                     <MusicPlayer
                         onClose={() => setShowMusicPlayer(false)}
+                        onFXOpen={() => {
+                            setShowMusicPlayer(false);
+                            setShowFXPanel(true);
+                        }}
                         beatSrc={uploadedBeat}
                         vocalSessions={sessions}
                         projectTitle={projectTitle || "Untitled"}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Play, Pause, Volume2, SkipBack, SkipForward } from 'lucide-react';
+import { MessageSquare, Play, Pause, Sliders } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { RecordingSession } from '@/types';
 import { formatTime } from '@/lib/utils/time';
@@ -7,6 +7,7 @@ import { SyncedLyrics } from './SyncedLyrics';
 
 interface MusicPlayerProps {
   onClose: () => void;
+  onFXOpen?: () => void;
   beatSrc?: string | null;
   vocalSessions: RecordingSession[];
   projectTitle: string;
@@ -14,6 +15,7 @@ interface MusicPlayerProps {
 
 export const MusicPlayer: React.FC<MusicPlayerProps> = ({
   onClose,
+  onFXOpen,
   beatSrc,
   vocalSessions,
   projectTitle
@@ -162,158 +164,199 @@ export const MusicPlayer: React.FC<MusicPlayerProps> = ({
     }
   };
 
+  // Render timeline markers every 5 seconds
+  const timelineMarkers = React.useMemo(() => {
+    const markers = [];
+    const step = 5; // 5 second intervals
+    for (let i = 0; i <= duration; i += step) {
+      markers.push(i);
+    }
+    return markers;
+  }, [duration]);
+
+  const formatTimeMs = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 100);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-[var(--bg-main)] z-50 flex flex-col items-center justify-center overflow-hidden"
+      className="fixed inset-0 bg-[var(--bg-main)] z-50 flex flex-col overflow-hidden"
+      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all z-10"
-      >
-        <X size={20} />
-      </button>
-
-      {/* Content */}
-      <div className="w-full h-full flex flex-col items-center justify-center px-6 max-w-lg" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {/* Artwork / Visualization */}
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="w-48 h-48 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center mb-12 shadow-2xl"
-        >
-          <div className="text-center px-4">
-            <div className="text-3xl font-bold text-[var(--bg-main)] mb-2 truncate">{projectTitle}</div>
-            <div className="text-xs mono text-[var(--bg-main)]/70 uppercase tracking-wider">
-              {hasVocals ? `${vocalSessions.length} take${vocalSessions.length > 1 ? 's' : ''}` : 'No vocals'}
-            </div>
+      {/* Top Timeline Section */}
+      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-[var(--border-main)]">
+        {/* Timeline with markers */}
+        <div className="mb-6 relative">
+          <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mono mb-2 px-1">
+            {timelineMarkers.slice(0, 5).map((time, idx) => (
+              <span key={idx} className="flex-1">
+                {Math.floor(time / 60)}:{String(Math.floor(time % 60)).padStart(2, '0')}
+              </span>
+            ))}
           </div>
-        </motion.div>
-
-        {/* Title & Info */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-[var(--text-main)] mb-1">{projectTitle}</h2>
-          {hasVocals && currentVocal && (
-            <p className="text-sm text-[var(--text-secondary)]">
-              Take {currentTrackIndex + 1} of {vocalSessions.length} • {currentVocal.duration}
-            </p>
-          )}
-        </div>
-
-        {/* Synced transcript — scroll through the take instead of re-listening */}
-        {hasVocals && currentVocal?.lines && currentVocal.lines.length > 0 && (
-          <div className="w-full h-40 mb-6 relative">
-            <SyncedLyrics
-              lines={currentVocal.lines}
-              currentTime={progress}
-              onSeek={handleProgressChange}
-              className="h-40"
-            />
-          </div>
-        )}
-
-        {/* Progress Bar */}
-        <div className="w-full mb-6">
-          <input
-            type="range"
-            min="0"
-            max={duration || 0}
-            step="0.1"
-            value={progress}
-            onChange={(e) => handleProgressChange(parseFloat(e.target.value))}
-            className="w-full h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
-          />
-          <div className="flex items-center justify-between text-xs tabular-nums mono text-[var(--text-tertiary)] mt-2">
-            <span>{formatTime(progress)}</span>
-            <span>{formatTime(duration)}</span>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div className="flex items-center justify-center gap-6 mb-12">
-          {/* Previous Take */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handlePrevVocal}
-            disabled={currentTrackIndex === 0 || !hasVocals}
-            className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >
-            <SkipBack size={18} />
-          </motion.button>
-
-          {/* Play/Pause */}
-          <motion.button
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-            onClick={handlePlayPause}
-            disabled={!hasBeat && !hasVocals}
-            className="w-16 h-16 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          >
-            {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
-          </motion.button>
-
-          {/* Next Take */}
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleNextVocal}
-            disabled={currentTrackIndex === vocalSessions.length - 1 || !hasVocals}
-            className="w-11 h-11 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          >
-            <SkipForward size={18} />
-          </motion.button>
-        </div>
-
-        {/* Volume Control */}
-        <div className="w-full max-w-xs">
-          <div className="flex items-center gap-3">
-            <Volume2 size={14} className="text-[var(--text-secondary)]" />
+          {/* Progress slider with track */}
+          <div className="relative">
             <input
               type="range"
               min="0"
-              max="1"
-              step="0.05"
-              value={volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="flex-1 h-1 bg-[var(--bg-secondary)] rounded-lg appearance-none cursor-pointer slider"
+              max={duration || 0}
+              step="0.1"
+              value={progress}
+              onChange={(e) => handleProgressChange(parseFloat(e.target.value))}
+              className="w-full h-6 bg-transparent appearance-none cursor-pointer slider-ios rounded-lg"
               style={{ touchAction: 'none' }}
             />
           </div>
         </div>
 
-        {/* Audio Elements - always render to maintain Web Audio connection */}
-        <audio ref={beatAudioRef} src={beatSrc || undefined} className="hidden" crossOrigin="anonymous" />
-        <audio ref={vocalAudioRef} src={currentVocal?.audioUrl || currentVocal?.base64 || undefined} className="hidden" crossOrigin="anonymous" />
+        {/* Large Time Display */}
+        <div className="text-center">
+          <div className="text-5xl font-bold tabular-nums text-[var(--text-main)] tracking-tight font-mono">
+            {formatTimeMs(progress)}
+          </div>
+        </div>
+      </div>
 
-        {/* Status Messages */}
-        {!hasBeat && !hasVocals && (
-          <div className="text-center text-[var(--text-tertiary)] text-sm">
-            Upload a beat or record a vocal to get started
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-6">
+        {/* Synced transcript — scroll through the take instead of re-listening */}
+        {hasVocals && currentVocal?.lines && currentVocal.lines.length > 0 && (
+          <div className="w-full h-64 mb-6 relative max-w-lg">
+            <SyncedLyrics
+              lines={currentVocal.lines}
+              currentTime={progress}
+              onSeek={handleProgressChange}
+              className="h-64"
+            />
+          </div>
+        )}
+
+        {/* Project Info */}
+        {!hasVocals && (
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-[var(--text-main)] mb-2">{projectTitle}</h2>
+            <p className="text-sm text-[var(--text-tertiary)]">No vocals recorded yet</p>
           </div>
         )}
       </div>
 
+      {/* Controls Section */}
+      <div className="flex-shrink-0 px-6 py-8 border-t border-[var(--border-main)]">
+        {/* Play Controls - Skip back 15s, Play/Pause, Skip forward 15s */}
+        <div className="flex items-center justify-center gap-12 mb-12">
+          {/* Skip Back 15s */}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleProgressChange(Math.max(0, progress - 15))}
+            disabled={!hasVocals}
+            className="w-12 h-12 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            title="Rewind 15s"
+          >
+            <span className="text-xs font-bold">-15</span>
+          </motion.button>
+
+          {/* Play/Pause - Large Center Button */}
+          <motion.button
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            onClick={handlePlayPause}
+            disabled={!hasBeat && !hasVocals}
+            className="w-20 h-20 rounded-full bg-[var(--accent)] text-[var(--bg-main)] flex items-center justify-center shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
+          </motion.button>
+
+          {/* Skip Forward 15s */}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleProgressChange(Math.min(duration, progress + 15))}
+            disabled={!hasVocals}
+            className="w-12 h-12 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            title="Forward 15s"
+          >
+            <span className="text-xs font-bold">+15</span>
+          </motion.button>
+        </div>
+
+        {/* Bottom Toolbar - Transcription, Pause, FX */}
+        <div className="flex items-center justify-center gap-8">
+          {/* Transcription/Chat Button */}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              // Placeholder for transcription/chat functionality
+            }}
+            className="w-12 h-12 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all"
+            title="View transcription"
+          >
+            <MessageSquare size={18} />
+          </motion.button>
+
+          {/* Pause Button - Red Center (currently playing indicator) */}
+          <div className="w-16 h-16 rounded-full bg-red-500/20 border-2 border-red-500/50 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
+              <Pause size={14} fill="white" className="text-white" />
+            </div>
+          </div>
+
+          {/* FX Button */}
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onFXOpen || onClose}
+            className="w-12 h-12 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-main)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all"
+            title="Open effects"
+          >
+            <Sliders size={18} />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Audio Elements - always render to maintain Web Audio connection */}
+      <audio ref={beatAudioRef} src={beatSrc || undefined} className="hidden" crossOrigin="anonymous" />
+      <audio ref={vocalAudioRef} src={currentVocal?.audioUrl || currentVocal?.base64 || undefined} className="hidden" crossOrigin="anonymous" />
+
       <style>{`
-        .slider::-webkit-slider-thumb {
+        .slider-ios::-webkit-slider-thumb {
           appearance: none;
-          width: 12px;
-          height: 12px;
+          width: 18px;
+          height: 18px;
           border-radius: 50%;
           background: var(--accent);
           cursor: pointer;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
-        .slider::-moz-range-thumb {
-          width: 12px;
-          height: 12px;
+        .slider-ios::-webkit-slider-runnable-track {
+          background: linear-gradient(to right, var(--accent) 0%, var(--accent) calc(100% * ${progress / (duration || 1)}), var(--bg-secondary) calc(100% * ${progress / (duration || 1)}), var(--bg-secondary) 100%);
+          height: 6px;
+          border-radius: 3px;
+        }
+        .slider-ios::-moz-range-thumb {
+          width: 18px;
+          height: 18px;
           border-radius: 50%;
           background: var(--accent);
           cursor: pointer;
           border: none;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .slider-ios::-moz-range-track {
+          background: transparent;
+          border: none;
+        }
+        .slider-ios::-moz-range-progress {
+          background: var(--accent);
+          height: 6px;
+          border-radius: 3px;
         }
       `}</style>
     </motion.div>
