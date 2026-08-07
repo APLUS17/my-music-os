@@ -19,8 +19,7 @@ import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio, transcribeAudioChunks } from '@/lib/audio/audioIntelligence';
-import { analyzeAudioStructure } from '@/app/actions';
-import { AISuggestBar } from './AISuggestBar';
+import { analyzeVocalSections } from '@/app/actions';
 import { NewProjectModal } from './NewProjectModal';
 import { ConfirmDialog, ConfirmDialogState } from './ConfirmDialog';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1300,6 +1299,19 @@ const StudioWorkspace: React.FC = () => {
                 console.error('Audio intelligence error:', err.message);
             });
 
+            // Vocal section timestamping: runs for all takes >= 10s.
+            // Replaces SmartSplit's energy-based labels with human-readable ones.
+            const VOCAL_SECTION_MIN_SEC = 10;
+            if (duration >= VOCAL_SECTION_MIN_SEC) {
+                analyzeVocalSections(base64).then(result => {
+                    if (result.success && result.sections.length > 0) {
+                        setSessions(prev => prev.map(s =>
+                            s.id === id ? { ...s, sections: result.sections } : s
+                        ));
+                    }
+                }).catch(() => {});
+            }
+
             // Granola-style session recap: auto-generate for takes long enough to be
             // a real session (the shape a 45-min continuous recording will always match).
             if (duration >= MUSE_AUTO_ANALYZE_MIN_SEC) {
@@ -1797,14 +1809,6 @@ const StudioWorkspace: React.FC = () => {
         setViewMode('studio');
         setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
         setShowSearch(false);
-    };
-
-    const handleAISuggestInsert = (sectionId: string, line: string) => {
-        setSections(prev => prev.map(s => {
-            if (s.id !== sectionId) return s;
-            const trimmed = s.text.trimEnd();
-            return { ...s, text: trimmed ? `${trimmed}\n${line}` : line };
-        }));
     };
 
     const handleCopyAll = async () => {
@@ -3339,22 +3343,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 />
             )}
 
-            {/* AI Suggestion Strip */}
-            {viewMode === 'studio' && !showRecorder && !showFXPanel && (
-                <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[90] pointer-events-none">
-                    <div className="pointer-events-auto">
-                        <AISuggestBar
-                            activeSectionId={activeSectionId}
-                            sections={sections}
-                            projectTitle={projectTitle}
-                            genre={projectGenre}
-                            mood={projectMood}
-                            onInsert={handleAISuggestInsert}
-                            onDismiss={() => setActiveSectionId(null)}
-                        />
-                    </div>
-                </div>
-            )}
 
             {/* New Project Modal */}
             <NewProjectModal
