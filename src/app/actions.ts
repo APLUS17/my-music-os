@@ -479,7 +479,10 @@ export async function suggestLyricLine(params: {
     allSections: { type: string; text: string }[];
 }): Promise<{ suggestions: string[]; success: boolean; error?: string }> {
     try {
-        await getAuthenticatedClient();
+        // Intentionally no auth check here — this is a stateless AI call (nothing
+        // read/written for a specific user), and the rest of the app works fully
+        // without signing in. Gating it behind getAuthenticatedClient() used to
+        // make every guest's suggestion request fail silently with "Unauthorized".
         const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
         if (!apiKey) return { suggestions: [], success: false, error: 'API key missing' };
 

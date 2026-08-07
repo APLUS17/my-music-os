@@ -22,6 +22,7 @@ import { transcribeAudio, transcribeAudioChunks } from '@/lib/audio/audioIntelli
 import { analyzeAudioStructure } from '@/app/actions';
 import { AISuggestBar } from './AISuggestBar';
 import { NewProjectModal } from './NewProjectModal';
+import { ConfirmDialog, ConfirmDialogState } from './ConfirmDialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Clock,
@@ -48,7 +49,8 @@ import {
     Sun,
     Moon,
     Archive,
-    Sparkles
+    Sparkles,
+    Copy
 } from 'lucide-react';
 import { MuseView } from './MuseView';
 import { processMuseSession } from '@/lib/muse/processMuseSession';
@@ -360,6 +362,7 @@ const StudioWorkspace: React.FC = () => {
     const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+    const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
     const [projectGenre, setProjectGenre] = useState<string>('');
     const [projectMood, setProjectMood] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState("");
@@ -377,7 +380,6 @@ const StudioWorkspace: React.FC = () => {
     const beatAudioCtxRef = useRef<AudioContext | null>(null);
     const beatGainRef = useRef<GainNode | null>(null);
 
-    const [showPillOptions, setShowPillOptions] = useState(false);
     const [projectTitle, setProjectTitle] = useState("");
     const [projectBpm, setProjectBpm] = useState("120");
     const [projectKey, setProjectKey] = useState("C Min");
@@ -1495,9 +1497,14 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleDeleteSession = async (sessionId: string) => {
-        if (!confirm("Permanently delete this recording?")) return;
-        await deleteSessionImmediate(sessionId);
+    const handleDeleteSession = (sessionId: string) => {
+        setConfirmDialog({
+            title: "Delete this recording?",
+            description: "This permanently deletes the take. This can't be undone.",
+            destructive: true,
+            confirmLabel: "Delete",
+            onConfirm: () => { deleteSessionImmediate(sessionId); },
+        });
     };
 
     const handlePlayBeat = (beatId: string) => {
@@ -1516,9 +1523,17 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleDeleteBeat = async (beatId: string) => {
-        if (!confirm("Permanently delete this beat?")) return;
+    const handleDeleteBeat = (beatId: string) => {
+        setConfirmDialog({
+            title: "Delete this beat?",
+            description: "This permanently deletes the beat from your library. This can't be undone.",
+            destructive: true,
+            confirmLabel: "Delete",
+            onConfirm: () => { void performDeleteBeat(beatId); },
+        });
+    };
 
+    const performDeleteBeat = async (beatId: string) => {
         if (playingBeatId === beatId) {
             globalAudioRef.current?.pause();
             setPlayingBeatId(null);
@@ -1701,6 +1716,12 @@ const StudioWorkspace: React.FC = () => {
         setShowNewProjectModal(true);
     };
 
+    // Skips the New Project modal entirely — used by the Library empty-state
+    // "+" button so tapping it drops the user straight into a fresh workspace.
+    const handleQuickNewProject = () => {
+        confirmNewProject(`Untitled Project ${savedProjects.length + 1}`);
+    };
+
     const confirmNewProject = (name: string, genre?: string, mood?: string) => {
         setShowNewProjectModal(false);
         vocalAudioRef.current?.pause();
@@ -1729,52 +1750,53 @@ const StudioWorkspace: React.FC = () => {
     };
 
     const loadProject = (p: SavedProject) => {
-        if (window.confirm(`Load "${p.name}"? Workspace will sync.`)) {
-            // Auto-archive current work before switching
-            archiveCurrentProject();
+        // Auto-archive current work before switching — this is lossless (archiveCurrentProject
+        // saves the active session to savedProjects), so opening a song doesn't need a
+        // confirmation gate in front of it. That was pure friction on the single most
+        // common action in the Library.
+        archiveCurrentProject();
 
-            // Stop all audio playback before loading new project
-            vocalAudioRef.current?.pause();
-            beatAudioRef.current?.pause();
-            setIsPlaying(false);
-            setIsBeatPlaying(false);
+        // Stop all audio playback before loading new project
+        vocalAudioRef.current?.pause();
+        beatAudioRef.current?.pause();
+        setIsPlaying(false);
+        setIsBeatPlaying(false);
 
-            const activeCat = p.activeCategory || 'Notes';
-            setActiveCategory(activeCat);
+        const activeCat = p.activeCategory || 'Notes';
+        setActiveCategory(activeCat);
 
-            const initialCategorySections = p.categorySections || {};
-            CATEGORIES.forEach(cat => {
-                if (!initialCategorySections[cat]) {
-                    if (cat === 'Lyrics' && p.sections && p.sections.length > 0) {
-                        initialCategorySections[cat] = p.sections;
-                    } else {
-                        initialCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
-                    }
+        const initialCategorySections = p.categorySections || {};
+        CATEGORIES.forEach(cat => {
+            if (!initialCategorySections[cat]) {
+                if (cat === 'Lyrics' && p.sections && p.sections.length > 0) {
+                    initialCategorySections[cat] = p.sections;
+                } else {
+                    initialCategorySections[cat] = [{ id: randomId(), type: 'verse' as SectionType, repeats: 1, text: "" }];
                 }
-            });
-
-            setCategorySections(initialCategorySections);
-            setSections(initialCategorySections[activeCat]);
-
-            setScraps(p.scraps || []);
-            // Merge project sessions into global sessions if they aren't already there
-            if (p.sessions && p.sessions.length > 0) {
-                setSessions(prev => {
-                    const existingIds = new Set(prev.map(s => s.id));
-                    const newOnes = p.sessions.filter(s => !existingIds.has(s.id));
-                    return [...newOnes, ...prev];
-                });
             }
-            setActiveSessionId(null);
-            setPlayingSessionId(null);
-            setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
-            setUploadedBeat(p.beats?.[0]?.audioUrl || null);
-            setUploadedBeatName(p.beats?.[0]?.name || "");
-            setActiveProjectId(p.id);
-            setViewMode('studio');
-            setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
-            setShowSearch(false);
+        });
+
+        setCategorySections(initialCategorySections);
+        setSections(initialCategorySections[activeCat]);
+
+        setScraps(p.scraps || []);
+        // Merge project sessions into global sessions if they aren't already there
+        if (p.sessions && p.sessions.length > 0) {
+            setSessions(prev => {
+                const existingIds = new Set(prev.map(s => s.id));
+                const newOnes = p.sessions.filter(s => !existingIds.has(s.id));
+                return [...newOnes, ...prev];
+            });
         }
+        setActiveSessionId(null);
+        setPlayingSessionId(null);
+        setProjectTitle(p.name === "Untitled Project" ? "" : p.name);
+        setUploadedBeat(p.beats?.[0]?.audioUrl || null);
+        setUploadedBeatName(p.beats?.[0]?.name || "");
+        setActiveProjectId(p.id);
+        setViewMode('studio');
+        setStudioMode(initialCategorySections[activeCat]?.length > 0 ? 'write' : 'flow');
+        setShowSearch(false);
     };
 
     const handleAISuggestInsert = (sectionId: string, line: string) => {
@@ -1783,6 +1805,18 @@ const StudioWorkspace: React.FC = () => {
             const trimmed = s.text.trimEnd();
             return { ...s, text: trimmed ? `${trimmed}\n${line}` : line };
         }));
+    };
+
+    const handleCopyAll = async () => {
+        const content = sections
+            .map(s => `[${s.type.toUpperCase()}]\n${s.text}`)
+            .join('\n\n');
+        try {
+            await navigator.clipboard.writeText(content);
+            toast.success("Lyrics copied to clipboard");
+        } catch {
+            toast.error("Couldn't copy — your browser blocked clipboard access");
+        }
     };
 
     const handleExportTXT = () => {
@@ -1796,11 +1830,15 @@ const StudioWorkspace: React.FC = () => {
         a.download = `${projectTitle || 'lyrics'}.txt`;
         a.click();
         URL.revokeObjectURL(url);
+        toast.success("Downloaded as TXT");
     };
 
     const handleExportPDF = () => {
         const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
+        if (!printWindow) {
+            toast.error("Popup blocked — allow popups to export as PDF");
+            return;
+        }
         const html = `<!DOCTYPE html><html><head><title>${projectTitle || 'Lyrics'}</title>
 <style>
   body { font-family: Georgia, serif; max-width: 600px; margin: 40px auto; color: #111; line-height: 1.8; }
@@ -1992,7 +2030,28 @@ ${sections.filter(s => s.text.trim()).map(s =>
         setSections(newSections);
     };
 
-    const deleteSection = (id: string) => setSections(prev => prev.filter(s => s.id !== id));
+    const deleteSection = (id: string) => {
+        setSections(prev => {
+            const index = prev.findIndex(s => s.id === id);
+            if (index === -1) return prev;
+            const removed = prev[index];
+            const next = prev.filter(s => s.id !== id);
+            // Non-blocking undo toast instead of a confirm gate — section deletes are a
+            // routine part of structuring a song, so we make them instantly reversible
+            // rather than interrupting the writing flow with a dialog every time.
+            toast(`${removed.type.charAt(0).toUpperCase() + removed.type.slice(1)} deleted`, {
+                action: {
+                    label: 'Undo',
+                    onClick: () => setSections(current => {
+                        const restored = [...current];
+                        restored.splice(Math.min(index, restored.length), 0, removed);
+                        return restored;
+                    }),
+                },
+            });
+            return next;
+        });
+    };
 
     const createDefaultSections = (): LyricSection[] => [
         { id: randomId(), type: 'verse', repeats: 1, text: "" }
@@ -2183,65 +2242,17 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         </div>
 
                         {isEmpty ? (
-                            // Blank Start / Option States
+                            // Blank Start — tap "+" to jump straight into a new workspace
                             <div className="flex-1 flex flex-col items-center justify-center px-6 relative">
-                                <AnimatePresence mode="wait">
-                                    {!showPillOptions ? (
-                                        <motion.div
-                                            key="start-state"
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="flex flex-col items-center gap-4 cursor-pointer"
-                                            onClick={() => setShowPillOptions(true)}
-                                        >
-                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
-                                                <Plus size={36} className="text-white" />
-                                            </div>
-                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="option-state"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 10 }}
-                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
-                                        >
-                                            <button
-                                                onClick={() => {
-                                                    fabInputRef.current?.click();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <Music size={16} />
-                                                <span>Import</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    handleNewProject();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <FilePlus size={16} />
-                                                <span>New Song</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    handleRecordStart();
-                                                    setShowPillOptions(false);
-                                                }}
-                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
-                                            >
-                                                <Mic size={16} />
-                                                <span>Record</span>
-                                            </button>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                                <input ref={fabInputRef} type="file" accept="audio/*, .mp3, .wav" className="hidden" onChange={handleLibraryBeatUpload} />
+                                <motion.button
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    onClick={handleQuickNewProject}
+                                    className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                                    title="New Song"
+                                >
+                                    <Plus size={36} className="text-white" />
+                                </motion.button>
                             </div>
                         ) : (
                             // Populated State (Packs Grid View)
@@ -2268,53 +2279,15 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                     {libraryTab === 'songs' ? (
                                         savedProjects.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                                                <AnimatePresence mode="wait">
-                                                    {!showPillOptions ? (
-                                                        <motion.div
-                                                            key="tab-songs-start"
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            className="flex flex-col items-center gap-4 cursor-pointer"
-                                                            onClick={() => setShowPillOptions(true)}
-                                                        >
-                                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
-                                                                <Plus size={36} className="text-white" />
-                                                            </div>
-                                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
-                                                        </motion.div>
-                                                    ) : (
-                                                        <motion.div
-                                                            key="tab-songs-options"
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, y: 10 }}
-                                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
-                                                        >
-                                                            <button
-                                                                onClick={() => { fabInputRef.current?.click(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <Music size={16} />
-                                                                <span>Import</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleNewProject(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <FilePlus size={16} />
-                                                                <span>New Song</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleRecordStart(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <Mic size={16} />
-                                                                <span>Record</span>
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                <motion.button
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    onClick={handleQuickNewProject}
+                                                    className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                                                    title="New Song"
+                                                >
+                                                    <Plus size={36} className="text-white" />
+                                                </motion.button>
                                             </div>
                                         ) : (
                                         <div className="columns-2 gap-4 space-y-4 [column-fill:_balance] w-full">
@@ -2355,9 +2328,13 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (confirm(`Delete "${p.name || 'Untitled Project'}"?`)) {
-                                                                            deleteProject(p.id);
-                                                                        }
+                                                                        setConfirmDialog({
+                                                                            title: `Delete "${p.name || 'Untitled Project'}"?`,
+                                                                            description: "This permanently deletes the song and its lyrics. This can't be undone.",
+                                                                            destructive: true,
+                                                                            confirmLabel: "Delete",
+                                                                            onConfirm: () => deleteProject(p.id),
+                                                                        });
                                                                     }}
                                                                     className="text-[var(--text-tertiary)] hover:text-red-500 p-1 rounded hover:bg-red-500/10 transition-colors"
                                                                     title="Delete"
@@ -2377,53 +2354,15 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                     ) : (
                                         beats.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                                                <AnimatePresence mode="wait">
-                                                    {!showPillOptions ? (
-                                                        <motion.div
-                                                            key="tab-beats-start"
-                                                            initial={{ opacity: 0, scale: 0.95 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            exit={{ opacity: 0, scale: 0.95 }}
-                                                            className="flex flex-col items-center gap-4 cursor-pointer"
-                                                            onClick={() => setShowPillOptions(true)}
-                                                        >
-                                                            <div className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl">
-                                                                <Plus size={36} className="text-white" />
-                                                            </div>
-                                                            <span className="text-lg font-bold text-white tracking-wide">Add Your Music</span>
-                                                        </motion.div>
-                                                    ) : (
-                                                        <motion.div
-                                                            key="tab-beats-options"
-                                                            initial={{ opacity: 0, y: 10 }}
-                                                            animate={{ opacity: 1, y: 0 }}
-                                                            exit={{ opacity: 0, y: 10 }}
-                                                            className="bg-zinc-900 border border-white/10 rounded-2xl p-1 flex items-center shadow-2xl max-w-sm w-full divide-x divide-white/5"
-                                                        >
-                                                            <button
-                                                                onClick={() => { fabInputRef.current?.click(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-l-xl transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <Music size={16} />
-                                                                <span>Import</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleNewProject(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <FilePlus size={16} />
-                                                                <span>New Song</span>
-                                                            </button>
-                                                            <button
-                                                                onClick={() => { handleRecordStart(); setShowPillOptions(false); }}
-                                                                className="flex-1 py-4 flex items-center justify-center gap-2 hover:bg-white/5 rounded-r-xl transition-all text-white font-medium text-sm active:scale-98"
-                                                            >
-                                                                <Mic size={16} />
-                                                                <span>Record</span>
-                                                            </button>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
+                                                <motion.button
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    onClick={handleQuickNewProject}
+                                                    className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
+                                                    title="New Song"
+                                                >
+                                                    <Plus size={36} className="text-white" />
+                                                </motion.button>
                                             </div>
                                         ) : (
                                         <div className="grid grid-cols-2 gap-4">
@@ -2468,7 +2407,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                     e.stopPropagation();
                                                                     handlePlayBeat(beat.id);
                                                                 }}
-                                                                className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-[var(--border-main)] flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
+                                                                className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-[var(--border-main)] flex items-center justify-center text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
                                                             >
                                                                 {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                                                             </button>
@@ -2481,9 +2420,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (confirm(`Delete "${beat.name}"?`)) {
-                                                                        handleDeleteBeat(beat.id);
-                                                                    }
+                                                                    handleDeleteBeat(beat.id);
                                                                 }}
                                                                 className="text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
                                                             >
@@ -3247,7 +3184,13 @@ ${sections.filter(s => s.text.trim()).map(s =>
                             {sections.some(s => s.text.trim()) && (
                                 <div className="pt-2 space-y-2">
                                     <div className="text-[10px] mono uppercase tracking-widest text-[var(--text-tertiary)] px-1">Export</div>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            onClick={() => { setIsSidebarOpen(false); handleCopyAll(); }}
+                                            className="flex items-center justify-center gap-2 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] rounded-xl text-xs font-medium transition-all active:scale-95 cursor-pointer"
+                                        >
+                                            <Copy size={13} /> Copy
+                                        </button>
                                         <button
                                             onClick={() => { setIsSidebarOpen(false); handleExportTXT(); }}
                                             className="flex items-center justify-center gap-2 py-2.5 bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[var(--text-secondary)] hover:text-[var(--text-main)] rounded-xl text-xs font-medium transition-all active:scale-95 cursor-pointer"
@@ -3418,6 +3361,12 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 isOpen={showNewProjectModal}
                 onConfirm={confirmNewProject}
                 onCancel={() => setShowNewProjectModal(false)}
+            />
+
+            {/* Themed confirm dialog — replaces native window.confirm() everywhere */}
+            <ConfirmDialog
+                state={confirmDialog}
+                onCancel={() => setConfirmDialog(null)}
             />
         </div>
     );

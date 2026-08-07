@@ -23,6 +23,7 @@ import { RecordingSession, MuseSegmentType, MuseManifest } from '@/types';
 import { generateId } from '@/lib/utils/id';
 import { useMuseRecorder } from '@/hooks/useMuseRecorder';
 import { useActiveBeatSection } from './useActiveBeatSection';
+import { ConfirmDialog, ConfirmDialogState } from './ConfirmDialog';
 
 // Meta definitions for segments (colors, names, emojis)
 export const MUSE_TYPE_META: Record<MuseSegmentType, { name: string; color: string; emoji: string; bg: string }> = {
@@ -43,7 +44,7 @@ interface MuseViewProps {
     currentTime: number;
     onPlaySession: (id: string, seekTime?: number) => void;
     onPauseSession: () => void;
-    onDeleteSession: (id: string) => Promise<void>;
+    onDeleteSession: (id: string) => void;
     onSaveMuseSession: (recording: { id: string; blob: Blob; duration: number; mimeType: string }) => Promise<string>;
     onRetryAnalysis: (sessionId: string) => Promise<void>;
     onRecoverSession: (manifest: MuseManifest) => Promise<void>;
@@ -67,6 +68,7 @@ export function MuseView({
     const [recoveryManifests, setRecoveryManifests] = useState<MuseManifest[]>([]);
     const [isRecovering, setIsRecovering] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
     const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     const recorder = useMuseRecorder();
@@ -951,12 +953,16 @@ export function MuseView({
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                if (confirm('Delete this session?')) {
-                                                                    onDeleteSession(session.id);
-                                                                }
+                                                                setConfirmDialog({
+                                                                    title: "Delete this session?",
+                                                                    description: "This permanently deletes the recording. This can't be undone.",
+                                                                    destructive: true,
+                                                                    confirmLabel: "Delete",
+                                                                    onConfirm: () => onDeleteSession(session.id),
+                                                                });
                                                             }}
                                                             aria-label="Delete session"
-                                                            className="text-[var(--text-tertiary)] hover:text-[var(--studio-red)] p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-0 group-hover:opacity-100"
+                                                            className="text-[var(--text-tertiary)] hover:text-[var(--studio-red)] p-2 rounded-xl hover:bg-[var(--bg-card)] transition-all opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
                                                         >
                                                             <Trash2 className="w-4 h-4" />
                                                         </button>
@@ -992,6 +998,8 @@ export function MuseView({
             </div>
         </div>
         </div>
+
+        <ConfirmDialog state={confirmDialog} onCancel={() => setConfirmDialog(null)} />
         </div>
     );
 }

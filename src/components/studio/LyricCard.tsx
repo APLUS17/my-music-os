@@ -78,7 +78,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   onSectionBlur,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
+  const [, setIsFocused] = useState(false);
   const [pendingFocus, setPendingFocus] = useState<{ index: number; caretPos: number } | null>(null);
 
   const lines = section.text.split('\n');
@@ -182,8 +182,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
 
   return (
     <div className={cn(
-      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]",
-      isFocused && "bg-[var(--bg-secondary)]"
+      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]"
     )}>
       <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
@@ -198,7 +197,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-md px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-main)] rounded-md px-1 py-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
             <button 
               onClick={() => onMove(section.id, 'up')} 
               className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all hover:scale-110 active:scale-90 cursor-pointer"
@@ -217,7 +216,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
           </div>
           <button 
             onClick={() => onDelete(section.id)} 
-            className="p-1 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
+            className="p-1 text-[var(--text-tertiary)] hover:text-red-400 hover:bg-red-500/10 rounded-md transition-all duration-300 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 active:scale-90 cursor-pointer"
             title="Delete section"
           >
             <X size={12} />
