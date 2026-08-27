@@ -7,6 +7,7 @@ import {
     museResponseSchema,
     MUSE_MODEL
 } from '@/lib/muse/museSchema';
+import { transcribeMuseSession, MUSE_TRANSCRIBE_MODEL } from '@/lib/muse/transcribeSession';
 
 export const maxDuration = 300; // Vercel Fluid Compute timeout (5 min)
 
@@ -65,7 +66,13 @@ const supabase = await createClient();
             }
         }
 
-        const promptText = buildMusePrompt(durationSec);
+        // 2. Transcribe first (Gemini 3.5 Transcribe) so the segmentation
+        // pass below can ground its quotes/labels in real words instead of
+        // inferring them purely from audio. Best-effort — falls back to
+        // audio-only segmentation if unavailable.
+        const transcript = await transcribeMuseSession(ai, fileUri, mimeType);
+
+        const promptText = buildMusePrompt(durationSec, transcript);
         const generateResponse = await ai.models.generateContent({
             model: MUSE_MODEL,
             contents: [
@@ -85,6 +92,11 @@ const supabase = await createClient();
 
         const responseText = generateResponse.text || '';
         const { segments, recap } = mapMuseResponse(responseText, durationSec);
+
+        if (transcript) {
+            recap.transcript = transcript;
+            recap.transcriptionModel = MUSE_TRANSCRIBE_MODEL;
+        }
 
         return NextResponse.json({ success: true, segments, recap });
     } catch (e: any) {
