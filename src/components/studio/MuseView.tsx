@@ -17,7 +17,8 @@ import {
     Calendar,
     FileAudio,
     Upload,
-    Menu
+    Menu,
+    ChevronDown
 } from 'lucide-react';
 import { RecordingSession, MuseSegmentType, MuseManifest } from '@/types';
 import { generateId } from '@/lib/utils/id';
@@ -69,6 +70,7 @@ export function MuseView({
     const [isRecovering, setIsRecovering] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+    const [showTranscript, setShowTranscript] = useState(false);
     const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     const recorder = useMuseRecorder();
@@ -609,6 +611,28 @@ export function MuseView({
                             <p className="text-[var(--text-secondary)] text-sm leading-relaxed italic">
                                 &ldquo;{recap.summary}&rdquo;
                             </p>
+                        </div>
+                    )}
+
+                    {/* Full Transcript (Gemini 3.5 Transcribe) */}
+                    {recap?.transcript && (
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl mt-3 overflow-hidden">
+                            <button
+                                onClick={() => setShowTranscript(v => !v)}
+                                className="w-full flex items-center justify-between p-4 text-left"
+                            >
+                                <span className="text-xs font-bold text-[var(--text-tertiary)] uppercase tracking-wide">
+                                    Full Transcript
+                                </span>
+                                <ChevronDown
+                                    className={`w-4 h-4 text-[var(--text-tertiary)] transition-transform ${showTranscript ? 'rotate-180' : ''}`}
+                                />
+                            </button>
+                            {showTranscript && (
+                                <pre className="whitespace-pre-wrap font-mono text-xs text-[var(--text-secondary)] leading-relaxed px-4 pb-4 max-h-64 overflow-y-auto">
+                                    {recap.transcript}
+                                </pre>
+                            )}
                         </div>
                     )}
                 </div>

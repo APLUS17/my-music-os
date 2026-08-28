@@ -97,9 +97,13 @@ export interface MuseResponseRaw {
     }[];
 }
 
-export function buildMusePrompt(durationSec: number): string {
+export function buildMusePrompt(durationSec: number, transcript?: string | null): string {
+    const transcriptBlock = transcript
+        ? `\n\nA verbatim, speaker-labeled transcript of this session (from Gemini 3.5 Transcribe) is provided below. Ground your "quote" fields and labels in what was actually said — don't invent or paraphrase lyrics/dialogue that isn't in it. Speaker labels (spk_1, spk_2, ...) and timestamps are approximate.\n\n---TRANSCRIPT START---\n${transcript}\n---TRANSCRIPT END---`
+        : '';
+
     return `You are Muse, an automatic studio-session logger and creative assistant.
-Analyze this audio recording of a music studio session. The total duration is ${durationSec} seconds.
+Analyze this audio recording of a music studio session. The total duration is ${durationSec} seconds.${transcriptBlock}
 
 Your main goal is to segment the ENTIRE timeline into contiguous, non-overlapping segments.
 Each segment must be classified as one of these 8 types:

@@ -79,6 +79,10 @@ export interface MuseRecap {
     stats: Partial<Record<MuseSegmentType, number>>; // seconds/type, computed client-side
     generatedAt: string;
     model: string;
+    /** Full speaker-labeled, timestamped transcript from Gemini 3.5 Transcribe, when available. */
+    transcript?: string;
+    /** Model that produced `transcript`, e.g. "gemini-3.5-transcribe". Absent if transcription was unavailable/skipped. */
+    transcriptionModel?: string;
 }
 
 export type MuseStatus = 'recorded' | 'uploading' | 'analyzing' | 'complete' | 'failed';
