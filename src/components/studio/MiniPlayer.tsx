@@ -73,7 +73,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                                 minWidth: 44,
                                 minHeight: 44,
                                 background: 'var(--accent)',
-                                boxShadow: isPlaying ? '0 0 14px rgba(127,255,0,0.45)' : '0 0 0 rgba(0,0,0,0)',
+                                boxShadow: isPlaying ? '0 0 14px rgba(180,255,57,0.4)' : '0 0 0 rgba(0,0,0,0)',
                                 touchAction: 'manipulation',
                                 /* CSS animation so play-state preserves rotation angle when paused */
                                 animationName: 'spin',
@@ -179,7 +179,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                             <motion.button
                                 onClick={(e) => { e.stopPropagation(); onTogglePlay(); }}
                                 whileTap={{ scale: 0.88 }}
-                                className="w-11 h-11 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 cursor-pointer shadow-[0_0_16px_rgba(127,255,0,0.25)]"
+                                className="w-11 h-11 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 cursor-pointer shadow-[0_0_16px_rgba(180,255,57,0.22)]"
                                 style={{ touchAction: 'manipulation', minWidth: 44, minHeight: 44 }}
                                 aria-label={isPlaying ? 'Pause' : 'Play'}
                             >

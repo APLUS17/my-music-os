@@ -45,8 +45,6 @@ import {
     Library,
     Disc,
     History,
-    Sun,
-    Moon,
     Archive,
     Sparkles,
     Copy
@@ -73,7 +71,6 @@ import {
 
 type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'muse';
 type LibraryTab = 'songs' | 'beats';
-type Theme = 'dark' | 'light' | 'midnight' | 'matrix' | 'sonar' | 'moises';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -326,13 +323,6 @@ const CATEGORIES = [
 
 const StudioWorkspace: React.FC = () => {
     const [latencyCompensation, setLatencyCompensation] = useState<number>(50); // ms
-    const [theme, setTheme] = useState<Theme>('dark');
-    const cycleTheme = () => {
-        const themes: Theme[] = ['dark', 'light', 'midnight', 'matrix', 'sonar', 'moises'];
-        const currentIndex = themes.indexOf(theme);
-        const nextIndex = (currentIndex + 1) % themes.length;
-        setTheme(themes[nextIndex]);
-    };
     const [viewMode, setViewMode] = useState<ViewMode>('home');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [previousViewMode, setPreviousViewMode] = useState<ViewMode>('home');
@@ -2101,17 +2091,11 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         <div className="space-y-8 overflow-y-auto pb-20">
                             <section>
                                 <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Appearance</h2>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {['dark', 'light', 'midnight', 'matrix', 'sonar', 'moises'].map((t) => (
-                                        <button
-                                            key={t}
-                                            onClick={() => setTheme(t as Theme)}
-                                            className={`p-4 rounded-lg border flex items-center justify-between transition-all capitalize ${theme === t ? 'bg-[var(--bg-card)] border-[var(--accent)]' : 'bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)]'}`}
-                                        >
-                                            <span className="text-sm font-medium text-[var(--text-main)]">{t}</span>
-                                            {theme === t && <Check size={16} className="text-[var(--accent)]" />}
-                                        </button>
-                                    ))}
+                                <div className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)]">
+                                    <h3 className="text-sm font-medium text-[var(--text-main)]">Lyriq Black</h3>
+                                    <p className="text-xs text-[var(--text-tertiary)] mt-1 max-w-[280px]">
+                                        There's one look, tuned for the words on the page. No theme picker to fuss with.
+                                    </p>
                                 </div>
                             </section>
 
@@ -2223,24 +2207,17 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                 >
                                     <Menu size={20} />
                                 </button>
-                                <span id="tour-nav-library" className="text-xl font-black tracking-tight uppercase text-[var(--text-main)]">LYRIQ</span>
+                                <span id="tour-nav-library" className="text-lg font-semibold tracking-tight text-[var(--text-main)]">Lyriq</span>
                             </div>
-                            <button
-                                onClick={cycleTheme}
-                                className="w-10 h-10 rounded-xl flex items-center justify-center text-zinc-300 hover:text-white transition-all cursor-pointer active:scale-95"
-                                title="Cycle Theme"
-                            >
-                                {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                            </button>
                         </div>
 
                         {/* Library Header Greeting */}
-                        <div className="px-6 mb-4">
-                            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-main)] animate-in fade-in slide-in-from-top-4 duration-300">My Library</h1>
-                            <p className="text-xs text-[var(--text-secondary)] mt-1 animate-in fade-in duration-300">
-                                {savedProjects.length === 0 
-                                    ? "No songs saved yet. Click the + or use Quick Capture to start creating."
-                                    : `You have ${savedProjects.length} song${savedProjects.length === 1 ? '' : 's'} in your catalog.`
+                        <div className="px-6 mb-6">
+                            <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-main)] animate-in fade-in slide-in-from-top-4 duration-300">Library</h1>
+                            <p className="text-sm text-[var(--text-tertiary)] mt-1 animate-in fade-in duration-300">
+                                {savedProjects.length === 0
+                                    ? "Nothing yet. Tap + to start a song."
+                                    : `${savedProjects.length} song${savedProjects.length === 1 ? '' : 's'}`
                                 }
                             </p>
                         </div>
@@ -2370,63 +2347,47 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                             </div>
                                         ) : (
                                         <div className="grid grid-cols-2 gap-4">
-                                            {beats.map((beat, index) => {
-                                                const gradients = [
-                                                    'from-zinc-900 to-zinc-950',
-                                                    'from-stone-900 to-zinc-950'
-                                                ];
-                                                const gradientClass = gradients[index % gradients.length];
+                                            {beats.map((beat) => {
                                                 const isPlaying = playingBeatId === beat.id;
 
                                                 return (
-                                                    <div key={beat.id} className="flex flex-col gap-2 group relative">
+                                                    <div key={beat.id} className="flex flex-col gap-2.5 group relative">
                                                         <div
                                                             onClick={() => handleStartProjectFromBeat(beat)}
-                                                            className="aspect-square w-full relative group"
+                                                            className="aspect-square w-full relative group rounded-2xl overflow-hidden cursor-pointer"
                                                         >
-                                                            {/* Silvery Metallic Vinyl Record */}
-                                                            <motion.div
-                                                                animate={isPlaying ? { rotate: 360 } : { rotate: 0 }}
-                                                                transition={isPlaying ? { repeat: Infinity, duration: 4, ease: "linear" } : { duration: 0.5 }}
-                                                                className={`w-full h-full rounded-full bg-[conic-gradient(from_0deg,_#a1a1aa,_#e4e4e7,_#71717a,_#e4e4e7,_#a1a1aa)] border ${isPlaying ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(255,255,255,0.15)]' : 'border-[var(--border-main)]'} relative overflow-hidden flex items-center justify-center shadow-2xl cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all`}
+                                                            <div
+                                                                className={`w-full h-full flex items-center justify-center transition-all ${isPlaying ? 'bg-[var(--accent)]' : 'bg-[var(--bg-card)] border border-[var(--border-main)] group-hover:border-[var(--border-strong)]'}`}
                                                             >
-                                                                {/* Grooves */}
-                                                                <div className="absolute inset-1.5 rounded-full border border-black/15" />
-                                                                <div className="absolute inset-4 rounded-full border border-black/15" />
-                                                                <div className="absolute inset-7 rounded-full border border-black/10" />
-                                                                <div className="absolute inset-10 rounded-full border border-black/10" />
-                                                                <div className="absolute inset-13 rounded-full border border-black/5" />
-                                                                <div className="absolute inset-16 rounded-full border border-black/5" />
-                                                                
-                                                                {/* Center Label (Colored vinyl label) */}
-                                                                <div className="w-1/3 h-1/3 rounded-full bg-zinc-800 border border-black/30 flex items-center justify-center relative shadow-inner">
-                                                                    {/* Spindle hole */}
-                                                                    <div className="w-3 h-3 rounded-full bg-black border border-zinc-700 shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]" />
-                                                                </div>
-                                                            </motion.div>
-                                                            
-                                                            {/* Play Button Overlay */}
+                                                                <Disc
+                                                                    size={28}
+                                                                    strokeWidth={1.25}
+                                                                    className={isPlaying ? 'text-black' : 'text-[var(--text-tertiary)]'}
+                                                                />
+                                                            </div>
+
+                                                            {/* Play control — always reachable, quiet until touched */}
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handlePlayBeat(beat.id);
                                                                 }}
-                                                                className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-[var(--border-main)] flex items-center justify-center text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all hover:bg-black/60 active:scale-90"
+                                                                className={`absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${isPlaying ? 'bg-black/20 text-black' : 'bg-black/50 backdrop-blur-md text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100'}`}
                                                             >
-                                                                {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
+                                                                {isPlaying ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" className="ml-0.5" />}
                                                             </button>
                                                         </div>
-                                                        <div className="flex items-start justify-between px-1">
+                                                        <div className="flex items-start justify-between px-0.5">
                                                             <div className="min-w-0">
-                                                                <h3 className="text-xs font-semibold text-[var(--text-main)] truncate">{beat.name}</h3>
-                                                                <span className="text-[10px] text-[var(--text-secondary)] font-medium tracking-wide">Beat · {beat.duration}</span>
+                                                                <h3 className="text-xs font-medium text-[var(--text-main)] truncate">{beat.name}</h3>
+                                                                <span className="text-[11px] text-[var(--text-tertiary)] tracking-wide">{beat.duration}</span>
                                                             </div>
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDeleteBeat(beat.id);
                                                                 }}
-                                                                className="text-[var(--text-secondary)] hover:text-[var(--text-main)] p-1"
+                                                                className="text-[var(--text-tertiary)] hover:text-[var(--text-main)] p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                                             >
                                                                 <span className="text-sm font-bold leading-none">···</span>
                                                             </button>
@@ -2448,16 +2409,16 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                     initial={{ opacity: 0, scale: 0.95, y: 15 }}
                                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                                                    className="bg-[#e4ece9] text-black border border-white/20 rounded-2xl p-2 flex flex-col gap-1 shadow-2xl min-w-[160px]"
+                                                    className="bg-[var(--bg-elevated)] text-[var(--text-main)] border border-[var(--border-main)] rounded-2xl p-1.5 flex flex-col gap-0.5 shadow-2xl min-w-[168px]"
                                                 >
                                                     <button
                                                         onClick={() => {
                                                             fabInputRef.current?.click();
                                                             setFabOpen(false);
                                                         }}
-                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
-                                                        <Music size={16} />
+                                                        <Music size={16} className="text-[var(--text-secondary)]" />
                                                         <span>Import</span>
                                                     </button>
                                                     <button
@@ -2465,9 +2426,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                             handleNewProject();
                                                             setFabOpen(false);
                                                         }}
-                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
-                                                        <FilePlus size={16} />
+                                                        <FilePlus size={16} className="text-[var(--text-secondary)]" />
                                                         <span>New Song</span>
                                                     </button>
                                                     <button
@@ -2475,9 +2436,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                             handleRecordStart();
                                                             setFabOpen(false);
                                                         }}
-                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-xl transition-all text-sm font-medium w-full text-left"
+                                                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 rounded-xl transition-all text-sm font-medium w-full text-left"
                                                     >
-                                                        <Mic size={16} />
+                                                        <Mic size={16} className="text-[var(--studio-red)]" />
                                                         <span>Record</span>
                                                     </button>
                                                 </motion.div>
@@ -2486,9 +2447,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
 
                                         <button
                                             onClick={() => setFabOpen(!fabOpen)}
-                                            className="w-14 h-14 bg-white text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                                            className="w-14 h-14 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all"
                                         >
-                                            {fabOpen ? <X size={28} strokeWidth={2.5} /> : <Plus size={28} strokeWidth={2.5} />}
+                                            {fabOpen ? <X size={26} strokeWidth={2.5} /> : <Plus size={26} strokeWidth={2.5} />}
                                         </button>
                                     </div>
                                 </div>
@@ -2712,71 +2673,35 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                     exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
                                                                     className="flex flex-col items-center justify-center min-h-[60vh] text-center px-12 relative"
                                                                 >
-                                                                    {/* Abstract Background Shapes */}
-                                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[400px] h-[400px] bg-[var(--accent)] opacity-[0.03] blur-[100px] rounded-full" />
-                                                                    <div className="absolute top-1/4 right-1/4 -z-10 w-[200px] h-[200px] bg-blue-500 opacity-[0.02] blur-[80px] rounded-full animate-pulse" />
-                                                                
-                                                                    <div className="w-32 h-32 rounded-[40px] border border-[var(--border-main)] flex items-center justify-center mb-10 relative overflow-hidden group">
-                                                                        <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent)] to-transparent opacity-[0.05] group-hover:opacity-10 transition-opacity" />
-                                                                        <div className="absolute inset-0 rounded-[40px] border border-[var(--border-subtle)]" />
-                                                                        <PenTool size={40} className="text-[var(--accent)] opacity-50 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500" />
-                                                                    
-                                                                        {/* Orbiting particles animation */}
-                                                                        <motion.div 
-                                                                            animate={{ rotate: 360 }}
-                                                                            transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                                                                            className="absolute inset-0 border border-dashed border-[var(--accent)]/10 rounded-full scale-150 pointer-events-none"
-                                                                        />
-                                                                    </div>
+                                                                    <PenTool size={28} strokeWidth={1.5} className="text-[var(--text-tertiary)] mb-8" />
 
-                                                                    <motion.h2 
-                                                                        initial={{ opacity: 0, y: 10 }}
+                                                                    <motion.h2
+                                                                        initial={{ opacity: 0, y: 8 }}
                                                                         animate={{ opacity: 1, y: 0 }}
-                                                                        transition={{ delay: 0.2 }}
-                                                                        className="text-4xl font-bold tracking-tight text-[var(--text-main)] mb-4 bg-clip-text text-transparent bg-gradient-to-b from-[var(--text-main)] to-[var(--text-secondary)]"
+                                                                        transition={{ delay: 0.1 }}
+                                                                        className="text-2xl font-semibold tracking-tight text-[var(--text-main)] mb-3"
                                                                     >
-                                                                        Capture the Flow
+                                                                        Start writing
                                                                     </motion.h2>
-                                                                
-                                                                    <motion.p 
-                                                                        initial={{ opacity: 0, y: 10 }}
+
+                                                                    <motion.p
+                                                                        initial={{ opacity: 0, y: 8 }}
                                                                         animate={{ opacity: 1, y: 0 }}
-                                                                        transition={{ delay: 0.3 }}
-                                                                        className="text-sm text-[var(--text-secondary)] leading-relaxed mb-12 max-w-sm mx-auto"
+                                                                        transition={{ delay: 0.15 }}
+                                                                        className="text-sm text-[var(--text-tertiary)] leading-relaxed mb-10 max-w-xs mx-auto"
                                                                     >
-                                                                        Your creative canvas is ready. Start with a loose thought, a hum, or a bold first verse.
+                                                                        A loose thought, a hum, a first line. No structure required yet.
                                                                     </motion.p>
 
                                                                     <motion.button
-                                                                        initial={{ opacity: 0, y: 20 }}
+                                                                        initial={{ opacity: 0, y: 8 }}
                                                                         animate={{ opacity: 1, y: 0 }}
-                                                                        transition={{ delay: 0.4 }}
+                                                                        transition={{ delay: 0.2 }}
                                                                         onClick={addSection}
-                                                                        className="px-10 h-14 bg-[var(--text-main)] text-[var(--bg-main)] rounded-full font-bold flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-md"
+                                                                        className="px-8 h-12 bg-[var(--accent)] text-black rounded-full font-medium text-sm flex items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all"
                                                                     >
-                                                                        <Plus size={20} strokeWidth={3} /> Start Writing
+                                                                        <Plus size={16} strokeWidth={2.5} /> Start writing
                                                                     </motion.button>
-                                                                
-                                                                    {/* Optional quick start types */}
-                                                                    <motion.div 
-                                                                        initial={{ opacity: 0 }}
-                                                                        animate={{ opacity: 1 }}
-                                                                        transition={{ delay: 0.6 }}
-                                                                        className="mt-16 flex items-center gap-6 text-[var(--text-tertiary)]"
-                                                                    >
-                                                                        <span className="text-[10px] mono uppercase tracking-widest">Quick Start:</span>
-                                                                        <div className="flex gap-4">
-                                                                            {['Verse', 'Chorus', 'Idea'].map(type => (
-                                                                                <button 
-                                                                                    key={type}
-                                                                                    onClick={addSection}
-                                                                                    className="text-xs hover:text-[var(--accent)] transition-colors"
-                                                                                >
-                                                                                    {type}
-                                                                                </button>
-                                                                            ))}
-                                                                        </div>
-                                                                    </motion.div>
                                                                 </motion.div>
                                                          ) : (
                                                              <motion.div 
@@ -2938,7 +2863,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
 
 
     return (
-        <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none transition-colors duration-500" data-theme={theme}>
+        <div className="h-[100dvh] w-full bg-[var(--bg-main)] text-[var(--text-main)] flex flex-col items-center overflow-hidden select-none">
             <main
                 className="w-full flex-1 max-w-lg overflow-hidden bg-[var(--bg-main)] border-x border-[var(--border-main)] shadow-2xl transition-all duration-500 ease-out flex flex-col"
             >

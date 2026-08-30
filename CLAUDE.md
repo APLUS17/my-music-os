@@ -222,6 +222,7 @@ Theming is done via CSS variables in `globals.css`. All 5 themes switch at the `
 
 | File | Contents |
 |---|---|
+| `ESSENCE_REDESIGN.md` | The Jobs/Ive-style redesign: what was cut, what stayed, and why |
 | `DESIGN.md` | Design system, colors, typography, component patterns |
 | `MVP_GAP_ANALYSIS.md` | Phase 1 readiness assessment, P0/P1 gap list |
 | `FLOW_WRITE_SYNC.md` | Dual-mode architecture and sync mechanics |

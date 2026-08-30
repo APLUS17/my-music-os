@@ -1,58 +1,69 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* 
+/*
    ---break---
 */
 @custom-variant dark (&:is(.dark *));
 
-/* 
-   LYRIQ STUDIO THEMES 
-   Deterministic CSS Variables for the BLAST Framework overhaul.
+/*
+   LYRIQ — ESSENCE
+   One material. One accent. No configuration.
+
+   There used to be six themes here. Cutting five of them was the
+   redesign — a chooser is a feature you built instead of a decision
+   you made. What's left is the one that was always right: true black,
+   a single acid-green accent spent only on things that are alive
+   (recording, playing, selected, focused), and enough restraint that
+   the words on the page are the only thing competing for attention.
 */
 
 :root {
-    /* Premium Dark Neutrals */
-    --bg-main: hsl(240, 6%, 10%);
-    --bg-card: hsl(240, 5%, 12%);
-    --bg-secondary: hsl(240, 5%, 14%);
-    --bg-elevated: hsl(240, 5%, 18%);
-    --bg-hover: hsla(0, 0%, 100%, 0.08);
+    /* True-black neutrals — an OLED-honest surface, not a "dark gray" pretending to be one */
+    --bg-main: #000000;
+    --bg-card: #0A0A0A;
+    --bg-secondary: #121212;
+    --bg-elevated: #1C1C1E;
+    --bg-hover: hsla(0, 0%, 100%, 0.06);
 
-    /* Borders & Accents */
-    --border-main: hsla(0, 0%, 100%, 0.12);
-    --border-subtle: hsla(0, 0%, 100%, 0.06);
-    --border-strong: hsla(0, 0%, 100%, 0.20);
+    /* Borders & Accents — hairlines, not boxes */
+    --border-main: hsla(0, 0%, 100%, 0.10);
+    --border-subtle: hsla(0, 0%, 100%, 0.05);
+    --border-strong: hsla(0, 0%, 100%, 0.18);
     --border-focus: hsla(0, 0%, 100%, 0.30);
 
     /* Text Hierarchy */
-    --text-main: #FFFFFF;
-    --text-secondary: #A1A1AA;
-    --text-tertiary: #71717A;
-    --text-muted: #52525B;
+    --text-main: #F5F5F3;
+    --text-secondary: #8E8E93;
+    --text-tertiary: #636366;
+    --text-muted: #48484A;
 
-    --accent: #3b82f6; /* Secondary Blue */
-    --accent-dim: rgba(59, 130, 246, 0.4);
-    --studio-red: #FF003C;
+    /* One accent, spent sparingly: the primary action, the active state, the live signal */
+    --accent: #B4FF39;
+    --accent-dim: rgba(180, 255, 57, 0.35);
+    --accent-foreground-strong: #050700;
 
-    --shark-blue: #007AB8;
-    --shark-blue-dim: rgba(0, 122, 184, 0.25);
+    /* Reserved for record / destructive — never confused with the brand accent */
+    --studio-red: #FF3B30;
 
-    /* Deep Glassmorphism Tokens */
-    --glass: hsla(0, 0%, 0%, 0.5);
-    --glass-border: hsla(0, 0%, 100%, 0.15);
-    --glass-reflection: linear-gradient(135deg, hsla(0, 0%, 100%, 0.08) 0%, transparent 100%);
-    --glass-card: hsla(240, 6%, 12%, 0.45);
-    --glass-strong: hsla(240, 6%, 8%, 0.85);
-    --glass-pill: hsla(0, 0%, 100%, 0.08);
-    --glass-pill-border: hsla(0, 0%, 100%, 0.15);
+    --shark-blue: #0A84FF;
+    --shark-blue-dim: rgba(10, 132, 255, 0.22);
 
-    /* Shapes & Fonts Defaults */
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
+    /* Quiet materials — blur used structurally (sheets, sticky bars), never as decoration */
+    --glass: hsla(0, 0%, 2%, 0.72);
+    --glass-border: hsla(0, 0%, 100%, 0.10);
+    --glass-reflection: none;
+    --glass-card: hsla(0, 0%, 4%, 0.6);
+    --glass-strong: hsla(0, 0%, 1%, 0.92);
+    --glass-pill: hsla(0, 0%, 100%, 0.06);
+    --glass-pill-border: hsla(0, 0%, 100%, 0.10);
+
+    /* Generous, calm geometry */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1.125rem;
+    --radius-xl: 1.75rem;
 
     --background: var(--bg-main);
     --foreground: var(--text-main);
@@ -64,7 +75,7 @@
     --popover-foreground: var(--text-main);
 
     --primary: var(--accent);
-    --primary-foreground: oklch(0.145 0 0);
+    --primary-foreground: var(--accent-foreground-strong);
 
     --secondary: var(--bg-secondary);
     --secondary-foreground: var(--text-main);
@@ -75,7 +86,7 @@
     --accent-shadcn: var(--bg-hover);
     --accent-foreground: var(--text-main);
 
-    --destructive: oklch(0.58 0.22 27);
+    --destructive: var(--studio-red);
     --destructive-foreground: var(--text-main);
 
     --border: var(--border-main);
@@ -93,170 +104,11 @@
     --sidebar: var(--bg-card);
     --sidebar-foreground: var(--text-main);
     --sidebar-primary: var(--accent);
-    --sidebar-primary-foreground: oklch(0.145 0 0);
+    --sidebar-primary-foreground: var(--accent-foreground-strong);
     --sidebar-accent: var(--bg-hover);
     --sidebar-accent-foreground: var(--text-main);
     --sidebar-border: var(--border-main);
     --sidebar-ring: var(--border-focus);
-}
-
-/* Light */
-[data-theme="light"] {
-    --bg-main: #F5F5F4;
-    /* stone-100 */
-    --bg-card: #FFFFFF;
-    --bg-hover: rgba(0, 0, 0, 0.04);
-    --bg-secondary: #E7E5E4;
-    /* stone-200 */
-
-    --border-main: rgba(0, 0, 0, 0.08);
-    --border-subtle: rgba(0, 0, 0, 0.04);
-    --border-strong: rgba(0, 0, 0, 0.16);
-    --border-focus: rgba(0, 0, 0, 0.25);
-
-    --text-main: #1C1917;
-    /* stone-900 */
-    --text-secondary: #78716C;
-    /* stone-500 */
-    --text-tertiary: #A8A29E;
-    /* stone-400 */
-
-    --accent: #3b82f6;
-    --accent-dim: rgba(59, 130, 246, 0.3);
-
-    --glass: rgba(255, 255, 255, 0.85);
-    --glass-border: rgba(0, 0, 0, 0.1);
-    --glass-reflection: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
-    --glass-card: rgba(255, 255, 255, 0.7);
-    --glass-strong: rgba(255, 255, 255, 0.9);
-    --glass-pill: rgba(0, 0, 0, 0.05);
-    --glass-pill-border: rgba(0, 0, 0, 0.1);
-
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
-}
-
-/* Midnight (Azure) */
-[data-theme="midnight"] {
-    --bg-main: #020617;
-    /* slate-950 */
-    --bg-card: #0F172A;
-    /* slate-900 */
-    --bg-hover: rgba(56, 189, 248, 0.08);
-    --bg-secondary: #1E293B;
-    /* slate-800 */
-
-    --border-main: rgba(56, 189, 248, 0.15);
-    --border-focus: rgba(56, 189, 248, 0.4);
-
-    --text-main: #F8FAFC;
-    /* slate-50 */
-    --text-secondary: #94A3B8;
-    /* slate-400 */
-    --text-tertiary: #475569;
-    /* slate-600 */
-
-    --accent: #38BDF8;
-    /* sky-400 */
-    --accent-dim: rgba(56, 189, 248, 0.4);
-
-    --glass: rgba(15, 23, 42, 0.8);
-
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
-}
-
-/* Matrix (Hacker) */
-[data-theme="matrix"] {
-    --bg-main: #050505;
-    --bg-card: #0A0F0A;
-    --bg-hover: #0F1A0F;
-    --bg-secondary: #0D1117;
-
-    --border-main: #1F6E29;
-    /* Dark green border */
-    --border-focus: #2EA043;
-
-    --text-main: #E6EDF3;
-    --text-secondary: #8B949E;
-    --text-tertiary: #484F58;
-
-    --accent: #238636;
-    /* GitHub Green */
-    --accent-dim: rgba(35, 134, 54, 0.2);
-
-    --glass: rgba(5, 5, 5, 0.9);
-
-    /* Sharp, technical edges */
-    --radius-sm: 0px;
-    --radius-md: 0px;
-    --radius-lg: 2px;
-    --radius-xl: 4px;
-}
-
-/* Sonar (Tech / Teal) */
-[data-theme="sonar"] {
-    --bg-main: #041315;
-    /* Deep Teal Black */
-    --bg-card: #081F22;
-    --bg-hover: #0E2E32;
-    --bg-secondary: #081F22;
-
-    --border-main: #134E48;
-    /* Teal 800 */
-    --border-focus: #2DD4BF;
-    /* Teal 400 */
-
-    --text-main: #CCFBF1;
-    /* Teal 50 */
-    --text-secondary: #5EEAD4;
-    /* Teal 300 (Dimmed) */
-    --text-tertiary: #115E59;
-    /* Teal 800 */
-
-    --accent: #14B8A6;
-    /* Teal 500 */
-    --accent-dim: rgba(20, 184, 166, 0.2);
-
-    --glass: rgba(4, 19, 21, 0.85);
-
-    --radius-sm: 2px;
-    --radius-md: 4px;
-    --radius-lg: 8px;
-    --radius-xl: 12px;
-}
-
-/* Moises (Vibrant Blue & Dark/Aqua accent) */
-[data-theme="moises"] {
-    --bg-main: #000000;
-    --bg-card: #080C10;
-    --bg-hover: rgba(24, 161, 221, 0.08);
-    --bg-secondary: #0D151C;
-
-    --border-main: rgba(24, 161, 221, 0.15);
-    --border-focus: #18A1DD;
-    --border-subtle: rgba(24, 161, 221, 0.08);
-    --border-strong: rgba(24, 161, 221, 0.25);
-
-    --text-main: #FFFFFF;
-    --text-secondary: #8E9AA6;
-    --text-tertiary: #3F4C59;
-
-    --accent: #18A1DD;
-    --accent-dim: rgba(24, 161, 221, 0.35);
-
-    --glass: rgba(0, 0, 0, 0.85);
-
-    --radius-sm: 0.125rem;
-    --radius-md: 0.375rem;
-    --radius-lg: 0.5rem;
-    --radius-xl: 0.75rem;
-
-    --font-sans: 'Plus Jakarta Sans', var(--font-sans), sans-serif;
 }
 
 /* Utility Overrides for Theming */
@@ -276,6 +128,10 @@
     border-radius: var(--radius-xl) !important;
 }
 
+html {
+    color-scheme: dark;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -283,7 +139,9 @@ body {
     color: var(--text-main);
     overflow: hidden;
     touch-action: manipulation;
-    transition: background-color 0.3s ease, color 0.3s ease, border-radius 0.3s ease;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Stop nested scroll panels (Notes, lyrics view, search results, sidebar)
@@ -316,8 +174,8 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -325,7 +183,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-focus);
+    background: var(--border-strong);
     border-radius: 4px;
 }
 
@@ -337,53 +195,50 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* Advanced Glassmorphism Utilities */
+/* Quiet materials — flat plates with a hairline edge, not faux glass with a fake gloss sheen */
 .glass {
     background: var(--glass);
-    backdrop-filter: blur(28px) saturate(200%);
-    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
     border: 1px solid var(--border-main);
-    background-image: var(--glass-reflection);
-    box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 0 0 hsla(0, 0%, 100%, 0.04) inset;
 }
 
 .glass-card {
     background: var(--glass-card);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     border: 1px solid var(--border-subtle);
-    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.25);
+    box-shadow: none;
 }
 
 .glass-strong {
     background: var(--glass-strong);
-    backdrop-filter: blur(48px);
-    -webkit-backdrop-filter: blur(48px);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
     border: 1px solid var(--border-strong);
-    box-shadow: 0 16px 48px -4px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 -1px 0 0 hsla(0, 0%, 100%, 0.05) inset;
 }
 
 .glass-pill {
     background: var(--glass-pill);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--glass-pill-border);
     border-radius: 9999px;
-    box-shadow: 0 2px 12px -1px rgba(0, 0, 0, 0.05);
+    box-shadow: none;
 }
 
 ::selection {
-    background: var(--text-tertiary);
+    background: var(--accent-dim);
     color: var(--text-main);
 }
 
-/* 
+/*
    ---break---
 */
 
 .dark {
-    --background: oklch(0.145 0 0);
-    /* This is close to #050505 but let's keep it as is, or use the custom ones? Let's use custom for consistency. */
     --background: var(--bg-main);
     --foreground: var(--text-main);
 
@@ -395,7 +250,7 @@ body {
 
     /* Primary buttons become Accent buttons with black text */
     --primary: var(--accent);
-    --primary-foreground: oklch(0.145 0 0);
+    --primary-foreground: var(--accent-foreground-strong);
 
     --secondary: var(--bg-secondary);
     --secondary-foreground: var(--text-main);
@@ -406,7 +261,7 @@ body {
     --accent: var(--bg-hover);
     --accent-foreground: var(--text-main);
 
-    --destructive: oklch(0.704 0.191 22.216);
+    --destructive: var(--studio-red);
     --destructive-foreground: var(--text-main);
 
     --border: var(--border-main);
@@ -422,14 +277,14 @@ body {
     --sidebar: var(--bg-card);
     --sidebar-foreground: var(--text-main);
     --sidebar-primary: var(--accent);
-    --sidebar-primary-foreground: oklch(0.145 0 0);
+    --sidebar-primary-foreground: var(--accent-foreground-strong);
     --sidebar-accent: var(--bg-hover);
     --sidebar-accent-foreground: var(--text-main);
     --sidebar-border: var(--border-main);
     --sidebar-ring: var(--border-focus);
 }
 
-/* 
+/*
    ---break---
 */
 
@@ -475,7 +330,7 @@ body {
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* 
+/*
    ---break---
 */
 
