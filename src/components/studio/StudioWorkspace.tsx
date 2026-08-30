@@ -10,12 +10,9 @@ import { RecorderDrawer } from './RecorderDrawer';
 import { MusicPlayer } from './MusicPlayer';
 import { VaultView } from "./VaultView";
 import { BeatUploader } from './BeatUploader';
-import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { MiniPlayer } from './MiniPlayer';
-import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
-import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { analyzeAudioAndSplit } from '@/lib/audio/smartSplit';
 import { transcribeAudio, transcribeAudioChunks } from '@/lib/audio/audioIntelligence';
@@ -43,15 +40,11 @@ import {
     ListMusic,
     Mic,
     Library,
-    Disc,
     History,
     Archive,
-    Sparkles,
     Copy
 } from 'lucide-react';
-import { MuseView } from './MuseView';
 import { processMuseSession } from '@/lib/muse/processMuseSession';
-import { MuseManifest } from '@/types';
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChevronDown, CheckCircle2, Bookmark, Menu, ChevronLeft } from 'lucide-react';
@@ -64,13 +57,12 @@ import {
     getMuseAudio,
     deleteMuseAudio,
     getMuseManifests,
+    getMuseChunks,
     deleteMuseChunks,
     deleteMuseManifest,
-    getMuseChunks
 } from '@/lib/idb/studioDB';
 
-type ViewMode = 'home' | 'studio' | 'vault' | 'settings' | 'muse';
-type LibraryTab = 'songs' | 'beats';
+type ViewMode = 'home' | 'studio' | 'vault' | 'settings';
 type SearchFilter = 'all' | 'songs' | 'sections' | 'recordings' | 'takes' | 'beats';
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -338,7 +330,6 @@ const StudioWorkspace: React.FC = () => {
         setRitualStats(prev => [...prev, stat]);
         toast.success("Practice complete!");
     };
-    const [libraryTab, setLibraryTab] = useState<LibraryTab>('songs');
 
     const [showRecorder, setShowRecorder] = useState(false);
     const [recorderMinimized, setRecorderMinimized] = useState(false);
@@ -347,8 +338,6 @@ const StudioWorkspace: React.FC = () => {
     const [showSearch, setShowSearch] = useState(false);
     const [showMusicPlayer, setShowMusicPlayer] = useState(false);
     const [showPlayerSheet, setShowPlayerSheet] = useState(false);
-    const [showFXPanel, setShowFXPanel] = useState(false);
-    const [fxSettings, setFxSettings] = useState<FXSettings>(defaultFXSettings);
     const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
     const [showNewProjectModal, setShowNewProjectModal] = useState(false);
     const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
@@ -473,7 +462,6 @@ const StudioWorkspace: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(0);
 
     // Vocal FX - only initialize when panel is open
-    useVocalFX(vocalAudioRef, fxSettings, showFXPanel, isPlaying, currentTime);
 
     const viewport = useVisualViewport();
     const keyboardHeight = viewport.isKeyboardOpen
@@ -533,7 +521,6 @@ const StudioWorkspace: React.FC = () => {
     useEffect(() => { beatLoopStartRef.current = beatLoopStart; }, [beatLoopStart]);
     useEffect(() => { beatLoopEndRef.current = beatLoopEnd; }, [beatLoopEnd]);
 
-    const [showTour, setShowTour] = useState(false);
 
     // Select a session, pausing playback first if needed (used by card taps)
     const handleSelectSession = (id: string) => {
@@ -848,20 +835,6 @@ const StudioWorkspace: React.FC = () => {
         }
     }, [sessions.length, uploadedBeat, activeSession]);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined' && !localStorage.getItem('lyriq-tour-completed')) {
-            setShowTour(true);
-        }
-    }, []);
-
-    const handleTourComplete = () => {
-        localStorage.setItem('lyriq-tour-completed', 'true');
-        setShowTour(false);
-        setViewMode('studio');
-        setSections(createDefaultSections()); // Blank canvas for new users
-        setProjectTitle('');
-        setStudioMode('flow');
-    };
 
     // Persistence Load
     useEffect(() => {
@@ -1310,7 +1283,46 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    // Recover a take whose audio finished writing to IndexedDB mid-recording but
+    // never made it into a saved session — the app was closed or crashed before
+    // RecorderDrawer's own save/cleanup ran. This used to surface as a manual
+    // "recover" list inside the standalone Muse tab; folded in here so it just
+    // happens, silently, the way a voice memo app should never lose a take to
+    // begin with. Runs once, shortly after mount, so project/session hydration
+    // has already settled.
+    useEffect(() => {
+        const timer = setTimeout(async () => {
+            try {
+                const manifests = await getMuseManifests();
+                const knownIds = new Set(sessionsRef.current.map(s => s.id));
+                const orphans = manifests.filter(m => !knownIds.has(m.id));
 
+                for (const manifest of orphans) {
+                    try {
+                        const chunks = await getMuseChunks(manifest.id);
+                        if (chunks.length === 0) {
+                            await deleteMuseManifest(manifest.id);
+                            continue;
+                        }
+                        const finalBlob = new Blob(chunks, { type: manifest.mimeType });
+                        const duration = manifest.chunkCount * CHUNK_TIMESLICE_SEC;
+                        await handleSaveRecordingSession(finalBlob, duration, undefined, false, manifest.id, chunks);
+                        await deleteMuseChunks(manifest.id);
+                        await deleteMuseManifest(manifest.id);
+                        toast.success('Recovered a take from an interrupted recording.');
+                    } catch (err) {
+                        console.error('Failed to recover orphaned take', manifest.id, err);
+                    }
+                }
+            } catch (err) {
+                console.error('Orphan recovery scan failed', err);
+            }
+        }, 2500);
+        return () => clearTimeout(timer);
+        // Deliberately runs once on mount — re-scanning on every sessions change
+        // would re-offer takes mid-recovery.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handlePlaySession = (sessionId: string) => {
         const session = sessions.find(s => s.id === sessionId);
@@ -1391,42 +1403,6 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
-    const handleSaveMuseSession = async (rec: { id: string; blob: Blob; duration: number; mimeType: string }): Promise<string> => {
-        const timestamp = new Date().toISOString();
-
-        // Muse audio lives in a separate IDB store (muse_audio, see studioDB.ts) from
-        // regular takes (audio_assets) — populate audioUrl directly from the recorded
-        // blob so playback works immediately without waiting on a reload/hydration pass.
-        const audioUrl = URL.createObjectURL(rec.blob);
-
-        const newSession: RecordingSession = {
-            id: rec.id,
-            name: "Studio Session",
-            timestamp,
-            isLoopSession: false,
-            duration: rec.duration,
-            sections: [],
-            kind: 'muse',
-            museStatus: 'uploading',
-            mimeType: rec.mimeType,
-            audioUrl
-        };
-
-        setSessions(prev => [newSession, ...prev]);
-
-        try {
-            await saveMuseAudio(rec.id, rec.blob);
-            await deleteMuseChunks(rec.id);
-            await deleteMuseManifest(rec.id);
-        } catch (e) {
-            console.error("Failed to save Muse audio locally", e);
-        }
-
-        triggerMuseAnalysis(rec.id, rec.blob, rec.mimeType, rec.duration);
-
-        return rec.id;
-    };
-
     const handleRetryMuseAnalysis = async (sessionId: string) => {
         const session = sessions.find(s => s.id === sessionId);
         if (!session) return;
@@ -1442,31 +1418,6 @@ const StudioWorkspace: React.FC = () => {
             console.error("Retry failed:", e);
             setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, museStatus: 'failed' } : s));
             toast.error(e.message || "Failed to retry analysis.");
-        }
-    };
-
-    const handleRecoverMuseSession = async (manifest: MuseManifest) => {
-        try {
-            const chunks = await getMuseChunks(manifest.id);
-            if (chunks.length === 0) {
-                throw new Error("No audio chunks found for recovery.");
-            }
-            const finalBlob = new Blob(chunks, { type: manifest.mimeType });
-            const duration = manifest.chunkCount * 20;
-
-            const rec = {
-                id: manifest.id,
-                blob: finalBlob,
-                duration,
-                mimeType: manifest.mimeType
-            };
-
-            await handleSaveMuseSession(rec);
-            toast.success("Orphaned session recovered and saved!");
-        } catch (e: any) {
-            console.error("Recovery failed:", e);
-            toast.error(e.message || "Session recovery failed.");
-            throw e;
         }
     };
 
@@ -2173,22 +2124,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                     </div>
                                 </div>
                             </section>
-                            <section className="pt-4">
-                                <h2 className="text-xs mono uppercase tracking-wide text-[var(--text-secondary)] mb-4">Help</h2>
-                                <div className="grid grid-cols-1 gap-3">
-                                    <button
-                                        onClick={() => {
-                                            localStorage.removeItem('lyriq-tour-completed');
-                                            setShowTour(true);
-                                            setViewMode('home');
-                                        }}
-                                        className="p-4 rounded-lg border bg-[var(--bg-card)] border-[var(--border-main)] hover:border-[var(--text-secondary)] flex items-center justify-between transition-all"
-                                    >
-                                        <span className="text-sm font-medium text-[var(--text-main)]">Restart Tour</span>
-                                        <ChevronRight size={16} className="text-[var(--text-secondary)]" />
-                                    </button>
-                                </div>
-                            </section>
                         </div>
                     </div>
                 );
@@ -2207,7 +2142,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                 >
                                     <Menu size={20} />
                                 </button>
-                                <span id="tour-nav-library" className="text-lg font-semibold tracking-tight text-[var(--text-main)]">Lyriq</span>
+                                <span className="text-lg font-semibold tracking-tight text-[var(--text-main)]">Lyriq</span>
                             </div>
                         </div>
 
@@ -2236,28 +2171,12 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                 </motion.button>
                             </div>
                         ) : (
-                            // Populated State (Packs Grid View)
+                            // Populated State — Songs only. Beats live in Vault, the one
+                            // place to browse standalone audio, so this surface doesn't
+                            // duplicate it.
                             <div className="flex-1 flex flex-col overflow-hidden px-4">
-                                <div className="mb-4">
-                                    {/* Segmented Control Switcher */}
-                                    <div className="w-full bg-[var(--bg-secondary)] backdrop-blur-md border border-[var(--border-main)] p-1 rounded-full flex gap-1 shadow-inner">
-                                        <button
-                                            onClick={() => setLibraryTab('songs')}
-                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'songs' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                                        >
-                                            Songs
-                                        </button>
-                                        <button
-                                            onClick={() => setLibraryTab('beats')}
-                                            className={`flex-1 py-2 text-xs font-semibold rounded-full transition-all text-center cursor-pointer active:scale-98 ${libraryTab === 'beats' ? 'bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border-main)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-main)]'}`}
-                                        >
-                                            Beats
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto pb-32 scrollbar-hide">
-                                    {libraryTab === 'songs' ? (
+                                <div className="flex-1 overflow-y-auto pt-2 pb-32 scrollbar-hide">
+                                    {(
                                         savedProjects.length === 0 ? (
                                             <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
                                                 <motion.button
@@ -2326,71 +2245,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                     <Play size={10} fill="currentColor" className="ml-0.5" />
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        )
-                                    ) : (
-                                        beats.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                                                <motion.button
-                                                    initial={{ opacity: 0, scale: 0.95 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    onClick={handleQuickNewProject}
-                                                    className="w-20 h-20 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl cursor-pointer"
-                                                    title="New Song"
-                                                >
-                                                    <Plus size={36} className="text-white" />
-                                                </motion.button>
-                                            </div>
-                                        ) : (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {beats.map((beat) => {
-                                                const isPlaying = playingBeatId === beat.id;
-
-                                                return (
-                                                    <div key={beat.id} className="flex flex-col gap-2.5 group relative">
-                                                        <div
-                                                            onClick={() => handleStartProjectFromBeat(beat)}
-                                                            className="aspect-square w-full relative group rounded-2xl overflow-hidden cursor-pointer"
-                                                        >
-                                                            <div
-                                                                className={`w-full h-full flex items-center justify-center transition-all ${isPlaying ? 'bg-[var(--accent)]' : 'bg-[var(--bg-card)] border border-[var(--border-main)] group-hover:border-[var(--border-strong)]'}`}
-                                                            >
-                                                                <Disc
-                                                                    size={28}
-                                                                    strokeWidth={1.25}
-                                                                    className={isPlaying ? 'text-black' : 'text-[var(--text-tertiary)]'}
-                                                                />
-                                                            </div>
-
-                                                            {/* Play control — always reachable, quiet until touched */}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handlePlayBeat(beat.id);
-                                                                }}
-                                                                className={`absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90 ${isPlaying ? 'bg-black/20 text-black' : 'bg-black/50 backdrop-blur-md text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100'}`}
-                                                            >
-                                                                {isPlaying ? <Pause size={13} fill="currentColor" /> : <Play size={13} fill="currentColor" className="ml-0.5" />}
-                                                            </button>
-                                                        </div>
-                                                        <div className="flex items-start justify-between px-0.5">
-                                                            <div className="min-w-0">
-                                                                <h3 className="text-xs font-medium text-[var(--text-main)] truncate">{beat.name}</h3>
-                                                                <span className="text-[11px] text-[var(--text-tertiary)] tracking-wide">{beat.duration}</span>
-                                                            </div>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeleteBeat(beat.id);
-                                                                }}
-                                                                className="text-[var(--text-tertiary)] hover:text-[var(--text-main)] p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            >
-                                                                <span className="text-sm font-bold leading-none">···</span>
-                                                            </button>
                                                         </div>
                                                     </div>
                                                 );
@@ -2471,6 +2325,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         isSessionPlaying={isPlaying}
                         onPlayBeat={handlePlayBeat}
                         playingBeatId={playingBeatId}
+                        onDeleteBeat={handleDeleteBeat}
                         currentTime={currentTime}
                         duration={duration}
                         ritualStats={ritualStats}
@@ -2480,7 +2335,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
             case 'studio':
                 return (
                     <div className="h-full flex flex-col relative">
-                        <div id="tour-nav-studio" className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
+                        <div className="glass z-50 sticky top-0 border-b border-[var(--border-main)]">
                             <div className="px-6 py-4">
                                 <div className="flex items-center justify-between gap-4">
                                     {/* Left: Title and Save Status */}
@@ -2554,7 +2409,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                     </div>
 
                                     {/* Right: Audio Controls */}
-                                    <div id="tour-audio-controls" className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2">
                                         <BeatUploader
                                             audioSrc={uploadedBeat}
                                             audioRef={beatAudioRef}
@@ -2649,13 +2504,13 @@ ${sections.filter(s => s.text.trim()).map(s =>
                             </div>
                         </div>
 
-                        <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
+                        <div className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
                                 <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-3xl mx-auto space-y-12">
                                         <>
-                                            {editorLayout === 'open' && !(sections.length === 0 && showTour) ? (
+                                            {editorLayout === 'open' ? (
                                                 <OpenEditor
                                                     sections={sections}
                                                     onUpdateSections={setSections}
@@ -2664,10 +2519,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                 />
                                             ) : (
                                                 <AnimatePresence mode="wait">
-                                                         {sections.length === 0 && showTour ? (
-                                                                <motion.div 
+                                                         {sections.length === 0 ? (
+                                                                <motion.div
                                                                     key="flow-canvas"
-                                                                    id="tour-lyric-card"
                                                                     initial={{ opacity: 0, scale: 0.95 }}
                                                                     animate={{ opacity: 1, scale: 1 }}
                                                                     exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
@@ -2711,8 +2565,8 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                  exit={{ opacity: 0 }}
                                                                  className="space-y-12"
                                                              >
-                                                                {sections.map((section, idx) => (
-                                                                    <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+                                                                {sections.map((section) => (
+                                                                    <motion.div key={section.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                         <LyricCard
                                                                             section={section}
                                                                             onUpdate={updateSection}
@@ -2787,7 +2641,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                             <PlayerTab
                                                 projectTitle={projectTitle || "Untitled Project"}
                                                 session={activeSession ?? null}
-                                                onOpenFX={() => setShowFXPanel(true)}
                                                 onDismiss={() => setShowPlayerSheet(false)}
                                                 onGenerateRecap={handleRetryMuseAnalysis}
                                                 sessions={sessions.filter(s => s.kind !== 'muse')}
@@ -2840,22 +2693,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
 
                         {/* Floating record button removed — use FLOW tab to record */}
                     </div>
-                );
-            case 'muse':
-                return (
-                    <MuseView
-                        sessions={sessions}
-                        activeSessionId={activeSessionId}
-                        isPlaying={isPlaying}
-                        currentTime={currentTime}
-                        onPlaySession={handleSelectSessionAndPlay}
-                        onPauseSession={handlePause}
-                        onDeleteSession={handleDeleteSession}
-                        onSaveMuseSession={handleSaveMuseSession}
-                        onRetryAnalysis={handleRetryMuseAnalysis}
-                        onRecoverSession={handleRecoverMuseSession}
-                        onOpenMenu={() => setIsSidebarOpen(true)}
-                    />
                 );
             default: return null;
         }
@@ -2987,7 +2824,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                     {[
                                         { id: 'home', label: 'Library', icon: Library },
                                         { id: 'vault', label: 'Vault', icon: Archive },
-                                        { id: 'muse', label: 'Muse', icon: Sparkles }
                                     ].map((item) => {
                                         const Icon = item.icon;
                                         const isActive = viewMode === item.id;
@@ -3191,17 +3027,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 )}
             </AnimatePresence>
 
-            {/* Vocal FX Panel */}
-            <AnimatePresence>
-                {showFXPanel && (
-                    <FXPanel
-                        onClose={() => setShowFXPanel(false)}
-                        settings={fxSettings}
-                        onUpdate={(key, value) => setFxSettings(prev => ({ ...prev, [key]: value }))}
-                    />
-                )}
-            </AnimatePresence>
-
             {showSearch && (
                 <div className="fixed inset-0 z-[200] bg-[var(--bg-main)]/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-300">
                     <div className="max-w-lg mx-auto h-full flex flex-col pt-[env(safe-area-inset-top)]">
@@ -3257,16 +3082,6 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 </div>
             )}
 
-
-            {showTour && (
-                <OnboardingTour
-                    onComplete={handleTourComplete}
-                    setViewMode={setViewMode}
-                    setShowRecorder={setShowRecorder}
-                    setRecorderMinimized={setRecorderMinimized}
-                    viewMode={viewMode}
-                />
-            )}
 
 
             {/* New Project Modal */}

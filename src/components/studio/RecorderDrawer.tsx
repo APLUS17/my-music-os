@@ -1003,7 +1003,8 @@ export const RecorderDrawer: React.FC<RecorderDrawerProps> = ({
 
       // Fresh recording id + chunk backup bookkeeping for this take. Chunks are
       // written to IndexedDB as they arrive so a crash mid-take leaves recoverable
-      // audio (surfaced automatically by MuseView's orphan-recovery scan).
+      // audio (recovered automatically on next launch — see StudioWorkspace's
+      // orphan-recovery effect).
       const recId = randomId().substring(0, 6).toUpperCase();
       recordingIdRef.current = recId;
       chunkSeqRef.current = 0;

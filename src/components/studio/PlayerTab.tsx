@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, SlidersHorizontal, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Play, Pause, Rewind, FastForward, MessageSquare, Repeat2, Volume2, Volume1, VolumeX, Languages, List, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RecordingSession, Beat, LyricSection, TranscriptionLine } from '@/types';
 import { cn } from '@/lib/utils';
@@ -34,7 +34,6 @@ interface PlayerTabProps {
     onDeleteSession?: (id: string) => void;
     isAnalyzingVocal?: boolean;
     isAnalyzingBeat?: boolean;
-    onOpenFX?: () => void;
     onDismiss?: () => void;
     onGenerateRecap?: (sessionId: string) => void;
 
@@ -113,7 +112,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
     onSelectSession,
     onDeleteSession,
     isAnalyzingBeat,
-    onOpenFX,
     onDismiss,
     onGenerateRecap,
 
@@ -426,7 +424,6 @@ export const PlayerTab: React.FC<PlayerTabProps> = React.memo(({
 
             {/* ── Controls ──────────────────────────────────────────── */}
             <div className="flex items-center justify-center gap-10 py-5">
-                {!onDismiss && <button onClick={onOpenFX} className="text-[var(--text-secondary)] hover:text-[var(--text-main)] active:opacity-60 transition-opacity"><SlidersHorizontal size={26} /></button>}
                 <button onClick={() => skip(-10)} className="text-[var(--text-main)] active:opacity-60 transition-opacity"><Rewind size={34} fill="currentColor" /></button>
                 <button onClick={togglePlay} className="w-20 h-20 bg-[var(--text-main)] rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-xl">
                     {isPlaying ? <Pause size={40} className="text-[var(--bg-main)]" fill="currentColor" /> : <Play size={40} className="text-[var(--bg-main)] ml-1" fill="currentColor" />}

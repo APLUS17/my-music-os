@@ -17,7 +17,7 @@
 | Animation | Framer Motion 12 |
 | Audio | Web Audio API, MediaRecorder API |
 | AI (transcription) | Groq Whisper (`whisper-large-v3-turbo`) — voice recording → text, via `/api/transcribe` server proxy |
-| AI (analysis + chat) | Google Gemini 2.0 Flash (`@google/genai`) — audio structure analysis + Studio Facilitator |
+| AI (analysis + recap) | Google Gemini 2.0 Flash (`@google/genai`) — audio structure analysis + inline take Recap |
 | Creative APIs | Datamuse (rhymes/synonyms), LRCLIB (lyrics search) |
 | Database | Supabase (PostgreSQL) via `@supabase/ssr` + Next.js Server Actions |
 | Auth | Supabase Auth — email OTP (magic link), wired and active |
@@ -86,18 +86,19 @@ src/
 │   │   ├── NoteAttachmentsView.tsx     # Attach recordings/beats to notes  ← DELETED
 │   │   ├── MuseDrawer.tsx              # AI assistant  ← DELETED
 │   │   ├── GeminiPanel.tsx             # Empty placeholder (0 bytes)
+│   │   ├── MuseView.tsx                # Standalone AI coach tab + long-form capture  ← DELETED (essence redesign; recap folded into PlayerTab)
 │   │   ├── AuthGate.tsx                # Email OTP auth form
 │   │   ├── Waveform.tsx                # Canvas-based waveform renderer
-│   │   ├── SpectralEQ.tsx              # Visual EQ panel
-│   │   ├── FXPanel.tsx                 # Effects controls UI (reverb, delay, EQ, compression)
-│   │   ├── OnboardingTour.tsx          # 6-step interactive walkthrough
+│   │   ├── SpectralEQ.tsx              # Visual EQ panel  ← DELETED (essence redesign)
+│   │   ├── FXPanel.tsx                 # Now just the FXSettings type RecorderDrawer's live-monitoring FX shares; the mixer UI itself was cut (essence redesign)
+│   │   ├── OnboardingTour.tsx          # 6-step interactive walkthrough  ← DELETED (essence redesign; empty states teach instead)
 │   │   ├── FeedbackModal.tsx           # In-app feedback submission
 │   │   └── useActiveBeatSection.ts     # Hook: tracks which beat section is playing
 │   └── ui/                             # shadcn/ui primitives
 ├── contexts/
 │   └── AuthContext.tsx                 # Auth provider: signInWithEmail (OTP), verifyOtp, signOut
 ├── hooks/
-│   ├── useVocalFX.ts                   # Web Audio API: real reverb (convolution), delay, EQ, compression
+│   ├── useVocalFX.ts                   # Now just `createReverbImpulse` — the playback FX mixer hook was cut (essence redesign); RecorderDrawer's live-monitoring reverb still uses this
 │   └── useVisualViewport.ts            # Mobile viewport resize handler
 ├── lib/
 │   ├── db.ts                           # Legacy Supabase client (keep for server actions compat)
@@ -162,8 +163,8 @@ MediaRecorder → Blob → base64 → IndexedDB
 - **Playback**: `<audio>` tag or Web Audio Context with mixing
 - **SmartSplit** (`lib/audio/smartSplit.ts`): Energy-based silence detection (RMS threshold 0.05), classifies vocal/instrument/speech via Zero Crossing Rate + energy variance
 - **Groq Whisper** (`lib/audio/audioIntelligence.ts`): `transcribeAudio()` → converts voice recording to text with per-segment timestamps. Proxied server-side via `/api/transcribe` to keep the API key off the client.
-- **Gemini 2.0 Flash** (`src/app/actions.ts`): `analyzeAudioStructure()` → beat/vocal structure detection with section labels and emoji tags. Also powers the Studio Facilitator conversational AI coach.
-- **Vocal FX** (`hooks/useVocalFX.ts`): Real Web Audio API processing chain — convolution reverb (with cached impulse response), delay, 3-band EQ (low/mid/high BiquadFilter), and dynamics compression. Wired to `FXPanel` settings.
+- **Gemini 2.0 Flash** (`src/app/actions.ts`): `analyzeAudioStructure()` → beat/vocal structure detection with section labels and emoji tags. Also powers **Recap** — a one-tap AI summary of any take, surfaced inline in `PlayerTab` (`onGenerateRecap` → `triggerMuseAnalysis` in `StudioWorkspace.tsx`). This replaced the standalone Muse AI coach tab in the essence redesign — same Gemini pipeline (`lib/muse/processMuseSession.ts`), no separate mode to go find.
+- **Live-monitoring FX** (`RecorderDrawer.tsx`, reverb impulse from `hooks/useVocalFX.ts`): a touch of reverb/delay/EQ in your headphones *while you record*, meant to help the performance, not polish it after the fact. The standalone post-hoc Vocal FX mixer (`FXPanel`) and its Spectral EQ visualizer were cut — see `ESSENCE_REDESIGN.md`.
 
 ### Auth
 
@@ -189,14 +190,18 @@ Email OTP flow via Supabase Auth:
 | Pin take to section | ✅ Shipped | `pinnedTakeId` on `LyricSection` |
 | AI transcription | ✅ Shipped | Groq Whisper (`whisper-large-v3-turbo`), per-segment timestamps |
 | AI Audio Analysis | ✅ Shipped | Gemini 2.0 Flash structure analysis via `analyzeAudioStructure()` |
-| Studio Facilitator AI | ✅ Shipped | Conversational AI coach via Gemini in `actions.ts` |
-| Vocal FX (reverb/delay/EQ) | ✅ Shipped | Real Web Audio API via `useVocalFX` hook |
-| Vault library view | ✅ Shipped | `VaultView` — grid/list layout for all content |
+| Recap (AI take summary) | ✅ Shipped | One-tap inline in `PlayerTab` — replaced the standalone Muse AI coach tab |
+| Crash-recovery for interrupted takes | ✅ Shipped | Silent, automatic on next launch — replaced Muse's manual "recover" list |
+| Live-monitoring FX (record-time only) | ✅ Shipped | Reverb/delay/EQ in your headphones while you sing, in `RecorderDrawer` |
+| ~~Vocal FX mixer + Spectral EQ~~ | ❌ Cut | Post-hoc mixing console on a played-back take — essence redesign, see `ESSENCE_REDESIGN.md` |
+| ~~Muse AI coach tab~~ | ❌ Cut | Standalone chat/long-form-capture mode — essence redesign; its useful part became Recap above |
+| Vault library view | ✅ Shipped | `VaultView` — grid/list layout for takes, scraps, and beats (the one place beats live, since Home lost its duplicate tab) |
 | Auth (email OTP) | ✅ Shipped | Supabase email magic link, `AuthContext` + `AuthGate` |
-| Mission Control | ✅ Shipped | `/mission-control` — business strategy & growth dashboard |
-| 5 themes | ✅ Shipped | Dark, Light, Midnight, Matrix, Sonar |
+| Mission Control | ✅ Shipped | `/mission-control` — business strategy & growth dashboard (separate from the songwriter product; out of scope for the essence redesign) |
+| ~~6 themes~~ | ❌ Cut | One theme now — **Lyriq Black**. See `ESSENCE_REDESIGN.md` |
+| ~~Home "Beats" tab~~ | ❌ Cut | Duplicated Vault's beat browsing; Vault is now the one place for standalone audio (sessions/scraps/beats), Home is Songs only |
 | Global search | ✅ Shipped | Projects, takes, beats, scraps |
-| Onboarding tour | ✅ Shipped | 6-step, restartable from Settings |
+| ~~Onboarding tour~~ | ❌ Cut | 6-step walkthrough overlay — essence redesign; the "Start writing" empty state now teaches on its own instead |
 | Rhyme finder | ⚠️ API ready | Datamuse integrated, no editor UI yet |
 | **AI lyric suggestions (UX)** | ⚠️ Partial | `services/ai.ts` is `isMock: true` — no real suggestions UI |
 | **Genre/mood selection** | ❌ Missing | P0 — feeds AI context on project creation |
@@ -241,7 +246,6 @@ npm run test
 
 Test files:
 - `src/components/studio/__tests__/RecordingThread.stress.test.tsx`
-- `src/components/studio/__tests__/SpectralEQ.test.tsx`
 - `src/components/studio/__tests__/takes-transcription-persistence.test.tsx`
 - `src/components/studio/__tests__/useActiveBeatSection.test.tsx`
 - `src/lib/audio/__tests__/smartSplit.test.ts`

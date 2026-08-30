@@ -3,7 +3,7 @@
 import React, { useMemo, memo, useState } from 'react';
 import {
     Library, Music, FileText, Play, Pause,
-    LayoutGrid, List as ListIcon, ChevronRight, MessageSquare, Menu
+    LayoutGrid, List as ListIcon, ChevronRight, MessageSquare, Menu, Trash2
 } from 'lucide-react';
 import { Button } from "../ui/button";
 import { LyricScrap, RecordingSession, Beat, RitualStat } from '../../types';
@@ -44,6 +44,7 @@ const VaultAudioCard = ({
     type,
     isPlaying,
     onPlay,
+    onDelete,
     currentTime,
     duration,
     compact = false
@@ -53,6 +54,7 @@ const VaultAudioCard = ({
     type: 'session' | 'beat';
     isPlaying: boolean;
     onPlay: (id: string) => void;
+    onDelete?: (id: string) => void;
     currentTime: number;
     duration: number;
     compact?: boolean;
@@ -62,7 +64,7 @@ const VaultAudioCard = ({
     return (
         <motion.div
             className={cn(
-                "relative flex flex-col mx-auto rounded-3xl overflow-hidden bg-[var(--bg-card)] shadow-[0_0_20px_rgba(0,0,0,0.1)] p-3 w-full h-full border border-[var(--border-main)]",
+                "relative flex flex-col mx-auto rounded-3xl overflow-hidden bg-[var(--bg-card)] shadow-[0_0_20px_rgba(0,0,0,0.1)] p-3 w-full h-full border border-[var(--border-main)] group",
                 compact && "h-auto"
             )}
             initial={{ opacity: 0, scale: 0.95 }}
@@ -70,6 +72,15 @@ const VaultAudioCard = ({
             transition={{ duration: 0.3 }}
             layout
         >
+            {onDelete && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(id); }}
+                    className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white/70 hover:text-[var(--studio-red)] opacity-0 group-hover:opacity-100 transition-all active:scale-90"
+                    title="Delete"
+                >
+                    <Trash2 size={13} />
+                </button>
+            )}
             <div className="flex flex-col relative h-full justify-between">
                 <div className={cn(
                     "bg-[var(--bg-secondary)] overflow-hidden rounded-[16px] w-full relative flex items-center justify-center",
@@ -150,6 +161,7 @@ const VaultListView = ({
     playingBeatId,
     onPlaySession,
     onPlayBeat,
+    onDeleteBeat,
     currentTime,
     duration
 }: {
@@ -159,6 +171,7 @@ const VaultListView = ({
     playingBeatId: string | null;
     onPlaySession: (id: string) => void;
     onPlayBeat: (id: string) => void;
+    onDeleteBeat?: (id: string) => void;
     currentTime: number;
     duration: number;
 }) => (
@@ -215,8 +228,17 @@ const VaultListView = ({
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4 pl-4">
+                    <div className="flex items-center gap-3 pl-4">
                         {durationStr && <span className="text-xs mono text-[var(--text-secondary)]">{durationStr}</span>}
+                        {item.type === 'beat' && onDeleteBeat && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDeleteBeat(d.id); }}
+                                className="text-[var(--text-tertiary)] hover:text-[var(--studio-red)] p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        )}
                         <ChevronRight size={14} className="text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
                 </motion.div>
@@ -237,6 +259,7 @@ interface VaultViewProps {
     isSessionPlaying: boolean;
     onPlayBeat: (id: string) => void;
     playingBeatId: string | null;
+    onDeleteBeat?: (id: string) => void;
     currentTime: number;
     duration: number;
     ritualStats: RitualStat[];
@@ -246,7 +269,7 @@ interface VaultViewProps {
 export const VaultView: React.FC<VaultViewProps> = ({
     sessions, scraps, beats,
     projectTitle, onPlaySession, playingSessionId, isSessionPlaying,
-    onPlayBeat, playingBeatId,
+    onPlayBeat, playingBeatId, onDeleteBeat,
     currentTime, duration, onOpenSidebar
 }) => {
     const [layoutMode, setLayoutMode] = useState<LayoutMode>('grid');
@@ -352,6 +375,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                                             type="beat"
                                             isPlaying={playingBeatId === (item.data as Beat).id}
                                             onPlay={onPlayBeat}
+                                            onDelete={onDeleteBeat}
                                             currentTime={playingBeatId === (item.data as Beat).id ? currentTime : 0}
                                             duration={playingBeatId === (item.data as Beat).id ? duration : 0}
                                             compact
@@ -374,6 +398,7 @@ export const VaultView: React.FC<VaultViewProps> = ({
                             playingBeatId={playingBeatId}
                             onPlaySession={onPlaySession}
                             onPlayBeat={onPlayBeat}
+                            onDeleteBeat={onDeleteBeat}
                             currentTime={currentTime}
                             duration={duration}
                         />

@@ -2,6 +2,103 @@
 
 *What it would look like if Steve Jobs and Jony Ive got their hands on it.*
 
+This document covers two passes. The first (below) redid the visual
+material — tokens, chrome, decoration. The second, **What Lyriq Is**,
+answers a harder question first: what is this product *for*, and what
+falls out once you answer that honestly. Read that section first if
+you're asking "why is X gone" about a whole feature rather than a color.
+
+---
+
+## What Lyriq Is
+
+**A better Notes and Voice Memos for songwriters.**
+
+Notes and Voice Memos each win by doing one thing invisibly well and
+never asking you to configure anything before you can think out loud.
+Their one weakness, for a songwriter, is that they don't talk to each
+other: the hum you recorded and the line you scribbled live in two
+apps with no memory of each other. That gap is Lyriq's entire reason
+to exist. Everything else is not.
+
+So the test for every feature became concrete: **does this help
+someone capture a lyric or a take, or connect the two, faster than
+Notes + Voice Memos would?** Run down the feature list against that
+question and it sorts itself:
+
+**Fits — this is the product:**
+- Flow (freeform capture) — the "better Notes" half
+- Recording + auto-transcription — the "better Voice Memos" half
+- Pinning a take to a line, multiple takes per line — the actual
+  differentiator; Notes and Voice Memos can't do this at all
+- Beat playback under a recording — songwriters write to a loop; this
+  is domain-specific capture, not production
+- Library/search, quiet auth + sync — the note list / recordings
+  list, unified, and nothing's ever lost, invisibly, like Notes
+
+**Doesn't fit — GarageBand's job, not Notes':**
+- The standalone Vocal FX mixer (reverb/delay/EQ/compression on a
+  *played-back* take) and its Spectral EQ visualizer. **Cut.**
+  RecorderDrawer's live-monitoring reverb — a touch of space in your
+  headphones *while you sing*, meant to help the performance rather
+  than polish it after — stayed. Same category of effect, opposite
+  purpose: one is capture, one is production.
+
+**Doesn't fit — a different product wearing Lyriq's clothes:**
+- Muse, the standalone AI conversational-coach tab: its own view, its
+  own long-form "hit record and just talk" capture pipeline, its own
+  IndexedDB manifest/chunk schema for crash recovery. A copilot, not a
+  notes app. **Cut the tab.** The two things inside it that were
+  actually useful — an AI recap of a take, and never losing a take to
+  a crash — got folded into the product that stayed:
+  - **Recap** is now one button on any take in `PlayerTab`, using the
+    same Gemini pipeline (`processMuseSession`), instead of a mode you
+    had to go find.
+  - **Crash recovery** runs silently on next launch instead of surfacing
+    a manual "orphaned recordings" list to sift through — see the new
+    effect in `StudioWorkspace.tsx` right after `handleSaveRecordingSession`.
+    A voice-memo app that can lose your take to a crash without ever
+    telling you isn't "notes and voice memos," it's a bug wearing a
+    feature's name.
+
+**Out of scope, not "in the way":** Mission Control (`/mission-control`)
+is a business dashboard at its own URL that no songwriter ever sees.
+Left alone — the essence question doesn't apply to a tool aimed at the
+person running Lyriq, not the people using it.
+
+**Duplication, not a feature question:** Home's Library had a
+Songs/Beats tab switcher; Vault separately browsed sessions, scraps,
+*and* beats. Same content, two homes. **Cut** the Beats tab from Home —
+Vault is now the one place standalone audio lives, and got a delete
+affordance for beats it was missing (Home's tab used to be the only
+place you could delete one).
+
+**Also cut:** the 6-step onboarding tour. A "Start writing" empty
+state that only appeared *during* the tour was arguably the tour's
+biggest tell — the product needed a guide to get you to the thing
+that should have explained itself. Deleted the tour; the empty state
+now shows whenever there's nothing to write, tour or not, and does
+the teaching Notes-style: quietly, in place, no overlay.
+
+### What this cost, concretely
+
+| Removed | Lines | Where it went |
+|---|---|---|
+| `FXPanel.tsx` (mixer UI) | ~170 | File now holds only the `FXSettings` type RecorderDrawer's live-monitor still shares |
+| `SpectralEQ.tsx` + its test | ~640 | Deleted outright |
+| `useVocalFX` hook (playback FX chain) | ~310 | Deleted; `createReverbImpulse` stayed for RecorderDrawer |
+| `MuseView.tsx` | ~1,030 | Deleted; recap + crash-recovery folded into `StudioWorkspace`/`PlayerTab` |
+| `useMuseRecorder.ts` | — | Deleted (long-form capture pipeline had no other caller) |
+| `OnboardingTour.tsx` | ~260 | Deleted |
+| Home's Beats tab | ~70 | Deleted; equivalent (plus a missing delete button) added to Vault |
+
+Nothing here touched Flow/Write sync, the recorder's core save path,
+take persistence, or the transcription/analysis pipeline. Verified with
+`tsc --noEmit`, `npm run lint` (no new errors), and the full test suite
+(115/115 passing after removing SpectralEQ's own 31 tests along with it).
+
+---
+
 ## The brief they'd have given
 
 Jobs didn't ask "how do we make this look nicer." He asked "what is this
