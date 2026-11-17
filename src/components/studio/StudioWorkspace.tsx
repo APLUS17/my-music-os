@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
@@ -14,6 +14,21 @@ import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { MiniPlayer } from './MiniPlayer';
+import { SectionTimeline, type BeatStructureSummary } from './SectionTimeline';
+import { KaraokeView } from './KaraokeView';
+import { SyncSettingsPanel } from './SyncSettingsPanel';
+import { useSongClock, useClockValue } from '@/hooks/useSongClock';
+import { useBeatAudio } from '@/hooks/useBeatAudio';
+import { useSyncSettings } from '@/hooks/useSyncSettings';
+import { useFollowPlayback } from '@/hooks/useFollowPlayback';
+import { useStableCallback } from '@/hooks/useStableCallback';
+import {
+    resolveSectionTimings, buildTimedLines, pickActiveLine, activeSectionIndex,
+    type TimedPhrase,
+} from '@/lib/timeline/timeline';
+import {
+    applyBeatSegments, moveBoundary, splitSectionAt, mergeWithNext, clearTimings, type BarGrid,
+} from '@/lib/timeline/sectionEdit';
 import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
@@ -706,6 +721,160 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    // ─── Song timeline: beat sections, the song clock, karaoke ───────────────
+    // Everything here lives on the SONG timeline (seconds from the start of the
+    // beat, or of the take when there is no beat). See lib/timeline.
+    const [syncSettings, updateSyncSettings, resetSyncSettings] = useSyncSettings();
+    const getAnchorSec = useCallback(() => {
+        const list = sessionsRef.current;
+        const s = list.find(x => x.id === activeSessionIdRef.current) ?? list[0];
+        return s?.beatOffset ?? 0;
+    }, []);
+    const songClock = useSongClock(beatAudioRef, vocalAudioRef, getAnchorSec);
+    const beatAudio = useBeatAudio(uploadedBeat);
+
+    const [isAnalyzingStructure, setIsAnalyzingStructure] = useState(false);
+    const [structureSummary, setStructureSummary] = useState<BeatStructureSummary | null>(null);
+    const [barGrid, setBarGrid] = useState<BarGrid | null>(null);
+    const [showKaraoke, setShowKaraoke] = useState(false);
+    const [showSyncSettings, setShowSyncSettings] = useState(false);
+    const lyricsScrollRef = useRef<HTMLDivElement>(null);
+
+    const timelineDuration = useMemo(() => {
+        if (beatAudio.durationSec > 0) return beatAudio.durationSec;
+        if (activeSession && activeSession.kind !== 'muse' && activeSession.duration) {
+            return (activeSession.beatOffset ?? 0) + activeSession.duration;
+        }
+        return 0;
+    }, [beatAudio.durationSec, activeSession]);
+
+    const sectionTimings = useMemo(() => resolveSectionTimings(sections, timelineDuration), [sections, timelineDuration]);
+    const sectionsAreTimed = useMemo(
+        () => sections.some(sec => typeof sec.startTimeSec === 'number' && typeof sec.endTimeSec === 'number'),
+        [sections]
+    );
+
+    // Transcribed phrases of the active take, placed on the song timeline.
+    const songPhrases = useMemo<TimedPhrase[] | null>(() => {
+        if (!activeSession || activeSession.kind === 'muse' || !activeSession.lines?.length) return null;
+        const anchor = activeSession.beatOffset ?? 0;
+        return activeSession.lines.map(l => ({ text: l.text, startSec: l.startTime + anchor, endSec: l.endTime + anchor }));
+    }, [activeSession]);
+
+    const timedLines = useMemo(() => buildTimedLines(sections, sectionTimings, songPhrases), [sections, sectionTimings, songPhrases]);
+
+    const activeLineIdx = useClockValue(songClock, useCallback(
+        (t: number) => pickActiveLine(timedLines, t, syncSettings.lyricOffsetMs),
+        [timedLines, syncSettings.lyricOffsetMs]
+    ));
+    const activeSectionIdx = useClockValue(songClock, useCallback((t: number) => activeSectionIndex(sectionTimings, t), [sectionTimings]));
+    // 0 = idle at the start, 1 = paused somewhere, 2 = playing
+    const playState = useClockValue(songClock, useCallback((t: number, playing: boolean) => (playing ? 2 : t > 0.05 ? 1 : 0), []));
+    const isSongPlaying = playState === 2;
+    const activeTimedLine = playState > 0 && activeLineIdx >= 0 ? timedLines[activeLineIdx] : null;
+
+    const follow = useFollowPlayback({
+        containerRef: lyricsScrollRef,
+        enabled: syncSettings.followPlayback && playState > 0,
+        activeKey: activeTimedLine?.key ?? null,
+    });
+
+    /**
+     * Seek to a song-timeline time. A loaded take drives the beat (the beat is kept at
+     * take time + offset), so playback can only land inside the take's own span. Outside
+     * it we jump to the nearest edge and say so, rather than silently ignoring the tap.
+     */
+    const seekSong = useCallback((timeSec: number) => {
+        const hasTake = sessions.length > 0 && !!vocalAudioRef.current?.getAttribute('src');
+        const total = timelineDuration > 0 ? timelineDuration : Infinity;
+        const t = Math.max(0, Math.min(total, timeSec));
+        if (!hasTake) {
+            seekTo(t);
+            return;
+        }
+        const anchor = activeSession?.beatOffset ?? 0;
+        // The saved length, not the element's: a MediaRecorder take reports `Infinity` until fully read.
+        const takeLen = activeSession?.duration ?? (Number.isFinite(duration) && duration > 0 ? duration : Infinity);
+        const inTake = Math.max(0, Math.min(takeLen, t - anchor));
+        if (Math.abs(inTake - (t - anchor)) > 1) {
+            toast.info('That spot is outside this take, so I jumped to its nearest edge');
+        }
+        seekTo(inTake);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessions.length, activeSession, timelineDuration, duration]);
+
+    const handleSeekToSection = useStableCallback((id: string) => {
+        const timing = sectionTimings.find(tm => tm.id === id);
+        if (timing) seekSong(timing.start + 0.001);
+    });
+
+    const handleToggleSongPlayback = useStableCallback(() => {
+        if (!uploadedBeat && sessions.length === 0) {
+            toast.info('Add a beat or record a take first');
+            return;
+        }
+        togglePlayback(!songClock.playing);
+    });
+
+    const handleAutoSection = useStableCallback(async () => {
+        if (!uploadedBeat) {
+            toast.info('Add a beat first, then I can find its sections');
+            return;
+        }
+        setIsAnalyzingStructure(true);
+        try {
+            const structure = await beatAudio.analyze();
+            if (!structure || structure.segments.length === 0) {
+                toast.error("Couldn't read this beat. Try another file.");
+                return;
+            }
+            setSections(prev => applyBeatSegments(prev, structure.segments, structure.durationSec, () => randomId()));
+            setBarGrid(structure.method === 'audio' ? { gridStartSec: structure.gridStartSec, barSec: structure.barSec } : null);
+            setStructureSummary({ bpm: structure.bpm, method: structure.method, confidence: structure.confidence });
+            if (structure.method === 'audio' && structure.bpm) setProjectBpm(String(Math.round(structure.bpm)));
+            toast.success(
+                structure.method === 'audio'
+                    ? `Found ${structure.segments.length} sections at ${Math.round(structure.bpm ?? 0)} BPM`
+                    : "Couldn't find a steady tempo, so I split it evenly. Drag the handles to fit."
+            );
+        } catch (err) {
+            console.error('[auto-section] failed:', err);
+            toast.error('Something went wrong reading the beat');
+        } finally {
+            setIsAnalyzingStructure(false);
+        }
+    });
+
+    const handleMoveBoundary = useStableCallback((index: number, timeSec: number) => {
+        setSections(prev => moveBoundary(prev, index, timeSec, timelineDuration));
+    });
+    const handleSplitAtPlayhead = useStableCallback(() => {
+        const next = splitSectionAt(sections, songClock.time, timelineDuration, randomId());
+        if (next === sections) {
+            toast.info('Move the playhead into a section (not at its edge) to split it');
+            return;
+        }
+        setSections(next);
+    });
+    const handleMergeWithNext = useStableCallback((index: number) => {
+        setSections(prev => mergeWithNext(prev, index, timelineDuration));
+    });
+    const handleResetTimings = useStableCallback(() => {
+        setSections(prev => clearTimings(prev));
+        setBarGrid(null);
+        setStructureSummary(null);
+    });
+    const handleOpenKaraoke = useCallback(() => setShowKaraoke(true), []);
+    const handleCloseKaraoke = useCallback(() => setShowKaraoke(false), []);
+    const handleOpenSyncSettings = useCallback(() => setShowSyncSettings(true), []);
+    const handleChangeLyricOffset = useStableCallback((ms: number) => updateSyncSettings({ lyricOffsetMs: ms }));
+
+    // Stable handlers so memoised section cards only re-render when their own props change.
+    const stableUpdateSection = useStableCallback((id: string, updates: Partial<LyricSection>) => updateSection(id, updates));
+    const stableDeleteSection = useStableCallback((id: string) => deleteSection(id));
+    const stableMoveSection = useStableCallback((id: string, direction: 'up' | 'down') => moveSection(id, direction));
+    const stableSectionBlur = useCallback(() => setActiveSectionId(null), []);
+
     // RAF loop: drives currentTime at ~16fps and corrects beat drift every 2s
     useEffect(() => {
         if (!isPlaying) {
@@ -1141,6 +1310,10 @@ const StudioWorkspace: React.FC = () => {
                     blob.type || 'audio/webm'
                 )
                 : transcribeAudio(base64);
+
+        // Created now but awaited later: without this, a failure before the await is reported
+        // as an unhandled rejection. The real handling still happens where it is awaited.
+        transcriptionPromise.catch(() => { /* handled at the await below */ });
 
         const timestamp = new Date().toISOString();
 
@@ -2612,6 +2785,10 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                             onSeek={handleBeatSeek}
                                             isBeatLoading={isBeatLoading || isUserRecording}
                                             onUpload={async (file) => {
+                                                // Times from the previous beat don't fit this one.
+                                                setSections(prev => clearTimings(prev));
+                                                setBarGrid(null);
+                                                setStructureSummary(null);
                                                 setIsBeatLoading(true);
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
@@ -2649,6 +2826,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                 setUploadedBeatName("");
                                                 setUploadedBeatId(null);
                                                 setIsBeatPlaying(false);
+                                                setSections(prev => clearTimings(prev));
+                                                setBarGrid(null);
+                                                setStructureSummary(null);
                                             }}
                                         />
                                     </div>
@@ -2688,10 +2868,33 @@ ${sections.filter(s => s.text.trim()).map(s =>
                             </div>
                         </div>
 
+                        {(uploadedBeat || sessions.length > 0) && (
+                            <SectionTimeline
+                                sections={sections}
+                                timings={sectionTimings}
+                                durationSec={timelineDuration}
+                                peaks={beatAudio.peaks}
+                                clock={songClock}
+                                hasBeat={!!uploadedBeat}
+                                isAnalyzing={isAnalyzingStructure}
+                                summary={structureSummary}
+                                grid={barGrid}
+                                isTimed={sectionsAreTimed}
+                                onSeek={seekSong}
+                                onMoveBoundary={handleMoveBoundary}
+                                onSplitAtPlayhead={handleSplitAtPlayhead}
+                                onMergeWithNext={handleMergeWithNext}
+                                onAutoSection={handleAutoSection}
+                                onResetTimings={handleResetTimings}
+                                onOpenKaraoke={handleOpenKaraoke}
+                                onOpenSettings={handleOpenSyncSettings}
+                            />
+                        )}
+
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
-                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div ref={lyricsScrollRef} className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-3xl mx-auto space-y-12">
                                         <>
                                             {editorLayout === 'open' && !(sections.length === 0 && showTour) ? (
@@ -2790,12 +2993,16 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                     <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                         <LyricCard
                                                                             section={section}
-                                                                            onUpdate={updateSection}
-                                                                            onDelete={deleteSection}
-                                                                            onMove={moveSection}
+                                                                            timing={sectionsAreTimed || timelineDuration > 0 ? sectionTimings[idx] ?? null : null}
+                                                                            isPlayingSection={isSongPlaying && idx === activeSectionIdx}
+                                                                            activeLineIndex={activeTimedLine && activeTimedLine.sectionId === section.id ? activeTimedLine.lineIndex : null}
+                                                                            onSeekToSection={handleSeekToSection}
+                                                                            onUpdate={stableUpdateSection}
+                                                                            onDelete={stableDeleteSection}
+                                                                            onMove={stableMoveSection}
                                                                             showSyllables={showSyllables}
                                                                             onSectionFocus={setActiveSectionId}
-                                                                            onSectionBlur={() => setActiveSectionId(null)}
+                                                                            onSectionBlur={stableSectionBlur}
                                                                         />
                                                                     </motion.div>
                                                                 ))}
@@ -2814,6 +3021,18 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                         </>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Follow paused because the user scrolled: offer a way back to the line being sung */}
+                            {follow.pausedByUser && isSongPlaying && syncSettings.followPlayback && (
+                                <button
+                                    type="button"
+                                    onClick={follow.recenter}
+                                    className="absolute bottom-28 right-4 z-40 flex items-center gap-1.5 px-3 h-8 rounded-full bg-[var(--accent)] text-white text-[11px] font-semibold shadow-lg active:scale-95"
+                                    data-testid="back-to-now"
+                                >
+                                    Back to now
+                                </button>
                             )}
 
                             {/* MiniPlayer pill — floats above lyrics, visible when beat or vocal loaded */}
@@ -2914,6 +3133,37 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         </div>
 
                         {/* Floating record button removed — use FLOW tab to record */}
+
+                        {showSyncSettings && (
+                            <div className="absolute inset-0 z-[70]" onClick={() => setShowSyncSettings(false)}>
+                                <div className="absolute right-3 top-40">
+                                    <SyncSettingsPanel
+                                        settings={syncSettings}
+                                        latencyMs={latencyCompensation}
+                                        onChange={updateSyncSettings}
+                                        onChangeLatency={setLatencyCompensation}
+                                        onReset={resetSyncSettings}
+                                        onClose={() => setShowSyncSettings(false)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {showKaraoke && (
+                            <KaraokeView
+                                sections={sections}
+                                timings={sectionTimings}
+                                lines={timedLines}
+                                clock={songClock}
+                                durationSec={timelineDuration}
+                                offsetMs={syncSettings.lyricOffsetMs}
+                                projectTitle={projectTitle}
+                                onClose={handleCloseKaraoke}
+                                onTogglePlay={handleToggleSongPlayback}
+                                onSeek={seekSong}
+                                onChangeOffset={handleChangeLyricOffset}
+                            />
+                        )}
                     </div>
                 );
             case 'muse':

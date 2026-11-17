@@ -1,5 +1,7 @@
 
-export type SectionType = 'verse' | 'chorus' | 'bridge' | 'tag' | 'intro' | 'outro' | 'idea';
+export type SectionType = 'verse' | 'chorus' | 'bridge' | 'tag' | 'intro' | 'outro' | 'idea' | 'pre-chorus';
+
+export type SectionEnergy = 'low' | 'medium' | 'high';
 
 export interface LyricSection {
     id: string;
@@ -7,6 +9,10 @@ export interface LyricSection {
     repeats: number;
     text: string;
     pinnedSessionId?: string;
+    /** Where this section sits on the song (beat) timeline, in seconds. Unset = even split of the song. */
+    startTimeSec?: number;
+    endTimeSec?: number;
+    energy?: SectionEnergy;
 }
 
 export interface LyricScrap {
@@ -148,7 +154,7 @@ export interface SavedProject {
 }
 
 // Removed 'tag' and 'idea' from this list so they don't appear in the LyricCard dropdown
-export const SECTION_TYPES: SectionType[] = ['intro', 'verse', 'chorus', 'bridge', 'outro'];
+export const SECTION_TYPES: SectionType[] = ['intro', 'verse', 'pre-chorus', 'chorus', 'bridge', 'outro'];
 
 export const COLORS = {
     bgPrimary: '#0F0F0F',

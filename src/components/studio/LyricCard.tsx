@@ -3,9 +3,19 @@ import { LyricSection, SECTION_TYPES } from '@/types';
 import { X, ChevronUp, ChevronDown } from 'lucide-react';
 import { countSyllables } from '@/lib/utils/syllable';
 import { cn } from '@/lib/utils';
+import { sectionColor, withAlpha } from '@/lib/timeline/sectionColors';
+import { formatTime } from '@/lib/utils/time';
 
 interface LyricCardProps {
   section: LyricSection;
+  /** Where this section sits on the song timeline, when known. */
+  timing?: { start: number; end: number } | null;
+  /** The song is playing and this is the section being played. */
+  isPlayingSection?: boolean;
+  /** Raw line index (into `section.text.split('\n')`) being sung, or null. */
+  activeLineIndex?: number | null;
+  /** Jump playback to the start of this section. */
+  onSeekToSection?: (id: string) => void;
   onUpdate: (id: string, updates: Partial<LyricSection>) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
@@ -68,8 +78,12 @@ const AutoResizeRowTextarea = ({
   );
 };
 
-export const LyricCard: React.FC<LyricCardProps> = ({
+const LyricCardBase: React.FC<LyricCardProps> = ({
   section,
+  timing = null,
+  isPlayingSection = false,
+  activeLineIndex = null,
+  onSeekToSection,
   onUpdate,
   onDelete,
   onMove,
@@ -82,6 +96,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   const [pendingFocus, setPendingFocus] = useState<{ index: number; caretPos: number } | null>(null);
 
   const lines = section.text.split('\n');
+  const color = sectionColor(section.type);
 
   // Caret positioning and row focusing side-effect
   useEffect(() => {
@@ -181,19 +196,36 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   };
 
   return (
-    <div className={cn(
-      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]"
-    )}>
+    <div
+      className={cn(
+        "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]",
+        isPlayingSection && "bg-[var(--bg-hover)]"
+      )}
+      style={isPlayingSection ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
+      data-section-id={section.id}
+      data-playing-section={isPlayingSection ? 'true' : undefined}
+    >
       <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all font-medium active:scale-95 cursor-pointer"
           >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
             {section.type}
             <ChevronDown size={10} className="opacity-70" />
           </button>
-
+          {timing && timing.end > timing.start && (
+            <button
+              type="button"
+              onClick={() => onSeekToSection?.(section.id)}
+              title="Jump to this section"
+              className="text-[10px] mono tabular-nums text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors px-1.5 py-0.5 rounded-md hover:bg-[var(--bg-secondary)] cursor-pointer"
+              data-testid="section-time-chip"
+            >
+              {formatTime(timing.start).replace(/^0/, '')} – {formatTime(timing.end).replace(/^0/, '')}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -227,7 +259,15 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       {/* Row-Based Lyrics Content */}
       <div className="space-y-1.5 relative transition-all">
         {lines.map((lineText, idx) => (
-          <div key={`${section.id}-row-${idx}`} className="flex items-start w-full gap-1">
+          <div
+            key={`${section.id}-row-${idx}`}
+            className={cn(
+              "flex items-start w-full gap-1 rounded-md transition-colors duration-200",
+              activeLineIndex === idx && "-mx-1.5 px-1.5"
+            )}
+            style={activeLineIndex === idx ? { background: withAlpha(color, 0.16), boxShadow: `inset 2px 0 0 ${color}` } : undefined}
+            data-active-lyric-line={activeLineIndex === idx ? 'true' : undefined}
+          >
             {showSyllables && (
               <div className="w-6 text-right pr-1.5 text-xs font-mono text-[var(--text-tertiary)] opacity-60 pt-1.5 select-none tabular-nums flex-shrink-0 animate-in fade-in duration-200">
                 {countSyllables(lineText) || '\u00A0'}
@@ -268,3 +308,5 @@ export const LyricCard: React.FC<LyricCardProps> = ({
     </div>
   );
 };
+
+export const LyricCard = React.memo(LyricCardBase);
