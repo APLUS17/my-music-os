@@ -1,4 +1,5 @@
 // Usage: node run.mjs <split: dev|test|cn|all> [--old] [--json params] [--limit n]
+// Boundaries only: these are songs with vocals, and the names are tuned for instrumentals.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,9 +36,6 @@ function decode(file) {
   return new Float32Array(b.buffer, b.byteOffset, b.length / 4);
 }
 
-const MAP7 = { 'pre-chorus': 'verse', hook: 'chorus', inst: 'inst' };
-const to7 = l => MAP7[l] ?? l;
-
 function gtSegments(rec) {
   const L = rec.labels;
   const segs = [];
@@ -62,19 +60,6 @@ function fmeasure(ref, est, win) {
   return p + r ? (2 * p * r) / (p + r) : 0;
 }
 function bounds(segs) { return [segs[0].start, ...segs.map(s => s.end)]; }
-
-function frameAcc(gt, est, dur, skipSilence) {
-  let ok = 0, n = 0;
-  for (let t = 0.05; t < dur; t += 0.1) {
-    const g = gt.find(s => t >= s.start && t < s.end);
-    if (!g) continue;
-    if (skipSilence && (g.label === 'silence' || g.label === 'end')) continue;
-    const e = est.find(s => t >= s.start && t < s.end) ?? est[est.length - 1];
-    n++;
-    if (to7(g.label) === to7(e.label)) ok++;
-  }
-  return n ? ok / n : 0;
-}
 
 const rows = [];
 let tAnalysis = 0;
@@ -107,8 +92,6 @@ for (const f of pick) {
     hr3: fmeasure(rb, eb, 3),
     hr05t: fmeasure(inner(rb), inner(eb), 0.5),
     hr3t: fmeasure(inner(rb), inner(eb), 3),
-    acc: frameAcc(gt, est, dur, false),
-    accNS: frameAcc(gt, est, dur, true),
     nRef: gt.length, nEst: est.length,
   });
   if (verbose) console.log('   GT', gt.map(s => `${s.start.toFixed(1)}${s.label.slice(0, 3)}`).join(' '));
@@ -118,7 +101,6 @@ const out = {
   split, old: runOld, n: rows.length,
   'HR.5F': mean('hr05').toFixed(3), 'HR3F': mean('hr3').toFixed(3),
   'HR.5F(trim)': mean('hr05t').toFixed(3), 'HR3F(trim)': mean('hr3t').toFixed(3),
-  ACC: mean('acc').toFixed(3), 'ACC(no silence)': mean('accNS').toFixed(3),
   sectionsRef: mean('nRef').toFixed(1), sectionsEst: mean('nEst').toFixed(1),
   msPerSong: Math.round(tAnalysis / Math.max(1, rows.length)),
 };

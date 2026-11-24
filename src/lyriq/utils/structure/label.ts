@@ -1,14 +1,15 @@
-// Repetition groups and section names.
+// Repetition groups and beat-style section names.
 //
-// Groups: segments that sound like each other (same chords and sound, beat by beat)
-// get the same letter. Names come from rules on those groups: the repeated, loudest
-// group is the chorus; other repeated groups are verses (or a pre-chorus when short
-// and always right before a chorus); a one-off section late in the song is the bridge;
-// quiet first and last sections are intro and outro.
-//
-// Names are a heuristic. Groups and boundaries are measured.
+// Groups: blocks that sound like each other (same chords and sound, beat by beat)
+// get the same letter. Names, for instrumentals, use the five names producers use:
+//   Hook   - the fullest block that comes back (the loop with everything in it),
+//   Verse  - the other blocks (the beat a rapper or singer writes over),
+//   Bridge - a one-off change in the second half,
+//   Intro / Outro - a short or sparse first / last block.
+// Names are a heuristic from the audio; boundaries and groups are what's measured.
 
 import type { SectionType } from '../../types';
+import type { BeatFeatures } from './segment';
 
 export interface Segment {
   /** First and one-past-last beat unit. */
@@ -19,13 +20,11 @@ export interface Segment {
 export interface LabelParams {
   /** Similarity, in standard deviations above the song's typical beat-pair similarity, to join a group. */
   groupThreshold: number;
-  /** Mean similarity (z) to the chorus group above which another section also counts as chorus. */
-  chorusJoin: number;
-  /** Longest opening section (bars) that can be an intro. */
-  introMaxBars: number;
+  /** ...and at least this share of the most similar pair of blocks in the beat. */
+  relativeThreshold: number;
 }
 
-export const DEFAULT_LABEL_PARAMS: LabelParams = { groupThreshold: 1.0, chorusJoin: 0.5, introMaxBars: 12.5 };
+export const DEFAULT_LABEL_PARAMS: LabelParams = { groupThreshold: 1.5, relativeThreshold: 0.85 };
 
 /**
  * Beat-by-beat similarity of two segments: the shorter slides over the longer
@@ -73,6 +72,8 @@ export function groupSegments(S: Float32Array, n: number, segs: Segment[], param
     sim[i][j] = v;
     sim[j][i] = v;
   }
+  let maxSim = -Infinity;
+  for (let i = 0; i < K; i++) for (let j = i + 1; j < K; j++) maxSim = Math.max(maxSim, sim[i][j]);
   let clusters: number[][] = segs.map((_, i) => [i]);
   for (;;) {
     let bi = -1, bj = -1, bv = -Infinity;
@@ -82,7 +83,9 @@ export function groupSegments(S: Float32Array, n: number, segs: Segment[], param
       s /= clusters[i].length * clusters[j].length;
       if (s > bv) { bv = s; bi = i; bj = j; }
     }
-    if (bi < 0 || bv < params.groupThreshold) break;
+    // Join only clear repeats: above the threshold and close to the best match in this beat
+    // (a hook and a verse built on one loop are similar, but less so than hook and hook).
+    if (bi < 0 || bv < Math.max(params.groupThreshold, params.relativeThreshold * maxSim)) break;
     clusters[bi] = [...clusters[bi], ...clusters[bj]];
     clusters = clusters.filter((_, k) => k !== bj);
   }
@@ -92,113 +95,173 @@ export function groupSegments(S: Float32Array, n: number, segs: Segment[], param
   return { groups: groupOf, sim };
 }
 
+/**
+ * Length-weighted z-scores with a floor under the spread, so blocks that are really the
+ * same (an unchanging loop) stay near 0 instead of having their noise stretched to +-1.
+ */
+function zWeighted(values: number[], weights: number[], minSd: number): number[] {
+  const W = weights.reduce((a, b) => a + b, 0) || 1;
+  const m = values.reduce((s, v, i) => s + v * weights[i], 0) / W;
+  const sd = Math.sqrt(values.reduce((s, v, i) => s + (v - m) ** 2 * weights[i], 0) / W);
+  return values.map(v => (v - m) / Math.max(sd, minSd));
+}
+
+/**
+ * Arrangement density per block, as z-scores across the beat. Masters are limited, so
+ * loudness alone says little; what changes between a verse and a hook is what's playing:
+ *   808 / low end (30-120 Hz level and kick punch), highs (hats, crashes: 3.5 kHz+),
+ *   mid-range layers (300 Hz-3 kHz) and harmonic spread (how many notes sound at once).
+ */
+export function blockFullness(bf: BeatFeatures, segs: Segment[]): number[] {
+  const mean = (a: Float64Array, sg: Segment, db: boolean) => {
+    let s = 0;
+    for (let u = sg.start; u < sg.end; u++) s += db ? 10 ** (a[u] / 10) : a[u];
+    s /= Math.max(1, sg.end - sg.start);
+    return db ? 10 * Math.log10(s + 1e-10) : s;
+  };
+  const w = segs.map(sg => sg.end - sg.start);
+  // Floors: 1.5 dB for band levels, 15% of the mean kick punch, 0.03 of chroma entropy.
+  const punchRaw = segs.map(sg => mean(bf.lowHit, sg, false));
+  const punchMean = punchRaw.reduce((a, b) => a + b, 0) / (punchRaw.length || 1);
+  const low = zWeighted(segs.map(sg => mean(bf.lowDb, sg, true)), w, 1.5);
+  const punch = zWeighted(punchRaw, w, Math.max(1e-6, 0.15 * punchMean));
+  const high = zWeighted(segs.map(sg => mean(bf.highDb, sg, true)), w, 1.5);
+  const mid = zWeighted(segs.map(sg => mean(bf.midDb, sg, true)), w, 1.5);
+  const spread = zWeighted(segs.map(sg => mean(bf.chromaSpread, sg, false)), w, 0.03);
+  const raw = segs.map((_, i) => low[i] + 0.5 * punch[i] + high[i] + 0.5 * mid[i] + 0.5 * spread[i]);
+  return zWeighted(raw, w, 1);
+}
+
+/**
+ * Splits a repeat group in two where its blocks fall into a sparse and a full set
+ * (a gap of at least `gap` in fullness). Returns new group ids.
+ */
+export function splitByFullness(groups: number[], fullness: number[], gap = 0.5): number[] {
+  const out = [...groups];
+  let next = Math.max(-1, ...groups) + 1;
+  const ids = [...new Set(groups)];
+  for (const g of ids) {
+    const idx = groups.map((x, i) => (x === g ? i : -1)).filter(i => i >= 0);
+    if (idx.length < 2) continue;
+    const sorted = [...idx].sort((a, b) => fullness[a] - fullness[b]);
+    let bestGap = 0, at = -1;
+    for (let k = 1; k < sorted.length; k++) {
+      const d = fullness[sorted[k]] - fullness[sorted[k - 1]];
+      if (d > bestGap) { bestGap = d; at = k; }
+    }
+    if (bestGap >= gap) {
+      const id = next++;
+      for (const i of sorted.slice(at)) out[i] = id;
+    }
+  }
+  return out;
+}
+
 export interface LabelInput {
   groups: number[];
-  /** Segment-to-segment similarity (z-scores), from groupSegments. */
-  sim?: number[][];
-  /** Mean loudness per segment (dB). */
-  energyDb: number[];
-  /** Length per segment in bars. */
+  /** Arrangement density per block (z-scores), from blockFullness. */
+  fullness: number[];
+  /** Length per block in bars. */
   bars: number[];
-  /** Start and end (seconds) per segment. */
+  /** Start and end (seconds) per block. */
   starts: number[];
   ends: number[];
   durationSec: number;
 }
 
-/** Names each segment from its repetition group, loudness and position. */
-export function labelSegments(input: LabelInput, params: LabelParams = DEFAULT_LABEL_PARAMS): SectionType[] {
-  const { groups, energyDb, bars, starts, ends, durationSec, sim } = input;
+/** Beat-style names for each block: Intro, Hook, Verse, Bridge, Outro. */
+export function nameBeatSections(input: LabelInput): SectionType[] {
+  const { groups, fullness: f, bars, starts, ends, durationSec } = input;
   const K = groups.length;
   if (K === 0) return [];
   if (K === 1) return ['verse'];
-
-  // Loudness z-scores weighted by section length.
   const lens = starts.map((s, i) => ends[i] - s);
-  const totalLen = lens.reduce((a, b) => a + b, 0) || 1;
-  const mE = energyDb.reduce((s, e, i) => s + e * lens[i], 0) / totalLen;
-  const sdE = Math.sqrt(energyDb.reduce((s, e, i) => s + (e - mE) ** 2 * lens[i], 0) / totalLen) || 1;
-  const ez = energyDb.map(e => (e - mE) / sdE);
-
+  const L = K - 1;
   const members = new Map<number, number[]>();
   groups.forEach((g, i) => members.set(g, [...(members.get(g) ?? []), i]));
   const count = (i: number) => members.get(groups[i])!.length;
-
-  // Interior segments exclude a short quiet first/last section, so an intro never becomes "the chorus".
-  const isEdgeQuiet = (i: number) =>
-    (i === 0 || i === K - 1) && bars[i] <= 8.5 && ez[i] < 0.3;
-
-  // Chorus group: repeated, loud, and not only at the very edges.
-  let chorusGroup = -1;
-  let bestScore = -Infinity;
-  for (const [g, idx] of members) {
-    const core = idx.filter(i => !isEdgeQuiet(i));
-    if (core.length < 2) continue;
-    const meanE = core.reduce((s, i) => s + ez[i], 0) / core.length;
-    const firstAt = starts[core[0]] / durationSec;
-    // A chorus rarely opens a song: slight preference for groups that first appear later.
-    const score = meanE + 0.15 * (core.length - 2) + (firstAt > 0.08 ? 0.25 : 0);
-    if (score > bestScore) { bestScore = score; chorusGroup = g; }
-  }
-
   const types: SectionType[] = new Array(K).fill('verse');
-  if (chorusGroup >= 0) {
-    const chorusIdx = members.get(chorusGroup)!;
-    for (const i of chorusIdx) types[i] = 'chorus';
-    // Sections that sound like the chorus but fell just outside its group join it
-    // (a chorus with an extra layer, or a double chorus split in two).
-    if (sim) {
-      for (let i = 0; i < K; i++) {
-        if (types[i] === 'chorus' || isEdgeQuiet(i)) continue;
-        const s = chorusIdx.reduce((a, j) => a + sim[i][j], 0) / chorusIdx.length;
-        if (s >= params.chorusJoin) types[i] = 'chorus';
-      }
-    }
-  } else if (K >= 3) {
-    // Nothing repeats: the loudest interior section is the chorus.
-    let bi = 1;
-    for (let i = 1; i < K - 1; i++) if (ez[i] > ez[bi]) bi = i;
-    types[bi] = 'chorus';
-  }
+  const meanOf = (idx: number[]) => idx.reduce((s, i) => s + f[i] * lens[i], 0) / (idx.reduce((s, i) => s + lens[i], 0) || 1);
 
-  // Pre-chorus: a short non-chorus group that sits right before a chorus at least twice.
+  // Intro / outro: only the first / last block, 4-8 bars, and noticeably sparser
+  // than the body. A beat that drops full at 0:00 has no intro: bar 1 is the first section.
+  const body = Array.from({ length: K }, (_, i) => i).filter(i => i > 0 && i < L);
+  const bodyMean = body.length ? meanOf(body) : 0;
+  // (Edge blocks may carry a partial bar: a lead-in before beat 1, a tail after the last bar.)
+  if (bars[0] < 9.5 && f[0] < bodyMean - 0.5) types[0] = 'intro';
+  if (L > 0 && bars[L] < 9.5 && f[L] < bodyMean - 0.5) types[L] = 'outro';
+  const open = (i: number) => types[i] === 'verse';
+
+  // Hook: the fullest group that repeats, if it clearly stands out from the rest.
+  let hookGroup = -1;
+  let bestF = -Infinity;
   for (const [g, idx] of members) {
-    if (g === chorusGroup || idx.length < 2) continue;
-    const before = idx.filter(i => i + 1 < K && types[i + 1] === 'chorus' && i > 0 && types[i - 1] !== 'chorus' && types[i] === 'verse');
-    const meanBars = idx.reduce((s, i) => s + bars[i], 0) / idx.length;
-    if (before.length >= 2 && meanBars <= 8.5) for (const i of before) types[i] = 'pre-chorus';
+    const core = idx.filter(open);
+    if (core.length < 2) continue;
+    const m = meanOf(core);
+    if (m > bestF) { bestF = m; hookGroup = g; }
+  }
+  if (hookGroup >= 0) {
+    // It must stand out from something: with one loop throughout there is no hook to tell apart.
+    const rest = Array.from({ length: K }, (_, i) => i).filter(i => open(i) && groups[i] !== hookGroup);
+    if (!rest.length || bestF - meanOf(rest) < 0.5) hookGroup = -1;
+  }
+  if (hookGroup >= 0) {
+    for (const i of members.get(hookGroup)!) if (open(i)) types[i] = 'hook';
+  } else {
+    // Nothing full repeats, but one block clearly is the fullest: that's the hook.
+    const idx = Array.from({ length: K }, (_, i) => i).filter(open);
+    if (idx.length >= 2) {
+      const top = idx.reduce((b, i) => (f[i] > f[b] ? i : b), idx[0]);
+      if (f[top] - Math.max(...idx.filter(i => i !== top).map(i => f[i])) > 0.8) types[top] = 'hook';
+    }
   }
 
-  // One-off sections in the second half that aren't the chorus: one bridge.
-  let bridgeDone = false;
-  for (let i = 1; i < K - 1; i++) {
+  // Pacing: no hook straight after a hook (8-16 bars of something else between them),
+  // except a double hook that closes the beat. The sparser of the two becomes a verse.
+  for (let i = 1; i < K; i++) {
+    if (types[i] !== 'hook' || types[i - 1] !== 'hook') continue;
+    const closing = i === L || (i === L - 1 && types[L] === 'outro');
+    if (closing) continue;
+    if (f[i - 1] < f[i]) types[i - 1] = 'verse';
+    else types[i] = 'verse';
+  }
+
+  // Bridge: one block, heard once, in the second half, after a hook.
+  for (let i = 1; i < L; i++) {
     if (types[i] !== 'verse' || count(i) > 1) continue;
     const mid = (starts[i] + ends[i]) / 2 / durationSec;
-    const afterChorus = types.slice(0, i).includes('chorus');
-    if (!bridgeDone && mid > 0.45 && mid < 0.9 && afterChorus) {
+    const afterHook = types.slice(0, i).includes('hook');
+    const othersRepeat = groups.some((g, j) => j !== i && members.get(g)!.length > 1);
+    if (mid > 0.45 && mid < 0.92 && afterHook && othersRepeat) {
       types[i] = 'bridge';
-      bridgeDone = true;
+      break;
     }
   }
-
-  // Intro: the opening section unless it is a full-energy part of a repeated group.
-  const opensLoud = ez[0] >= 0.5 && count(0) > 1 && types[0] !== 'chorus';
-  if (bars[0] <= params.introMaxBars && !opensLoud) {
-    types[0] = 'intro';
-    // A two-part intro: a second short, quiet, one-off section right after it.
-    if (K > 3 && count(1) === 1 && ez[1] < 0 && bars[1] <= 8.5 && types[1] !== 'chorus') types[1] = 'intro';
-  } else if (ez[0] < -0.8) {
-    types[0] = 'intro';
-  }
-  // Outro: a closing section that is quieter than average or doesn't repeat.
-  const L = K - 1;
-  if (L > 0 && types[L] !== 'intro' && ((bars[L] <= 16.5 && (ez[L] < 0 || count(L) === 1)) || ez[L] < -0.8)) types[L] = 'outro';
-
   return types;
 }
 
+/** Joins neighbouring blocks with the same music while the result stays within maxBars. */
+export function mergeRepeats(segs: Segment[], groups: number[], bars: number[], maxBars = 16): { segs: Segment[]; groups: number[] } {
+  const outS: Segment[] = [];
+  const outG: number[] = [];
+  const outB: number[] = [];
+  for (let i = 0; i < segs.length; i++) {
+    const k = outS.length - 1;
+    if (k >= 0 && outG[k] === groups[i] && outB[k] + bars[i] <= maxBars + 0.3) {
+      outS[k] = { start: outS[k].start, end: segs[i].end };
+      outB[k] += bars[i];
+    } else {
+      outS.push({ ...segs[i] });
+      outG.push(groups[i]);
+      outB.push(bars[i]);
+    }
+  }
+  return { segs: outS, groups: outG };
+}
+
 // ---------------------------------------------------------------------------
-// Lyrics: repeated lines mark the chorus
+// Lyrics: repeated lines mark the hook
 // ---------------------------------------------------------------------------
 
 function normLine(s: string): string {
@@ -211,10 +274,10 @@ function lineSet(text: string): Set<string> {
 
 /**
  * Indices of sections whose lyrics repeat another section's (half their lines or
- * more in common). The largest such group is returned: that is the chorus.
+ * more in common). The largest such group is returned: that is the hook.
  * Returns [] when no lyrics repeat.
  */
-export function chorusFromRepeatedLyrics(texts: string[]): number[] {
+export function hookFromRepeatedLyrics(texts: string[]): number[] {
   const sets = texts.map(lineSet);
   const K = sets.length;
   const parent = Array.from({ length: K }, (_, i) => i);
@@ -234,22 +297,22 @@ export function chorusFromRepeatedLyrics(texts: string[]): number[] {
 }
 
 /**
- * Renames sections whose lyrics repeat to "chorus". Lyrics are the written text plus
+ * Renames sections whose lyrics repeat to "hook". Lyrics are the written text plus
  * any take transcripts. Returns the same array when nothing repeats.
  */
-export function markRepeatedLyricsAsChorus<T extends { text: string; type: SectionType; voiceNotes?: Array<{ transcript?: string }> }>(
+export function markRepeatedLyricsAsHook<T extends { text: string; type: SectionType; voiceNotes?: Array<{ transcript?: string }> }>(
   sections: T[]
 ): { sections: T[]; changed: number } {
   const texts = sections.map(s =>
     [s.text, ...(s.voiceNotes ?? []).map(t => t.transcript ?? '')].filter(Boolean).join('\n')
   );
-  const idx = chorusFromRepeatedLyrics(texts);
+  const idx = hookFromRepeatedLyrics(texts);
   if (idx.length < 2) return { sections, changed: 0 };
   let changed = 0;
   const out = sections.map((s, i) => {
     if (!idx.includes(i) || s.type === 'chorus' || s.type === 'hook') return s;
     changed++;
-    return { ...s, type: 'chorus' as SectionType };
+    return { ...s, type: 'hook' as SectionType };
   });
   return { sections: changed ? out : sections, changed };
 }

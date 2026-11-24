@@ -7,7 +7,7 @@ import { analyzeStructure, type StructureResult } from '../utils/structure';
 import { ANALYSIS_SR, resampleTo } from '../utils/structure/features';
 
 /** Bump when the algorithm changes, so beats analysed by an older version are redone. */
-export const STRUCTURE_VERSION = 1;
+export const STRUCTURE_VERSION = 2;
 
 const WORKER_TIMEOUT_MS = 45_000;
 

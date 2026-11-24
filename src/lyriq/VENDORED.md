@@ -17,7 +17,8 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 6. **Beat sectioning is ours.** `utils/structure/` + `services/structureAnalysis.ts` (new files) do the
    sectioning in a Web Worker. In `App.tsx`, `runBackgroundBeatAnalysis` calls `analyzeBeatStructure`
    instead of `analyzeBeatArrangement` (server), `isFinalArrangement` replaces the `source === 'ai'`
-   checks, and `handleConfirmReanalysis` runs `markRepeatedLyricsAsChorus`. `types.ts`: `BeatAnalysis`
+   checks, and `handleConfirmReanalysis` runs `markRepeatedLyricsAsHook`. Sections get beat-style names
+   (Intro, Hook, Verse, Bridge, Outro). `types.ts`: `BeatAnalysis`
    gains `source: 'local-structure'`, `version`, `groups`; `ArrangementSource` gains `'structure'`.
    `utils/audio.ts` gains `decodeToMono`.
 

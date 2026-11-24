@@ -10,6 +10,9 @@ export const N_FFT = 2048;
 /** 256 samples at 11025 Hz = 23.2 ms per frame (43.07 frames/s). */
 export const HOP = 256;
 export const N_MELS = 40;
+/** Onsets use a short window (46 ms): with the long one, a hit "arrives" up to 90 ms early. */
+export const N_FFT_ONSET = 512;
+const N_MELS_ONSET = 24;
 export const N_MFCC = 13;
 
 export interface FrameFeatures {
@@ -28,8 +31,14 @@ export interface FrameFeatures {
   rmsDb: Float32Array;
   /** Spectral-flux onset strength (all bands). */
   onset: Float32Array;
-  /** Onset strength from the bands under ~150 Hz (kick drum). */
+  /** Onset strength from the bands under ~150 Hz (kick drum, 808). */
   lowOnset: Float32Array;
+  /** Onset strength from the bands above 3.5 kHz (hats, crashes, risers). */
+  highOnset: Float32Array;
+  /** Band levels in dB: low 30-120 Hz (808/kick), mid 300-3000 Hz (melodic layers), high 3.5 kHz+ (hats, air). */
+  lowDb: Float32Array;
+  midDb: Float32Array;
+  highDb: Float32Array;
 }
 
 /** Block-averaging resampler, the same as the app's downsampleMono, also handling non-integer ratios. */
@@ -195,7 +204,12 @@ export function extractFrameFeatures(x: Float32Array, sr: number = ANALYSIS_SR):
   const mel = melFilterbank(sr, N_FFT, N_MELS, 30, Math.min(5000, sr / 2));
   const chromaOf = chromaMap(sr, N_FFT, 150, 2000);
   const dct = dctMatrix(N_MELS, N_MFCC, true);
-  const lowBands = mel.map((b, i) => ({ i, hz: (b.start * sr) / N_FFT })).filter(b => b.hz < 150).map(b => b.i);
+  // Band centre frequencies, to group mel bands into low / mid / high.
+  const centreHz = mel.map(b => ((b.start + b.weights.indexOf(Math.max(...b.weights))) * sr) / N_FFT);
+  const bandsIn = (lo: number, hi: number) => centreHz.map((hz, i) => ({ i, hz })).filter(b => b.hz >= lo && b.hz < hi).map(b => b.i);
+  const subBands = bandsIn(30, 120);
+  const midBands = bandsIn(300, 3000);
+  const highBands = bandsIn(3500, 1e9);
 
   const logMel = new Float32Array(nFrames * N_MELS);
   const mfcc = new Float32Array(nFrames * N_MFCC);
@@ -203,6 +217,10 @@ export function extractFrameFeatures(x: Float32Array, sr: number = ANALYSIS_SR):
   const rmsDb = new Float32Array(nFrames);
   const onset = new Float32Array(nFrames);
   const lowOnset = new Float32Array(nFrames);
+  const highOnset = new Float32Array(nFrames);
+  const lowDb = new Float32Array(nFrames);
+  const midDb = new Float32Array(nFrames);
+  const highDb = new Float32Array(nFrames);
 
   const re = new Float64Array(N_FFT);
   const im = new Float64Array(N_FFT);
@@ -234,6 +252,14 @@ export function extractFrameFeatures(x: Float32Array, sr: number = ANALYSIS_SR):
       melRow[m] = 10 * Math.log10(s + 1e-10);
       logMel[f * N_MELS + m] = melRow[m];
     }
+    const bandDb = (idx: number[]) => {
+      let p = 0;
+      for (const m of idx) p += 10 ** (melRow[m] / 10);
+      return 10 * Math.log10(p + 1e-10);
+    };
+    lowDb[f] = bandDb(subBands);
+    midDb[f] = bandDb(midBands);
+    highDb[f] = bandDb(highBands);
     for (let k = 0; k < N_MFCC; k++) {
       let s = 0;
       for (let n = 0; n < N_MELS; n++) s += dct[k * N_MELS + n] * melRow[n];
@@ -248,6 +274,39 @@ export function extractFrameFeatures(x: Float32Array, sr: number = ANALYSIS_SR):
     for (let p = 0; p < 12; p++) chroma[f * 12 + p] = chromaRow[p];
   }
 
+  // Onset curves from a short-window STFT centred on the same frames.
+  const oPlan = makeFftPlan(N_FFT_ONSET);
+  const oWin = new Float64Array(N_FFT_ONSET);
+  for (let i = 0; i < N_FFT_ONSET; i++) oWin[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N_FFT_ONSET);
+  const oMel = melFilterbank(sr, N_FFT_ONSET, N_MELS_ONSET, 30, Math.min(5000, sr / 2));
+  const oCentre = oMel.map(b => ((b.start + b.weights.indexOf(Math.max(...b.weights))) * sr) / N_FFT_ONSET);
+  const oLow = oCentre.map((hz, i) => ({ i, hz })).filter(b => b.hz < 150).map(b => b.i);
+  const oHigh = oCentre.map((hz, i) => ({ i, hz })).filter(b => b.hz >= 3500).map(b => b.i);
+  const oLog = new Float32Array(nFrames * N_MELS_ONSET);
+  const ore = new Float64Array(N_FFT_ONSET);
+  const oim = new Float64Array(N_FFT_ONSET);
+  const ohalf = N_FFT_ONSET / 2;
+  for (let f = 0; f < nFrames; f++) {
+    const centre = f * HOP;
+    for (let i = 0; i < N_FFT_ONSET; i++) {
+      const idx = centre - ohalf + i;
+      ore[i] = (idx >= 0 && idx < x.length ? x[idx] : 0) * oWin[i];
+      oim[i] = 0;
+    }
+    fftInPlace(oPlan, ore, oim);
+    for (let m = 0; m < N_MELS_ONSET; m++) {
+      const { start, weights } = oMel[m];
+      let p = 0;
+      for (let i = 0; i < weights.length; i++) { const k = start + i; p += weights[i] * (ore[k] * ore[k] + oim[k] * oim[k]); }
+      oLog[f * N_MELS_ONSET + m] = 10 * Math.log10(p + 1e-10);
+    }
+  }
+  {
+    let pk = -Infinity;
+    for (let i = 0; i < oLog.length; i++) if (oLog[i] > pk) pk = oLog[i];
+    for (let i = 0; i < oLog.length; i++) if (oLog[i] < pk - 80) oLog[i] = pk - 80;
+  }
+
   // Like librosa's power_to_db(top_db=80): floor the mel spectrogram 80 dB under its peak,
   // so the jump out of digital silence doesn't read as the strongest onset in the song.
   let peak = -Infinity;
@@ -258,17 +317,23 @@ export function extractFrameFeatures(x: Float32Array, sr: number = ANALYSIS_SR):
   for (let f = 1; f < nFrames; f++) {
     let flux = 0;
     let low = 0;
-    for (let m = 0; m < N_MELS; m++) {
-      const d = logMel[f * N_MELS + m] - logMel[(f - 1) * N_MELS + m];
+    let high = 0;
+    for (let m = 0; m < N_MELS_ONSET; m++) {
+      const d = oLog[f * N_MELS_ONSET + m] - oLog[(f - 1) * N_MELS_ONSET + m];
       if (d > 0) flux += d;
     }
-    for (const m of lowBands) {
-      const d = logMel[f * N_MELS + m] - logMel[(f - 1) * N_MELS + m];
+    for (const m of oLow) {
+      const d = oLog[f * N_MELS_ONSET + m] - oLog[(f - 1) * N_MELS_ONSET + m];
       if (d > 0) low += d;
     }
-    onset[f] = flux / N_MELS;
-    lowOnset[f] = lowBands.length ? low / lowBands.length : 0;
+    for (const m of oHigh) {
+      const d = oLog[f * N_MELS_ONSET + m] - oLog[(f - 1) * N_MELS_ONSET + m];
+      if (d > 0) high += d;
+    }
+    onset[f] = flux / N_MELS_ONSET;
+    lowOnset[f] = oLow.length ? low / oLow.length : 0;
+    highOnset[f] = oHigh.length ? high / oHigh.length : 0;
   }
 
-  return { sampleRate: sr, hop: HOP, fps: sr / HOP, nFrames, logMel, mfcc, chroma, rmsDb, onset, lowOnset };
+  return { sampleRate: sr, hop: HOP, fps: sr / HOP, nFrames, logMel, mfcc, chroma, rmsDb, onset, lowOnset, highOnset, lowDb, midDb, highDb };
 }

@@ -71,6 +71,17 @@ export function estimateTempo(onset: Float32Array, fps: number): number {
     const s = (ac[lag - 1] * 0.5 + ac[lag] + ac[lag + 1] * 0.5) * prior(lag);
     if (s > bestScore) { bestScore = s; best = lag; }
   }
+  // Half-time ambiguity: kick and snare alternate, so the 2-beat period often wins.
+  // Producers count those beats at the faster tempo (a "140" trap beat, not "70"), so a
+  // slow reading (under 80 BPM) moves up an octave when the double tempo has a real peak
+  // of its own. 80-95 stays: that is boom-bap territory, counted at the slower tempo.
+  const raw = (lag: number) => ac[lag - 1] * 0.5 + ac[lag] + ac[lag + 1] * 0.5;
+  if ((fps * 60) / best < 80) {
+    const half = Math.round(best / 2);
+    let hb = half;
+    for (let lag = Math.max(minLag, half - 1); lag <= Math.min(maxLag, half + 1); lag++) if (raw(lag) > raw(hb)) hb = lag;
+    if (hb >= minLag && (fps * 60) / hb <= 190 && raw(hb) >= 0.6 * raw(best)) best = hb;
+  }
   const y0 = ac[best - 1], y1 = ac[best], y2 = ac[best + 1];
   const denom = y0 - 2 * y1 + y2;
   const shift = denom < 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (y0 - y2)) / denom)) : 0;

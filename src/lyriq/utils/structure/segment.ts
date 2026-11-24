@@ -5,8 +5,10 @@
 //    - Foote checkerboard novelty on timbre and on harmony self-similarity (where the sound changes),
 //    - Serrà "structure features" on a recurrence lag matrix (where the pattern of repeats changes),
 //    - loudness steps.
-// 3. A dynamic programme over downbeats that trades novelty against a phrase-length
-//    prior (sections of 4, 8 or 16 bars are the norm in songs).
+// 3. A dynamic programme over bar lines (downbeats) that trades novelty against a
+//    phrase prior: beats are built from 8- and 16-bar blocks, so those lengths win,
+//    4 bars is allowed for short edges and breaks, and nothing runs past 16 bars
+//    (an unchanging loop still comes out as writable 16-bar blocks).
 
 import type { FrameFeatures } from './features';
 import { N_MFCC } from './features';
@@ -22,6 +24,15 @@ export interface BeatFeatures {
   timbre: Float64Array;
   /** Mean RMS level per beat (dB). */
   rmsDb: Float64Array;
+  /** Band levels per beat (dB): low 30-120 Hz, mid 300-3000 Hz, high 3.5 kHz+. */
+  lowDb: Float64Array;
+  midDb: Float64Array;
+  highDb: Float64Array;
+  /** Harmonic spread per beat: entropy of the chroma (0 = one note, 1 = all twelve). */
+  chromaSpread: Float64Array;
+  /** Strongest low (kick/808) and high (crash/hat) attack within a few frames of the beat. */
+  lowHit: Float64Array;
+  highHit: Float64Array;
 }
 
 export const TIMBRE_DIM = N_MFCC + 1;
@@ -32,25 +43,30 @@ export interface SegmentParams {
   wTimbre: number;
   wHarmony: number;
   wEnergy: number;
+  wTransition: number;
+  /** Penalty for a boundary that isn't on the first bar of a 4-bar phrase. */
+  hyperPenalty: number;
+  /** Weight of the kick/808 vote when choosing which beat is beat 1. */
+  anchorWeight: number;
   /** Per-boundary cost: higher means fewer sections. */
   boundaryCost: number;
-  /** Bonus for sections of 4/8/16 bars. */
+  /** Bonus for 8- and 16-bar sections (half of it for 4 bars). */
   phraseBonus: number;
-  /** Allow boundaries on any beat, not only on the detected downbeats. */
-  anyBeat?: boolean;
-  /** How far (beats) a boundary may slide from its downbeat toward a sharper change. */
-  refineBeats?: number;
+  /** Longest section, in bars. */
+  maxBars: number;
 }
 
-/** Tuned on the SongFormBench dev split (40 songs). */
 export const DEFAULT_SEGMENT_PARAMS: SegmentParams = {
   wStructure: 1,
   wTimbre: 1,
   wHarmony: 0.5,
   wEnergy: 0.5,
+  wTransition: 0.5,
+  hyperPenalty: 0.4,
+  anchorWeight: 1.5,
   boundaryCost: 1.4,
-  phraseBonus: 0.6,
-  refineBeats: 1,
+  phraseBonus: 0.8,
+  maxBars: 16,
 };
 
 /** Averages frame features over each beat interval. The region before the first beat becomes unit 0. */
@@ -62,18 +78,42 @@ export function beatSyncFeatures(feats: FrameFeatures, beatTimes: number[], dura
   const chroma = new Float64Array(n * 12);
   const mfccSum = new Float64Array(n * N_MFCC);
   const rmsDb = new Float64Array(n);
+  const lowDb = new Float64Array(n);
+  const midDb = new Float64Array(n);
+  const highDb = new Float64Array(n);
+  const chromaSpread = new Float64Array(n);
+  const lowHit = new Float64Array(n);
+  const highHit = new Float64Array(n);
+  const toDb = (p: number) => 10 * Math.log10(p + 1e-10);
   for (let i = 0; i < n; i++) {
     const a = Math.min(feats.nFrames - 1, Math.max(0, Math.floor(times[i] * feats.fps)));
     const end = i + 1 < n ? times[i + 1] : durationSec;
     const b = Math.min(feats.nFrames, Math.max(a + 1, Math.floor(end * feats.fps)));
     const cnt = b - a;
-    let r = 0;
+    let r = 0, pl = 0, pm = 0, ph = 0;
+    for (let f = Math.max(0, a - 2); f <= Math.min(feats.nFrames - 1, a + 2); f++) {
+      lowHit[i] = Math.max(lowHit[i], feats.lowOnset[f]);
+      highHit[i] = Math.max(highHit[i], feats.highOnset[f]);
+    }
     for (let f = a; f < b; f++) {
+      pl += 10 ** (feats.lowDb[f] / 10);
+      pm += 10 ** (feats.midDb[f] / 10);
+      ph += 10 ** (feats.highDb[f] / 10);
       for (let p = 0; p < 12; p++) chroma[i * 12 + p] += feats.chroma[f * 12 + p];
       for (let k = 0; k < N_MFCC; k++) mfccSum[i * N_MFCC + k] += feats.mfcc[f * N_MFCC + k];
       r += 10 ** (feats.rmsDb[f] / 10);
     }
-    rmsDb[i] = 10 * Math.log10(r / cnt + 1e-10);
+    rmsDb[i] = toDb(r / cnt);
+    lowDb[i] = toDb(pl / cnt);
+    midDb[i] = toDb(pm / cnt);
+    highDb[i] = toDb(ph / cnt);
+    {
+      let tot = 0;
+      for (let p = 0; p < 12; p++) tot += chroma[i * 12 + p];
+      let h = 0;
+      for (let p = 0; p < 12; p++) { const q = chroma[i * 12 + p] / (tot || 1); if (q > 0) h -= q * Math.log(q); }
+      chromaSpread[i] = h / Math.log(12);
+    }
     // Mean-centre, then unit length: drums add the same energy to every pitch class, and
     // without centring every beat looks alike. Cosine of centred chroma is a correlation.
     let mean = 0;
@@ -98,7 +138,7 @@ export function beatSyncFeatures(feats: FrameFeatures, beatTimes: number[], dura
   };
   for (let k = 0; k < N_MFCC; k++) standardise(i => mfccSum[i * N_MFCC + k], k, 1);
   standardise(i => rmsDb[i], N_MFCC, 2);
-  return { n, times, chroma, timbre, rmsDb };
+  return { n, times, chroma, timbre, rmsDb, lowDb, midDb, highDb, chromaSpread, lowHit, highHit };
 }
 
 /** Cosine self-similarity of row vectors. */
@@ -240,11 +280,43 @@ export function energyNovelty(bf: BeatFeatures, w = 8): Float64Array {
   return normaliseMax(out);
 }
 
+/**
+ * Producer transitions at a beat: a dropout right before it (drums/808 muted on the
+ * last beat or two of the bar) followed by the full beat coming back, plus an impact
+ * on the beat itself (kick/808 hit, crash or riser in the highs).
+ */
+export function transitionNovelty(bf: BeatFeatures): Float64Array {
+  const n = bf.n;
+  const z = (a: Float64Array) => {
+    let m = 0;
+    for (let i = 0; i < n; i++) m += a[i];
+    m /= n || 1;
+    let v = 0;
+    for (let i = 0; i < n; i++) v += (a[i] - m) ** 2;
+    const sd = Math.sqrt(v / (n || 1)) || 1;
+    return Array.from(a, x => (x - m) / sd);
+  };
+  const zLow = z(bf.lowHit);
+  const zHigh = z(bf.highHit);
+  const out = new Float64Array(n);
+  for (let u = 4; u < n; u++) {
+    // Level of the bar before, without its last two beats, vs. the dip at its end.
+    const before = (bf.rmsDb[u - 4] + bf.rmsDb[u - 3]) / 2;
+    const dip = Math.min(bf.rmsDb[u - 1], (bf.rmsDb[u - 1] + bf.rmsDb[u - 2]) / 2);
+    const back = bf.rmsDb[u];
+    const dropout = Math.max(0, before - dip) > 3 && back - dip > 3 ? Math.min(before - dip, back - dip) : 0;
+    const impact = Math.max(0, zLow[u]) + Math.max(0, zHigh[u]);
+    out[u] = dropout / 6 + 0.5 * impact;
+  }
+  return normaliseMax(out);
+}
+
 export interface NoveltyCurves {
   structure: Float64Array;
   timbre: Float64Array;
   harmony: Float64Array;
   energy: Float64Array;
+  transition: Float64Array;
 }
 
 export function computeNovelty(bf: BeatFeatures): NoveltyCurves & { ssmTimbre: Float32Array; ssmHarmony: Float32Array } {
@@ -265,102 +337,86 @@ export function computeNovelty(bf: BeatFeatures): NoveltyCurves & { ssmTimbre: F
     timbre: normaliseMax(timbre),
     harmony: normaliseMax(harmony),
     energy: energyNovelty(bf),
+    transition: transitionNovelty(bf),
     ssmTimbre,
     ssmHarmony,
   };
 }
 
+/** Combined novelty per beat unit, standardised (z-scores) so costs mean the same in every song. */
+export function combinedNovelty(nov: NoveltyCurves, n: number, params: SegmentParams = DEFAULT_SEGMENT_PARAMS): Float64Array {
+  const out = new Float64Array(n);
+  const wSum = params.wStructure + params.wTimbre + params.wHarmony + params.wEnergy + params.wTransition || 1;
+  for (let i = 0; i < n; i++) {
+    out[i] =
+      (params.wStructure * nov.structure[i] + params.wTimbre * nov.timbre[i] +
+        params.wHarmony * nov.harmony[i] + params.wEnergy * nov.energy[i] +
+        params.wTransition * nov.transition[i]) / wSum;
+  }
+  let m = 0;
+  for (let i = 0; i < n; i++) m += out[i];
+  m /= n || 1;
+  let v = 0;
+  for (let i = 0; i < n; i++) v += (out[i] - m) ** 2;
+  const sd = Math.sqrt(v / (n || 1)) || 1;
+  for (let i = 0; i < n; i++) out[i] = (out[i] - m) / sd;
+  return out;
+}
+
 /**
- * Picks section starts among downbeat beat-units.
- * `downbeatUnits`: beat-unit indices that are downbeats, ascending.
- * Returns the chosen unit indices (excluding 0), each a section start.
+ * Picks section starts among bar lines.
+ * `barUnits`: beat-unit indices of the bar lines (downbeats), ascending.
+ * Returns the chosen unit indices (excluding 0), each a section start, and the score,
+ * so callers can compare downbeat phases.
  */
 export function chooseBoundaries(
-  nov: NoveltyCurves,
+  novelty: Float64Array,
   n: number,
-  downbeatUnits: number[],
-  params: SegmentParams = DEFAULT_SEGMENT_PARAMS,
+  barUnits: number[],
+  params: SegmentParams,
   /** Start time of each unit, and the bar length: section lengths are measured in time. */
-  timing?: { times: number[]; durationSec: number; barSec: number }
-): number[] {
-  if (downbeatUnits.length < 3) return [];
-  const combined = new Float64Array(n);
-  const wSum = params.wStructure + params.wTimbre + params.wHarmony + params.wEnergy || 1;
-  for (let i = 0; i < n; i++) {
-    combined[i] =
-      (params.wStructure * nov.structure[i] + params.wTimbre * nov.timbre[i] +
-        params.wHarmony * nov.harmony[i] + params.wEnergy * nov.energy[i]) / wSum;
-  }
-  // Standardise so the boundary cost means the same in every song.
-  let m = 0;
-  for (let i = 0; i < n; i++) m += combined[i];
-  m /= n;
-  let v = 0;
-  for (let i = 0; i < n; i++) v += (combined[i] - m) ** 2;
-  const sd = Math.sqrt(v / n) || 1;
-  const valueAt = (u: number) => {
-    let best = -Infinity;
-    for (let d = -1; d <= 1; d++) {
-      const j = u + d;
-      if (j >= 0 && j < n) best = Math.max(best, (combined[j] - m) / sd);
-    }
-    return best;
-  };
-
-  // Positions: virtual start (unit 0), downbeats > 0, virtual end (unit n).
-  const pos = [0, ...downbeatUnits.filter(u => u > 0 && u < n), n];
-  const beatsPerBar = 4;
-  const timeOf = (u: number) => (timing ? (u >= n ? timing.durationSec : timing.times[u]) : u);
-  const barsBetween = (a: number, b: number) =>
-    timing ? (timeOf(pos[b]) - timeOf(pos[a])) / timing.barSec : (pos[b] - pos[a]) / beatsPerBar;
-  const prior = (bars: number) => {
-    const r = Math.round(bars);
-    if (bars < 1.5) return -3;
-    if (Math.abs(bars - r) > 0.3) return -params.phraseBonus; // partial bars: only at the song edges
-    if (r === 4 || r === 8 || r === 16) return params.phraseBonus;
-    if (r === 2 || r === 12) return 0;
-    if (r > 32) return -params.phraseBonus * 2;
-    return -params.phraseBonus * 0.5;
-  };
+  timing: { times: number[]; durationSec: number; barSec: number },
+  /** 4-bar phrase grid: bar k (0 = first bar line) starts a phrase when (k - hyperOffset) % 4 == 0. */
+  hyperOffset = 0
+): { starts: number[]; score: number } {
+  const bars = barUnits.filter(u => u > 0 && u < n);
+  const pos = [0, ...bars, n];
+  // Bar index of each position (bar lines counted from the first one).
+  const barIdx = [-1, ...bars.map((_, k) => k), -1];
   const P = pos.length;
+  const timeOf = (u: number) => (u >= n ? timing.durationSec : timing.times[u]);
+  const barsBetween = (a: number, b: number) => (timeOf(pos[b]) - timeOf(pos[a])) / timing.barSec;
+  // The novelty peak may sit a beat either side of the bar line it belongs to, but a peak
+  // right on the bar line counts more: otherwise all four beat phases score the same.
+  const valueAt = (u: number) =>
+    Math.max(novelty[u] ?? -Infinity, 0.8 * (novelty[u - 1] ?? -Infinity), 0.8 * (novelty[u + 1] ?? -Infinity));
+  const prior = (bars: number, edge: boolean) => {
+    const r = Math.round(bars);
+    // Edge sections may be partial bars (a pickup before bar 1, a tail after the last bar).
+    if (Math.abs(bars - r) > 0.3) return edge ? 0 : -3 * params.phraseBonus;
+    if (r === 8 || r === 16) return params.phraseBonus;
+    if (r === 4) return edge ? params.phraseBonus * 0.5 : 0;
+    if (r === 12) return 0;
+    if (r % 2 === 0) return -params.phraseBonus;
+    return -2 * params.phraseBonus;
+  };
   const best = new Float64Array(P).fill(-Infinity);
   const prev = new Int32Array(P).fill(-1);
   best[0] = 0;
-  const maxBack = 40; // positions (bars): no section longer than 40 bars
   for (let j = 1; j < P; j++) {
-    const gain = j === P - 1 ? 0 : valueAt(pos[j]) - params.boundaryCost;
-    for (let i = Math.max(0, j - maxBack); i < j; i++) {
-      if (best[i] === -Infinity) continue;
+    const offPhrase = j < P - 1 && (((barIdx[j] - hyperOffset) % 4) + 4) % 4 !== 0;
+    const gain = j === P - 1 ? 0 : valueAt(pos[j]) - params.boundaryCost - (offPhrase ? params.hyperPenalty : 0);
+    for (let i = j - 1; i >= 0; i--) {
       const bars = barsBetween(i, j);
-      // Edge sections (first / last) may be partial bars without the penalty.
-      const isEdge = i === 0 || j === P - 1;
-      // No section shorter than 1.5 bars, anywhere: a 1-second "outro" is noise, not a section.
-      if (bars < 1.5) continue;
-      const pr = isEdge && Math.abs(bars - Math.round(bars)) > 0.3 ? 0 : prior(bars);
-      const s = best[i] + pr + gain;
+      if (bars > params.maxBars + 0.3) break;
+      // No section under 1.5 bars, anywhere: a 1-second "outro" is noise, not a section.
+      if (bars < 1.5 || best[i] === -Infinity) continue;
+      const s = best[i] + prior(bars, i === 0 || j === P - 1) + gain;
       if (s > best[j]) { best[j] = s; prev[j] = i; }
     }
   }
-  const chosen: number[] = [];
-  for (let j = prev[P - 1]; j > 0; j = prev[j]) chosen.push(pos[j]);
-  chosen.reverse();
-
-  // Each boundary may slide a couple of beats to the sharpest change nearby: on real
-  // recordings the downbeat phase is often off by a beat or two, or slips mid-song.
-  const r = params.refineBeats ?? 0;
-  if (r <= 0) return chosen;
-  const refined: number[] = [];
-  for (let k = 0; k < chosen.length; k++) {
-    const lo = Math.max(1, chosen[k] - r, (refined[k - 1] ?? 0) + 4);
-    const hi = Math.min(n - 1, chosen[k] + r, (chosen[k + 1] ?? n) - 4);
-    let bu = chosen[k];
-    let bv = -Infinity;
-    for (let u = lo; u <= hi; u++) {
-      // Ties go to the original downbeat.
-      const v = combined[u] + (u === chosen[k] ? 1e-6 : 0);
-      if (v > bv) { bv = v; bu = u; }
-    }
-    refined.push(bu);
-  }
-  return refined;
+  if (best[P - 1] === -Infinity) return { starts: [], score: -Infinity };
+  const starts: number[] = [];
+  for (let j = prev[P - 1]; j > 0; j = prev[j]) starts.push(pos[j]);
+  return { starts: starts.reverse(), score: best[P - 1] };
 }

@@ -9,7 +9,7 @@ import {
 } from './types';
 import { fetchSongSuggestions, formatAiError, getAiFeatures, type AiFeatures } from './services/ai';
 import { analyzeBeatStructure, isFinalArrangement, toBeatAnalysis } from './services/structureAnalysis';
-import { markRepeatedLyricsAsChorus } from './utils/structure';
+import { markRepeatedLyricsAsHook } from './utils/structure';
 import {
   createImmediateBeat,
   createStarterBeats,
@@ -1139,8 +1139,8 @@ export default function App() {
         mode,
         takeIndicesRef.current
       );
-      // Lyrics that repeat mark the chorus better than the audio alone can.
-      const { sections: updated, changed: lyricChoruses } = markRepeatedLyricsAsChorus(reTimed);
+      // Lyrics that repeat mark the hook better than the audio alone can.
+      const { sections: updated, changed: lyricHooks } = markRepeatedLyricsAsHook(reTimed);
       pushUndoSnapshot(sectionsRef.current, updated);
       setSections(updated);
       takeIndicesRef.current = remappedIndices;
@@ -1154,7 +1154,7 @@ export default function App() {
         (mode === 'markers-only'
           ? `Updated section markers (${updated.length} sections). Lyrics and vocal sync preserved.`
           : `Replaced section layout (${updated.length} sections). Vocal recordings preserved.`) +
-          (lyricChoruses > 0 ? ` Repeated lyrics marked ${lyricChoruses === 1 ? 'a section' : `${lyricChoruses} sections`} as chorus.` : '')
+          (lyricHooks > 0 ? ` Repeated lyrics marked ${lyricHooks === 1 ? 'a section' : `${lyricHooks} sections`} as hook.` : '')
       );
     },
     [pendingReanalysis, pushUndoSnapshot, showNotice]

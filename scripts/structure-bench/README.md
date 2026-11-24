@@ -1,39 +1,34 @@
-# Structure analysis benchmark
+# Structure analysis benchmark (boundaries only)
 
-Scores the editor's beat sectioning (`src/lyriq/utils/structure`) against human
-annotations from [SongFormBench](https://huggingface.co/datasets/ASLP-lab/SongFormBench)
-(CC-BY-4.0): real songs with expert-labelled sections.
+Checks where the editor's beat sectioning (`src/lyriq/utils/structure`) puts section
+boundaries, against human annotations from
+[SongFormBench](https://huggingface.co/datasets/ASLP-lab/SongFormBench) (CC-BY-4.0).
+These are songs **with vocals**; the sectioning is built for instrumentals, so only
+boundaries are scored here, not names. Names are tested on synthetic beats in
+`src/lyriq/__tests__/structure.test.ts`.
 
 ```bash
 ./fetch.sh                # ~840 MB into ./data (git-ignored); needs ffmpeg
-node run.mjs test         # new algorithm, held-out split
+node run.mjs test         # held-out split
 node run.mjs test --old   # the previous energy-only draft, for comparison
-node train.mjs            # refit the section-name weights (labelModel.ts) on dev
 ```
 
-Splits: **dev** = first 40 HarmonixSet songs (all tuning and fitting happened here),
-**test** = next 40 HarmonixSet songs, **cn** = 20 Chinese pop songs. Test and cn were
-never used for tuning.
+Splits: **dev** = first 40 HarmonixSet songs (tuning happened here), **test** = next 40,
+**cn** = 20 Chinese pop songs.
 
-Metrics: **HR.5F / HR3F** = F-measure of section starts found within 0.5 s / 3 s
-(the "trim" variants leave out the song's first and last boundary, which are free).
-**ACC** = share of time with the right name, using 7 classes (pre-chorus counts as verse).
-The editor has no "instrumental" or "silence" name, and those are about a fifth of the
-annotated time, so ACC can't reach 1.
+**HR.5F / HR3F** = F-measure of section starts found within 0.5 s / 3 s ("trim" leaves
+out the song's first and last boundary, which are free). Matching is greedy one-to-one by
+distance (mir_eval uses maximum bipartite matching; results differ slightly).
 
-Results (2026-11-24):
+Results (2026-11-24, STRUCTURE_VERSION 2):
 
-| Split | Version | HR.5F | HR3F | HR.5F trim | HR3F trim | ACC |
-|---|---|---|---|---|---|---|
-| test (40) | old energy draft | 0.180 | 0.417 | 0.055 | 0.315 | 0.462 |
-| test (40) | **new** | **0.466** | **0.640** | **0.406** | **0.581** | **0.621** |
-| cn (20) | old energy draft | 0.222 | 0.466 | 0.077 | 0.347 | 0.619 |
-| cn (20) | **new** | **0.377** | **0.685** | **0.293** | **0.631** | **0.746** |
+| Split | Version | HR.5F | HR3F | HR.5F trim | HR3F trim |
+|---|---|---|---|---|---|
+| test (40) | old energy draft | 0.180 | 0.417 | 0.055 | 0.315 |
+| test (40) | v1 (any beat, song names) | 0.466 | 0.640 | 0.406 | 0.581 |
+| test (40) | **v2 (bar-aligned beat blocks)** | **0.512** | **0.670** | **0.452** | **0.613** |
+| dev (40) | old / v1 / **v2** | 0.213 / 0.464 / **0.415** | 0.440 / 0.700 / **0.678** | 0.044 / 0.384 / **0.320** | 0.311 / 0.648 / **0.620** |
+| cn (20) | old / v1 / **v2** | 0.222 / 0.377 / **0.269** | 0.466 / 0.685 / **0.675** | 0.077 / 0.293 / **0.162** | 0.347 / 0.631 / **0.614** |
 
-For reference, published scores on the full 200-song HarmonixSet half (SongFormer
-paper, arXiv 2510.02797; their metric code, so only roughly comparable):
-All-In-One 0.596 / 0.730 / ACC 0.740, SongFormer 0.703 / 0.784 / ACC 0.795,
-Gemini 2.5 Pro 0.423 / 0.813 / ACC 0.748.
-
-Matching here is greedy one-to-one by distance (mir_eval uses maximum bipartite
-matching; results differ slightly).
+v2 forces every boundary onto a bar line. Vocal songs often start a section on a pickup,
+which costs some ±0.5 s hits on dev and cn; ±3 s is unchanged.
