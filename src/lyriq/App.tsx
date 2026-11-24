@@ -7,8 +7,9 @@ import LibraryView from './components/LibraryView';
 import {
   SongSection, SectionType, Take, ImportedBeat, SongSession, BeatAnalysis, ArrangementSource,
 } from './types';
-import { buildBeatAnalysisWav } from './utils/audio';
-import { ApiError, analyzeBeatArrangement, fetchSongSuggestions, formatAiError, getAiFeatures, type AiFeatures } from './services/ai';
+import { fetchSongSuggestions, formatAiError, getAiFeatures, type AiFeatures } from './services/ai';
+import { analyzeBeatStructure, isFinalArrangement, toBeatAnalysis } from './services/structureAnalysis';
+import { markRepeatedLyricsAsChorus } from './utils/structure';
 import {
   createImmediateBeat,
   createStarterBeats,
@@ -900,10 +901,11 @@ export default function App() {
   }, []);
 
   /**
-   * Runs background or explicit `/api/analyze-beat` for a beat (e.g. newly uploaded
-   * beat, uncached Vault beat, or explicit "Re-analyze Beat Arrangement"), caches the
-   * AI arrangement in IndexedDB, and silently upgrades untouched projects in place.
-   * Automatic background failures are swallowed silently so local-first flow is never interrupted.
+   * Sections a beat in the browser (utils/structure: beats, downbeats, repetition,
+   * names) for a newly imported beat, a library beat analysed by an older version,
+   * or an explicit "Re-analyze Beat Arrangement". Caches the result on the beat and
+   * silently upgrades untouched projects in place. Automatic failures stay silent so
+   * the local-first flow is never interrupted.
    */
   const runBackgroundBeatAnalysis = useCallback(
     async (
@@ -916,8 +918,9 @@ export default function App() {
       } = {}
     ) => {
       if (beat.isStarter) return;
-      if (!options.explicit && beat.arrangement?.source === 'ai') return;
-      if (!options.analysisWav && !beat.audioBlob) {
+      if (!options.explicit && isFinalArrangement(beat.arrangement)) return;
+      const audio = beat.audioBlob ?? options.analysisWav;
+      if (!audio) {
         if (options.explicit) showNotice('Audio data for this beat is unavailable to analyze.', 'error');
         return;
       }
@@ -929,72 +932,39 @@ export default function App() {
 
       setIsAnalyzingBeatBg(true);
       try {
-        let analysisWav = options.analysisWav;
-        let duration = beat.duration;
-        let effectiveBpm =
-          options.bpmPreference ??
-          (beat.bpm && beat.bpm >= 40 && beat.bpm <= 240 ? beat.bpm : undefined);
-        let effectiveConfidence = beat.bpmConfidence;
-        let effectiveOrigin = beat.gridOriginSec ?? 0;
-
-        if (!analysisWav) {
-          const prepared = await buildBeatAnalysisWav(beat.audioBlob!, beat.bpm);
-          if (token !== beatAnalysisTokenRef.current || controller.signal.aborted) return;
-          if (!prepared) {
-            throw new Error('Could not decode this beat for arrangement analysis.');
-          }
-          analysisWav = prepared.analysisWav;
-          duration = prepared.duration || beat.duration;
-          effectiveBpm = effectiveBpm ?? prepared.detectedBpm?.bpm;
-          effectiveConfidence = effectiveConfidence ?? prepared.detectedBpm?.confidence;
-          effectiveOrigin =
-            beat.gridOriginSec && beat.gridOriginSec > 0
-              ? beat.gridOriginSec
-              : prepared.gridOriginSec ?? beat.gridOriginSec ?? 0;
-        }
-
-        const data = await analyzeBeatArrangement(
-          {
-            audioBlob: analysisWav,
-            mimeType: 'audio/wav',
-            fileName: options.fileName || beat.name,
-            audioDurationSec: duration,
-            bpm: effectiveBpm,
-            gridOriginSec: effectiveOrigin,
-            bpmConfidence: effectiveConfidence,
-          },
-          controller.signal
-        );
+        // A tempo the user gave (file name or typed in) is kept; a detected one is re-measured.
+        const userBpm =
+          (beat.bpmSource === 'filename' || beat.bpmSource === 'manual') && beat.bpm && beat.bpm >= 40 && beat.bpm <= 240
+            ? beat.bpm
+            : undefined;
+        const result = await analyzeBeatStructure(audio, userBpm);
         if (token !== beatAnalysisTokenRef.current || controller.signal.aborted) return;
-
-        if (!Array.isArray(data.sections) || data.sections.length === 0) {
-          throw new Error('AI returned no usable sections.');
+        if (!result || result.sections.length === 0) {
+          throw new Error('Could not decode this beat for arrangement analysis.');
         }
 
-        const finalBpm = options.bpmPreference ?? effectiveBpm ?? data.estimatedBpm ?? beat.bpm;
-        const grid: BeatGrid | null =
-          finalBpm && finalBpm >= 40 && finalBpm <= 240
-            ? { bpm: finalBpm, gridOriginSec: effectiveOrigin, confidence: effectiveConfidence }
-            : null;
+        const duration = result.durationSec || beat.duration;
+        const finalBpm = userBpm ?? result.bpm;
+        const effectiveConfidence = userBpm ? 1 : result.gridConfidence;
+        const effectiveOrigin = result.gridOriginSec;
+        const grid: BeatGrid = { bpm: finalBpm, gridOriginSec: effectiveOrigin, confidence: effectiveConfidence };
         const snappedSections =
-          duration > 0
-            ? applyGridSnapToArrangement(data.sections, duration, grid, true)
-            : data.sections;
+          duration > 0 ? applyGridSnapToArrangement(result.sections, duration, grid, true) : result.sections;
         const finalAnalysis: BeatAnalysis = {
-          ...data,
-          source: 'ai',
-          estimatedBpm: finalBpm ?? data.estimatedBpm,
-          gridOriginSec: effectiveOrigin,
+          ...toBeatAnalysis(result),
+          estimatedBpm: finalBpm,
           sections: snappedSections,
         };
 
         // Always persist cached AI arrangement + grid metadata onto the beat in state & IndexedDB.
         cacheBeatMetadata(beat.id, {
-          bpm: finalBpm ?? beat.bpm,
+          bpm: finalBpm,
           bpmConfidence: effectiveConfidence,
+          bpmSource: userBpm ? beat.bpmSource : 'detected',
           gridOriginSec: effectiveOrigin,
           arrangement: finalAnalysis,
         });
+        if (importedBeatRef.current?.id === beat.id) setBpm(finalBpm);
 
         // Only mutate active song if this beat is still the active beat.
         if (importedBeatRef.current?.id !== beat.id) return;
@@ -1022,14 +992,14 @@ export default function App() {
               energy: sec.energy,
             }))
           );
-          setArrangementSource('ai');
+          setArrangementSource('structure');
           if (options.explicit) {
             showNotice(`Arranged into ${finalAnalysis.sections.length} beat-snapped sections.`);
           }
         } else if (options.explicit) {
           const updatedBeat = {
             ...beat,
-            bpm: finalBpm ?? beat.bpm,
+            bpm: finalBpm,
             gridOriginSec: effectiveOrigin,
             arrangement: finalAnalysis,
           };
@@ -1037,12 +1007,9 @@ export default function App() {
         }
       } catch (err) {
         if (token !== beatAnalysisTokenRef.current || controller.signal.aborted) return;
+        console.warn('Beat structure analysis failed:', err);
         if (options.explicit) {
-          const reason = formatAiError(err, 'arrangement');
-          showNotice(
-            `Auto-arrangement failed: ${reason}`,
-            err instanceof ApiError && err.code === 'ai_unavailable' ? 'info' : 'error'
-          );
+          showNotice(`Could not analyze this beat: ${err instanceof Error ? err.message : 'unknown error'}`, 'error');
         }
       } finally {
         if (beatAnalysisAbortRef.current === controller) beatAnalysisAbortRef.current = null;
@@ -1113,7 +1080,7 @@ export default function App() {
               : resolvedAnalysis.sections;
 
           const stamp = Date.now();
-          setArrangementSource(resolvedAnalysis.source === 'local-energy' ? 'energy' : 'ai');
+          setArrangementSource(resolvedAnalysis.source === 'local-energy' ? 'energy' : resolvedAnalysis.source === 'local-structure' ? 'structure' : 'ai');
           return snappedSections.map((sec, idx): SongSection => ({
             id: `s-auto-${stamp}-${idx}`,
             type: sec.type,
@@ -1140,7 +1107,7 @@ export default function App() {
       if (
         options?.triggerBackgroundAnalysis &&
         !enrichedBeat.isStarter &&
-        enrichedBeat.arrangement?.source !== 'ai' &&
+        !isFinalArrangement(enrichedBeat.arrangement) &&
         (options.analysisWav || enrichedBeat.audioBlob)
       ) {
         void runBackgroundBeatAnalysis(enrichedBeat, {
@@ -1165,26 +1132,29 @@ export default function App() {
     (mode: 'markers-only' | 'replace-layout') => {
       if (!pendingReanalysis) return;
       const { analysis } = pendingReanalysis;
-      const { sections: updated, activeTakeIndices: remappedIndices } = applyReanalyzedArrangement(
+      const { sections: reTimed, activeTakeIndices: remappedIndices } = applyReanalyzedArrangement(
         sectionsRef.current,
         timingsRef.current,
         analysis.sections,
         mode,
         takeIndicesRef.current
       );
+      // Lyrics that repeat mark the chorus better than the audio alone can.
+      const { sections: updated, changed: lyricChoruses } = markRepeatedLyricsAsChorus(reTimed);
       pushUndoSnapshot(sectionsRef.current, updated);
       setSections(updated);
       takeIndicesRef.current = remappedIndices;
       setActiveTakeIndices(remappedIndices);
-      setArrangementSource('ai');
+      setArrangementSource(analysis.source === 'local-structure' ? 'structure' : 'ai');
       if (updated[0] && !updated.some(s => s.id === activeSectionIdRef.current)) {
         setActiveSectionId(updated[0].id);
       }
       setPendingReanalysis(null);
       showNotice(
-        mode === 'markers-only'
+        (mode === 'markers-only'
           ? `Updated section markers (${updated.length} sections). Lyrics and vocal sync preserved.`
-          : `Replaced section layout (${updated.length} sections). Vocal recordings preserved.`
+          : `Replaced section layout (${updated.length} sections). Vocal recordings preserved.`) +
+          (lyricChoruses > 0 ? ` Repeated lyrics marked ${lyricChoruses === 1 ? 'a section' : `${lyricChoruses} sections`} as chorus.` : '')
       );
     },
     [pendingReanalysis, pushUndoSnapshot, showNotice]
@@ -1448,7 +1418,7 @@ export default function App() {
     handleImportBeat(readyBeat, immediateArrangement);
     setViewMode('studio');
     showNotice(`Loaded "${readyBeat.name}" into current song.`);
-    if (!readyBeat.isStarter && readyBeat.arrangement?.source !== 'ai' && readyBeat.audioBlob) {
+    if (!readyBeat.isStarter && !isFinalArrangement(readyBeat.arrangement) && readyBeat.audioBlob) {
       void runBackgroundBeatAnalysis(readyBeat);
     }
   }, [handleImportBeat, runBackgroundBeatAnalysis, showNotice]);
@@ -1488,7 +1458,7 @@ export default function App() {
         isUserModified: false,
         energy: sec.energy,
       }));
-      initialArrangementSource = immediateArrangement.source === 'local-energy' ? 'energy' : 'ai';
+      initialArrangementSource = immediateArrangement.source === 'local-energy' ? 'energy' : immediateArrangement.source === 'local-structure' ? 'structure' : 'ai';
     } else {
       initialSections = [newBlankSection()];
     }
@@ -1514,7 +1484,7 @@ export default function App() {
     setViewMode('studio');
     requestFocusSection(initialSections[0].id, 'start');
     showNotice(`Created "${newSession.title}" with beat.`);
-    if (!readyBeat.isStarter && readyBeat.arrangement?.source !== 'ai' && readyBeat.audioBlob) {
+    if (!readyBeat.isStarter && !isFinalArrangement(readyBeat.arrangement) && readyBeat.audioBlob) {
       void runBackgroundBeatAnalysis(readyBeat);
     }
   }, [cacheBeatMetadata, requestFocusSection, runBackgroundBeatAnalysis, showNotice]);

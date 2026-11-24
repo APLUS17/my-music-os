@@ -35,7 +35,7 @@ export interface Take {
   warnings?: string[];
 }
 
-export type ArrangementSource = 'ai' | 'manual' | 'even' | 'energy';
+export type ArrangementSource = 'ai' | 'manual' | 'even' | 'energy' | 'structure';
 
 export interface ImportedBeat {
   id: string;
@@ -61,9 +61,16 @@ export interface ImportedBeat {
   isFavorite?: boolean;
 }
 
-/** Result of server-side arrangement analysis or local energy fallback; absent fields mean unavailable. */
+/**
+ * A beat's arrangement. 'local-structure' is the in-browser structure analysis
+ * (utils/structure); 'local-energy' the instant draft shown while it runs.
+ */
 export interface BeatAnalysis {
-  source?: 'ai' | 'local-energy';
+  source?: 'ai' | 'local-energy' | 'local-structure';
+  /** Algorithm version for 'local-structure' (services/structureAnalysis STRUCTURE_VERSION). */
+  version?: number;
+  /** Repetition group per section ('A', 'B', ...): same letter, same music. */
+  groups?: string[];
   estimatedBpm?: number;
   gridOriginSec?: number;
   sections: Array<{

@@ -50,6 +50,23 @@ function mixToMono(buffer: AudioBuffer): Float32Array {
   return out;
 }
 
+/** Decodes an audio file to mono PCM (channel mean). Null when the browser can't decode it. */
+export async function decodeToMono(file: Blob): Promise<{ mono: Float32Array; sampleRate: number } | null> {
+  const Ctor = getAudioContextCtor();
+  if (!Ctor || file.size === 0 || file.size > MAX_DECODE_BYTES) return null;
+  let ctx: AudioContext | null = null;
+  try {
+    ctx = new Ctor();
+    const buffer = await decodeAudioBuffer(ctx, await file.arrayBuffer());
+    return { mono: mixToMono(buffer), sampleRate: buffer.sampleRate };
+  } catch (err) {
+    console.warn('Could not decode audio for structure analysis:', err);
+    return null;
+  } finally {
+    ctx?.close().catch(() => {});
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Analysis
 // ---------------------------------------------------------------------------

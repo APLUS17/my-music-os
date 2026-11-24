@@ -16,7 +16,7 @@
 
 The two UIs are separate **route groups** with their own root layouts (`src/app/(lyriq)/`, `src/app/(classic)/`) so their CSS cannot collide. Navigating between them is a full page load.
 
-**New-app API** (`src/app/api/`): `transcribe-audio` (raw WAV in, `{lines:[{text,startSec,endSec}]}` out, via Groq Whisper with word timestamps and your written lyrics as a spelling hint; mapping in `src/lib/server/whisperLines.ts`), `health` (`{ai, features:{transcription,arrangement,suggestions}}`), and `analyze-beat` / `song-assistant` which always answer `503 ai_unavailable` (beat sectioning runs locally; suggestions are not wired). A per-IP rate limiter guards them because auth is off. The classic app still uses `/api/transcribe` and `/api/muse/*`.
+**New-app API** (`src/app/api/`): `transcribe-audio` (raw WAV in, `{lines:[{text,startSec,endSec}]}` out, via Groq Whisper with word timestamps and your written lyrics as a spelling hint; mapping in `src/lib/server/whisperLines.ts`), `health` (`{ai, features:{transcription,arrangement,suggestions}}`), and `analyze-beat` / `song-assistant` which always answer `503 ai_unavailable` (suggestions are not wired). **Beat sectioning runs in the browser**: `src/lyriq/utils/structure/` (beats, downbeats, repetition-based boundaries, A/B/C groups, fitted section names) in a Web Worker, see its README; benchmark against human-annotated songs in `scripts/structure-bench/`. A per-IP rate limiter guards them because auth is off. The classic app still uses `/api/transcribe` and `/api/muse/*`.
 
 ---
 

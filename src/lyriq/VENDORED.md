@@ -14,6 +14,12 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 4. `__tests__/`: `node:test` -> `vitest`, each file pinned to the `node` environment. Their
    Express `server.test.ts` was dropped (there is no Express server here).
 5. Not copied: `main.tsx`, `server.ts`, `vite.config.ts` (replaced by `src/app/(lyriq)/` and `src/app/api/`).
+6. **Beat sectioning is ours.** `utils/structure/` + `services/structureAnalysis.ts` (new files) do the
+   sectioning in a Web Worker. In `App.tsx`, `runBackgroundBeatAnalysis` calls `analyzeBeatStructure`
+   instead of `analyzeBeatArrangement` (server), `isFinalArrangement` replaces the `source === 'ai'`
+   checks, and `handleConfirmReanalysis` runs `markRepeatedLyricsAsChorus`. `types.ts`: `BeatAnalysis`
+   gains `source: 'local-structure'`, `version`, `groups`; `ArrangementSource` gains `'structure'`.
+   `utils/audio.ts` gains `decodeToMono`.
 
 ## Server side (ours, not vendored)
 
@@ -26,4 +32,4 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 ## Re-syncing
 
 Copy upstream `src/{components,hooks,services,utils,lib}`, `App.tsx`, `types.ts`, `index.css` over
-this folder, re-apply the five differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
+this folder, re-apply the six differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
