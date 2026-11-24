@@ -235,14 +235,20 @@ function Header({
       triggerBackgroundAnalysis: true,
     });
 
+    // The sections shown now are an instant draft; the real ones (and the measured BPM)
+    // arrive a second or two later from the background analysis, which reports them.
     if (outcome?.arrangementApplied) {
-      showFeedback(`✓ "${readyBeat.name}" • ${readyBeat.bpm} BPM • ${outcome.sectionCount} sections`);
+      showFeedback(`✓ "${readyBeat.name}" loaded • finding sections…`);
     } else if (outcome?.reason === 'manual-edits') {
       showFeedback(`✓ "${readyBeat.name}" loaded • kept your custom section boundaries`);
     } else if (outcome?.reason === 'has-content') {
       showFeedback(`✓ "${readyBeat.name}" loaded • kept your existing lyrics & takes`);
     } else {
-      showFeedback(`✓ "${readyBeat.name}" loaded • ${readyBeat.bpm} BPM (${decoded.bpmSource})`);
+      showFeedback(
+        decoded.bpmSource === 'from filename'
+          ? `✓ "${readyBeat.name}" loaded • ${readyBeat.bpm} BPM (from filename)`
+          : `✓ "${readyBeat.name}" loaded`
+      );
     }
   };
 

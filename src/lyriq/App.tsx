@@ -993,9 +993,7 @@ export default function App() {
             }))
           );
           setArrangementSource('structure');
-          if (options.explicit) {
-            showNotice(`Arranged into ${finalAnalysis.sections.length} beat-snapped sections.`);
-          }
+          showNotice(`Sections ready: ${finalAnalysis.sections.length} sections • ${Math.round(finalBpm * 10) / 10} BPM`);
         } else if (options.explicit) {
           const updatedBeat = {
             ...beat,

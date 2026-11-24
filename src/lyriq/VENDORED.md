@@ -20,7 +20,9 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
    checks, and `handleConfirmReanalysis` runs `markRepeatedLyricsAsHook`. Sections get beat-style names
    (Intro, Hook, Verse, Bridge, Outro). `types.ts`: `BeatAnalysis`
    gains `source: 'local-structure'`, `version`, `groups`; `ArrangementSource` gains `'structure'`.
-   `utils/audio.ts` gains `decodeToMono`.
+   `utils/audio.ts` gains `decodeToMono`. `components/Header.tsx`: the import message no longer
+   quotes the instant draft's BPM and section count ("loaded • finding sections…"); `App.tsx`
+   announces the real ones when the analysis lands ("Sections ready: 8 sections • 140 BPM").
 
 ## Server side (ours, not vendored)
 
