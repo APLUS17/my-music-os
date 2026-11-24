@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored copy of the minimal editor app (see src/lyriq/VENDORED.md). It is typechecked and
+    // tested, but it was written against different lint rules, so we don't lint it here.
+    "src/lyriq/**",
   ]),
 ]);
 

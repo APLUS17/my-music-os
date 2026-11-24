@@ -4,7 +4,19 @@
 
 **Lyriq Lab** (formerly "My Music OS") is a music studio web app for songwriters. It combines lyric writing, voice recording, beat playback, and AI-powered creative tools in a single offline-first, mobile-friendly interface.
 
-**Current Status**: Beta. Core writing, recording, beat sectioning, timed editor/karaoke and AI transcription are shipped. **Auth is disabled for now** (see Auth). Gaps: AI lyric suggestions UI (mocked).
+**Current Status**: Beta. **`/` is now the minimal LYRIQ editor** (simple view, bottom dock, timed-lyrics popup, one-tap recording), with take transcription via Groq Whisper. Our previous studio is kept at `/classic`. **Auth is disabled for now** (see Auth).
+
+## Routes
+
+| Route | What it is |
+|---|---|
+| `/` | The minimal editor. Code in `src/lyriq/` (a vendored copy, see `src/lyriq/VENDORED.md`). Library + editor, bottom dock, timed-lyrics popup (tap the take chip, e.g. `C1`), keyboard bar, undo, rhymes, reorder. Own theme: black, amber, Cormorant/Inter. |
+| `/classic` | Our previous studio (`StudioWorkspace`, Vault, Muse, FX, 5 themes). Unchanged; everything below under "Song timeline" and "Project Structure" describes this one. |
+| `/mission-control` | Business dashboard (unchanged). |
+
+The two UIs are separate **route groups** with their own root layouts (`src/app/(lyriq)/`, `src/app/(classic)/`) so their CSS cannot collide. Navigating between them is a full page load.
+
+**New-app API** (`src/app/api/`): `transcribe-audio` (raw WAV in, `{lines:[{text,startSec,endSec}]}` out, via Groq Whisper with word timestamps and your written lyrics as a spelling hint; mapping in `src/lib/server/whisperLines.ts`), `health` (`{ai, features:{transcription,arrangement,suggestions}}`), and `analyze-beat` / `song-assistant` which always answer `503 ai_unavailable` (beat sectioning runs locally; suggestions are not wired). A per-IP rate limiter guards them because auth is off. The classic app still uses `/api/transcribe` and `/api/muse/*`.
 
 ---
 
@@ -44,8 +56,8 @@ Required in `.env.local` (not committed):
 ```
 NEXT_PUBLIC_SUPABASE_URL          # only the waitlist/email-capture actions use Supabase now
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-GOOGLE_API_KEY                  # Gemini API key (server-side; also checks GEMINI_API_KEY)
-GROQ_API_KEY                    # Groq Whisper key (server-side only, used by /api/transcribe)
+GOOGLE_API_KEY                  # Gemini key. Only the classic Muse recap uses it; the new app does not need it
+GROQ_API_KEY                    # Groq Whisper key (server-side). Powers take transcription in BOTH apps (/api/transcribe-audio and /api/transcribe)
 ```
 
 ---
@@ -54,13 +66,16 @@ GROQ_API_KEY                    # Groq Whisper key (server-side only, used by /a
 
 ```
 src/
+├── lyriq/                              # THE NEW EDITOR at `/` (vendored from the minimal app, see VENDORED.md)
+├── lib/server/                         # apiGuard (rate limit, error envelope), whisperLines (Groq -> lyric lines)
 ├── app/
-│   ├── layout.tsx                      # Root layout (no auth provider)
-│   ├── page.tsx                        # Homepage → mounts StudioWorkspace
-│   ├── globals.css                     # Global styles + 5 CSS theme variables
+│   ├── (lyriq)/                        # Root layout + page for `/`
+│   ├── (classic)/                      # Old root layout/globals + `/classic` + `/mission-control`
+│   │   ├── layout.tsx                  # Classic root layout (no auth provider)
+│   │   ├── globals.css                 # Classic global styles + 5 CSS theme variables
+│   │   └── classic/page.tsx            # Mounts StudioWorkspace at `/classic`
 │   ├── actions.ts                      # Server actions: Supabase CRUD, Gemini analysis, Facilitator AI
-│   ├── mission-control/
-│   │   └── page.tsx                    # Mission Control — business strategy dashboard
+│   │   └── mission-control/page.tsx    # Mission Control — business strategy dashboard (`/mission-control`)
 │   └── api/
 │       ├── transcribe/route.ts         # Proxies audio to Groq Whisper (keeps key server-side)
 │       └── mission-control-sync/route.ts  # Mission control data sync endpoint
