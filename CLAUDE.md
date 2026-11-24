@@ -87,6 +87,8 @@ src/
 │   │   ├── SectionTimeline.tsx         # Beat sectioning strip: waveform, draggable bar-snapped boundaries, auto-section, split/merge
 │   │   ├── KaraokeView.tsx             # Full-screen karaoke: active line centered + filled, click-to-seek
 │   │   ├── SyncSettingsPanel.tsx       # Lyric timing offset, recording latency, follow playback
+│   │   ├── KeyboardAccessoryBar.tsx    # Undo / Redo / Rhymes / Stanza / Done, shown while typing (above the mobile keyboard)
+│   │   ├── ReorderList.tsx             # Drag-to-reorder sections (keeps each section's length)
 │   │   ├── Waveform.tsx                # Canvas-based waveform renderer
 │   │   ├── SpectralEQ.tsx              # Visual EQ panel
 │   │   ├── FXPanel.tsx                 # Effects controls UI (reverb, delay, EQ, compression)
@@ -177,12 +179,14 @@ All pure logic is in `lib/timeline/` and unit-tested; the UI is thin.
 
 - `timeline.ts` — section timings (`resolveSectionTimings`), the single source of truth for per-line times (`buildTimedLines`), `pickActiveLine`. Sections without explicit times split the song evenly.
 - `beatSections.ts` — non-AI beat analysis: tempo (refined to 0.05 BPM against the whole track), bar grid, per-bar energy, boundaries by DP, labels by energy. **The frame hop is 220 samples = 9.977 ms at 22.05 kHz, not 10 ms — always use `hopFor()`**; the nominal value drifts the grid ~0.4 s over a song.
-- `sectionEdit.ts` — move boundary / split / merge / apply analysed structure to lyric sections. Never drops lyrics.
+- `sectionEdit.ts` — move boundary / split / merge / apply analysed structure to lyric sections. Never drops lyrics. **Add / delete / reorder go through `insertSectionAfter`, `deleteSectionAt`, `reorderSections`**: they keep the timeline covering exactly `[0, duration]` (no gap, overlap or zero-width section). Never `setSections` with a bare append/filter/swap on a timed song. Hand edits set `isUserModified`, so Re-detect asks before overwriting them. `snapToBar` is magnetic (pulls within 35% of a bar, else leaves the time alone).
+- `history.ts` + `hooks/useSectionHistory.ts` — undo/redo for the sections. **Edit through `commitSections`**; typing in one stanza and a boundary drag each coalesce into one undo step. Anything that still calls `setSections` directly (loading a song) just invalidates the history, which is safe. Cmd/Ctrl+Z, Cmd+Shift+Z/Ctrl+Y work in the lyrics area; Space plays/pauses when nothing has focus.
+- `lib/creative/rhyme.ts` — offline rhyme groups (ported from the minimal app). `LyricCard` underlines them via a transparent mirror layer over each row's textarea. Note: every `-ing` word groups together, so gerunds underline even mid-line.
 - `songClock.ts` + `hooks/useSongClock.ts` — one clock read from the real audio elements (beat is the timeline when playing; a take is `take time + beatOffset`). Components subscribe to a derived value via `useClockValue` so only what changes re-renders.
 - `LyricSection` has optional `startTimeSec` / `endTimeSec` / `energy`; `SectionType` gained `'pre-chorus'`.
 - With a take loaded, the take drives the beat, so seeks outside the take's span clamp to its nearest edge (with a toast). Use `session.duration`, not the element's: `MediaRecorder` takes report `Infinity`.
 
-Known gaps: the bar grid is not persisted across reloads (boundaries then drag freely instead of snapping); the "open" editor layout has no active-line highlight (use karaoke); a take does not yet enter at its position while the beat plays on from elsewhere.
+Known gaps: the "open" editor layout has no active-line highlight or rhyme underlines (use the card layout / karaoke); a take does not yet enter at its position while the beat plays on from elsewhere. The bar grid is not stored: after a reload it is recomputed from the audio once per beat.
 
 ---
 
@@ -211,7 +215,9 @@ Known gaps: the bar grid is not persisted across reloads (boundaries then drag f
 | 5 themes | ✅ Shipped | Dark, Light, Midnight, Matrix, Sonar |
 | Global search | ✅ Shipped | Projects, takes, beats, scraps |
 | Onboarding tour | ✅ Shipped | 6-step, restartable from Settings |
-| Rhyme finder | ⚠️ API ready | Datamuse integrated, no editor UI yet |
+| Rhyme highlighting | ✅ Shipped | Offline, toggle in the keyboard bar; Datamuse client still unused |
+| Undo / redo | ✅ Shipped | Sections text + structure + timing, `useSectionHistory` |
+| Reorder sections | ✅ Shipped | `ReorderList`, keeps section lengths |
 | **AI lyric suggestions (UX)** | ⚠️ Partial | `services/ai.ts` is `isMock: true` — no real suggestions UI |
 | **Genre/mood selection** | ❌ Missing | P0 — feeds AI context on project creation |
 | **Export (TXT/PDF/copy)** | ❌ Missing | P0 — critical for Phase 1 |

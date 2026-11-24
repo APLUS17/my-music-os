@@ -1,7 +1,7 @@
 'use client';
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Mic2, Scissors, Merge, RotateCcw, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { Loader2, Mic2, Scissors, Merge, RotateCcw, SlidersHorizontal, Wand2, Undo2, Redo2 } from 'lucide-react';
 import type { LyricSection } from '@/types';
 import type { SongClock } from '@/lib/timeline/songClock';
 import type { SectionTiming } from '@/lib/timeline/timeline';
@@ -36,6 +36,10 @@ interface SectionTimelineProps {
     onMergeWithNext: (index: number) => void;
     onAutoSection: () => void;
     onResetTimings: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+    onUndo: () => void;
+    onRedo: () => void;
     onOpenKaraoke: () => void;
     onOpenSettings: () => void;
 }
@@ -103,6 +107,7 @@ function SectionTimelineBase(props: SectionTimelineProps) {
     const {
         sections, timings, durationSec, peaks, clock, hasBeat, isAnalyzing, summary, grid, isTimed,
         onSeek, onMoveBoundary, onSplitAtPlayhead, onMergeWithNext, onAutoSection, onResetTimings,
+        canUndo, canRedo, onUndo, onRedo,
         onOpenKaraoke, onOpenSettings,
     } = props;
 
@@ -290,7 +295,31 @@ function SectionTimelineBase(props: SectionTimelineProps) {
 
             <div className="flex items-center justify-between mt-1.5 text-[10px] mono text-[var(--text-tertiary)]">
                 <span>{sourceNote ?? (isTimed ? 'Sections timed' : durationSec > 0 ? 'Sections split evenly' : '')}</span>
-                <span>{durationSec > 0 ? formatTime(durationSec) : ''}</span>
+                <div className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={onUndo}
+                        disabled={!canUndo}
+                        title="Undo"
+                        aria-label="Undo"
+                        data-testid="timeline-undo"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                    >
+                        <Undo2 size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onRedo}
+                        disabled={!canRedo}
+                        title="Redo"
+                        aria-label="Redo"
+                        data-testid="timeline-redo"
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                    >
+                        <Redo2 size={13} />
+                    </button>
+                    <span className="ml-1">{durationSec > 0 ? formatTime(durationSec) : ''}</span>
+                </div>
             </div>
         </div>
     );

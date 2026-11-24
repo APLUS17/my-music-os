@@ -5,6 +5,7 @@ import { countSyllables } from '@/lib/utils/syllable';
 import { cn } from '@/lib/utils';
 import { sectionColor, withAlpha } from '@/lib/timeline/sectionColors';
 import { formatTime } from '@/lib/utils/time';
+import type { RhymeWordInfo } from '@/lib/creative/rhyme';
 
 interface LyricCardProps {
   section: LyricSection;
@@ -16,6 +17,13 @@ interface LyricCardProps {
   activeLineIndex?: number | null;
   /** Jump playback to the start of this section. */
   onSeekToSection?: (id: string) => void;
+  /** Underline words that rhyme with another word in the song. */
+  showRhymes?: boolean;
+  rhymeWordMap?: Map<string, RhymeWordInfo>;
+  /** Return pressed twice at the end of a stanza: start the next one. */
+  onAddSectionBelow?: (id: string) => void;
+  /** Backspace in an empty extra stanza: remove it and go back to the one above. */
+  onDeleteEmptyAndFocusPrev?: (id: string) => void;
   onUpdate: (id: string, updates: Partial<LyricSection>) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
@@ -78,12 +86,33 @@ const AutoResizeRowTextarea = ({
   );
 };
 
+/** Splits a line into words and underlines the ones that rhyme. Rendered invisibly over the textarea. */
+function renderRhymeUnderlines(text: string, rhymeWordMap: Map<string, RhymeWordInfo>) {
+  const tokens = text.split(/(\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b)/g);
+  return tokens.map((token, idx) => {
+    const clean = token.toLowerCase().replace(/[^a-z]/g, '');
+    const info = clean ? rhymeWordMap.get(clean) : undefined;
+    if (info) {
+      return (
+        <span key={idx} className={`underline ${info.colorClass} decoration-[2.5px] underline-offset-[5px]`}>
+          {token}
+        </span>
+      );
+    }
+    return <span key={idx}>{token}</span>;
+  });
+}
+
 const LyricCardBase: React.FC<LyricCardProps> = ({
   section,
   timing = null,
   isPlayingSection = false,
   activeLineIndex = null,
   onSeekToSection,
+  showRhymes = false,
+  rhymeWordMap,
+  onAddSectionBelow,
+  onDeleteEmptyAndFocusPrev,
   onUpdate,
   onDelete,
   onMove,
@@ -126,6 +155,17 @@ const LyricCardBase: React.FC<LyricCardProps> = ({
       const currentLines = [...lines];
       const lineText = currentLines[index] || '';
 
+      // Return on an empty last line, right after a written one: that blank line is the
+      // "new stanza" gesture. Drop it and start the next stanza instead.
+      if (
+        onAddSectionBelow && !e.shiftKey && index === currentLines.length - 1 && index > 0 &&
+        lineText.trim() === '' && (currentLines[index - 1] || '').trim() !== ''
+      ) {
+        onUpdate(section.id, { text: currentLines.slice(0, -1).join('\n') });
+        onAddSectionBelow(section.id);
+        return;
+      }
+
       const before = lineText.slice(0, selectionStart);
       const after = lineText.slice(selectionStart);
 
@@ -135,7 +175,10 @@ const LyricCardBase: React.FC<LyricCardProps> = ({
       onUpdate(section.id, { text: currentLines.join('\n') });
       setPendingFocus({ index: index + 1, caretPos: 0 });
     } else if (e.key === 'Backspace' && selectionStart === 0 && selectionEnd === 0) {
-      if (index > 0) {
+      if (index === 0 && section.text === '' && onDeleteEmptyAndFocusPrev) {
+        e.preventDefault();
+        onDeleteEmptyAndFocusPrev(section.id);
+      } else if (index > 0) {
         e.preventDefault();
         const currentLines = [...lines];
         const prevLineText = currentLines[index - 1] || '';
@@ -273,7 +316,16 @@ const LyricCardBase: React.FC<LyricCardProps> = ({
                 {countSyllables(lineText) || '\u00A0'}
               </div>
             )}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 relative">
+              {showRhymes && rhymeWordMap && rhymeWordMap.size > 0 && lineText && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none select-none text-base leading-relaxed font-sans py-0.5 whitespace-pre-wrap break-words overflow-hidden text-transparent"
+                  data-testid="rhyme-overlay"
+                >
+                  {renderRhymeUnderlines(lineText, rhymeWordMap)}
+                </div>
+              )}
               <AutoResizeRowTextarea
                 id={`input-${section.id}-${idx}`}
                 value={lineText}

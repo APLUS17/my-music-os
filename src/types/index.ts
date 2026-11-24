@@ -13,6 +13,8 @@ export interface LyricSection {
     startTimeSec?: number;
     endTimeSec?: number;
     energy?: SectionEnergy;
+    /** Set when the user hand-edited this section's timing or structure, so re-detecting the beat can ask before overwriting it. */
+    isUserModified?: boolean;
 }
 
 export interface LyricScrap {
