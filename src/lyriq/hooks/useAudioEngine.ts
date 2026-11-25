@@ -19,6 +19,15 @@ import {
   syncVocalBufferPlayback,
   stopVocalBufferPlayback,
   triggerLoopWrapFade,
+  getBeatLoopClock,
+  getLoopHandoffSec,
+  getLoopLeadSec,
+  isBeatLoopReady,
+  prepareBeatLoop,
+  releaseBeatLoopCache,
+  startBeatLoop,
+  stopBeatLoop,
+  type BeatLoopClock,
 } from '../utils/mixer';
 import type { SyncSettings } from '../utils/settings';
 import {
@@ -63,7 +72,7 @@ export interface UseAudioEngineReturn {
   globalVocalAudioRef: MutableRefObject<HTMLAudioElement | null>;
   playElement: (el: HTMLAudioElement) => void;
   seekAudioToTime: (timeSec: number, shouldPlay: boolean) => void;
-  syncVocalPlayback: (timeSec: number, shouldPlay: boolean, strict?: boolean, fadeInMs?: number) => void;
+  syncVocalPlayback: (timeSec: number, shouldPlay: boolean, strict?: boolean, fadeInMs?: number, atCtxTime?: number) => void;
   handleSeekToTime: (timeSec: number) => void;
   handleUserSeek: (timeSec: number) => void;
   handleJumpToSection: (sectionId: string, customTimeSec?: number) => void;
@@ -136,7 +145,11 @@ export function useAudioEngine({
   /** Distinguishes internal loop wraps from user scrubs so 'seeking' never freezes the loop clock for 400ms. */
   const isInternalLoopSeekRef = useRef<boolean>(false);
   const loopWrapTargetRef = useRef<{ targetSec: number; prevEndSec: number; expiresAt: number } | null>(null);
-  const syncVocalPlaybackRef = useRef<(timeSec: number, shouldPlay: boolean, strict?: boolean, fadeInMs?: number) => void>(() => {});
+  /** Passes of the seamless loop already seen by the clock, to spot each wrap. */
+  const loopPassesRef = useRef(0);
+  /** The loop pass whose vocal restart has already been booked on the audio clock. */
+  const vocalBookedPassRef = useRef(-1);
+  const syncVocalPlaybackRef = useRef<(timeSec: number, shouldPlay: boolean, strict?: boolean, fadeInMs?: number, atCtxTime?: number) => void>(() => {});
 
   /**
    * Holds the clock while a seek is in flight. The 'seeked' event normally
@@ -179,9 +192,40 @@ export function useAudioEngine({
     });
   }, [showNotice]);
 
+  /** Moves the (possibly muted) beat element to `target`, guarding the clock against its stale position. */
+  const seekBeatElement = useCallback((target: number, prevEndSec: number) => {
+    const el = globalBeatAudioRef.current;
+    if (!el || !importedBeatRef.current?.audioUrl || el.readyState < 1) return;
+    loopWrapTargetRef.current = { targetSec: target, prevEndSec, expiresAt: performance.now() + 350 };
+    isInternalLoopSeekRef.current = true;
+    try {
+      el.currentTime = target;
+    } finally {
+      isInternalLoopSeekRef.current = false;
+    }
+    if (el.paused) playElement(el);
+  }, [playElement]);
+
+  /**
+   * Wraps the beat element back to `target` (no seamless loop available): dips its level in a smooth
+   * envelope, and seeks once the dip has begun so the seek's splice lands inside the silence.
+   */
+  const wrapBeatElement = useCallback((target: number, prevEndSec: number) => {
+    const el = globalBeatAudioRef.current;
+    if (!el) return;
+    const waitSec = triggerLoopWrapFade(el, settingsRef.current.beatVolume);
+    loopWrapTargetRef.current = { targetSec: target, prevEndSec, expiresAt: performance.now() + waitSec * 1000 + 350 };
+    setTimeout(() => seekBeatElement(target, prevEndSec), waitSec * 1000);
+  }, [seekBeatElement]);
+
   // --- Beat element lifecycle ---
+  const loopCacheUrlRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const url = importedBeat?.audioUrl;
+    if (loopCacheUrlRef.current !== url) {
+      loopCacheUrlRef.current = url;
+      releaseBeatLoopCache();
+    }
     if (!url) {
       const el = globalBeatAudioRef.current;
       if (el) {
@@ -225,6 +269,8 @@ export function useAudioEngine({
     };
     const onTimeUpdate = () => {
       if (isSeekingRef.current) return;
+      // The seamless loop runs its own clock; the muted element underneath must not move the playhead.
+      if (getBeatLoopClock()) return;
       const t = beatAudio.currentTime;
       const wrap = loopWrapTargetRef.current;
       if (wrap && performance.now() < wrap.expiresAt && t >= wrap.prevEndSec - 0.12) return;
@@ -242,24 +288,7 @@ export function useAudioEngine({
         if (timings.length > 0) {
           const last = timings.reduce((a, b) => (b.end > a.end ? b : a));
           const wrapStart = Math.max(0, last.start);
-          triggerLoopWrapFade(
-            beatAudio,
-            settingsRef.current.beatVolume,
-            isVocalMutedRef.current ? 0 : settingsRef.current.vocalVolume,
-            8
-          );
-          loopWrapTargetRef.current = {
-            targetSec: wrapStart,
-            prevEndSec: last.end,
-            expiresAt: performance.now() + 350,
-          };
-          isInternalLoopSeekRef.current = true;
-          try {
-            beatAudio.currentTime = wrapStart;
-          } finally {
-            isInternalLoopSeekRef.current = false;
-          }
-          playElement(beatAudio);
+          wrapBeatElement(wrapStart, last.end);
           currentTimeRef.current = wrapStart;
           setCurrentTime(wrapStart);
           syncVocalPlaybackRef.current(wrapStart, true, true, 8);
@@ -298,6 +327,7 @@ export function useAudioEngine({
     releaseSeekGuard,
     isEndSectionLooping,
     playElement,
+    wrapBeatElement,
     isRecordingRef,
     isCountingDownRef,
   ]);
@@ -330,7 +360,7 @@ export function useAudioEngine({
    * Keeps the vocal element locked to the song clock. The take that sounds is
    * chosen by where each take was recorded on the timeline, not by section.
    */
-  const syncVocalPlayback = useCallback((timeSec: number, shouldPlay: boolean, strict = false, fadeInMs = 0) => {
+  const syncVocalPlayback = useCallback((timeSec: number, shouldPlay: boolean, strict = false, fadeInMs = 0, atCtxTime?: number) => {
     const existing = globalVocalAudioRef.current;
     const pauseElement = () => {
       if (existing && !existing.paused) {
@@ -362,7 +392,8 @@ export function useAudioEngine({
       hit.offsetSec,
       settingsRef.current.vocalVolume,
       strict,
-      fadeInMs
+      fadeInMs,
+      atCtxTime
     );
     if (status !== 'fallback') {
       pauseElement();
@@ -408,6 +439,7 @@ export function useAudioEngine({
 
   /** Moves both media elements to `timeSec`. */
   const seekAudioToTime = useCallback((timeSec: number, shouldPlay: boolean) => {
+    stopBeatLoop();
     const beatAudio = globalBeatAudioRef.current;
     if (beatAudio && importedBeatRef.current?.audioUrl) {
       try {
@@ -428,6 +460,7 @@ export function useAudioEngine({
   // the vocal take itself drives the clock so playhead and lyrics stay in pure lock.
   useEffect(() => {
     if (!isGlobalPlaying) {
+      stopBeatLoop();
       if (!isSeekingRef.current) {
         globalBeatAudioRef.current?.pause();
         stopVocalBufferPlayback();
@@ -447,6 +480,23 @@ export function useAudioEngine({
     let hiddenTimer: ReturnType<typeof setInterval> | null = null;
     let stopped = false;
 
+    /**
+     * Ends the seamless loop. When the beat is still meant to play (loop switched off, a take starting),
+     * the element is moved to where the loop is and takes over; otherwise the loop just fades out.
+     */
+    const releaseLoopVoice = (clock: BeatLoopClock, keepPlaying: boolean) => {
+      const el = globalBeatAudioRef.current;
+      if (keepPlaying && el && el.readyState >= 1 && clock.elapsedSec >= 0) {
+        // The loop keeps sounding for a moment while the element moves to where the loop will be, then hands over.
+        const lead = getLoopHandoffSec() + 0.03;
+        seekBeatElement(clock.positionSec + lead, clock.endSec);
+        stopBeatLoop({ handoff: true });
+        currentTimeRef.current = clock.positionSec;
+      } else {
+        stopBeatLoop();
+      }
+    };
+
     const stepClock = () => {
       if (stopped) return;
       const now = performance.now();
@@ -460,9 +510,38 @@ export function useAudioEngine({
       const hasBeat = Boolean(beat && importedBeatRef.current?.audioUrl);
       const beatRunning = hasBeat && !beat!.paused && !beat!.ended;
 
+      const timing = findTimingAt(timingsRef.current, prevTime);
+      const section = sectionsRef.current.find(s => s.id === timing?.id);
+      // While a take is counting in or recording, time must run straight on:
+      // a loop jump would desync the take from the beat, and stopping at the
+      // song end would freeze the timer while the mic is still capturing.
+      const tracking = isRecordingRef.current || isCountingDownRef.current;
+      const wantsLoop = !tracking && Boolean(section?.isLooping && timing && timing.end > timing.start);
+
+      // The seamless loop only stays valid while the same section keeps looping and the beat keeps playing.
+      let loopClock = getBeatLoopClock();
+      if (
+        loopClock &&
+        !(beatRunning && wantsLoop && timing &&
+          Math.abs(loopClock.startSec - timing.start) < 1e-3 && Math.abs(loopClock.endSec - timing.end) < 1e-3)
+      ) {
+        releaseLoopVoice(loopClock, beatRunning);
+        loopClock = null;
+      }
+
       let nextTime: number;
+      let loopWrapped = false;
       const activeWrap = loopWrapTargetRef.current;
-      if (beatRunning) {
+      if (beatRunning && loopClock) {
+        // While the loop plays on the audio clock, that clock is the truth: it never drifts or jitters.
+        if (loopClock.elapsedSec >= 0) {
+          nextTime = loopClock.positionSec;
+          loopWrapped = loopClock.loops > loopPassesRef.current;
+          loopPassesRef.current = loopClock.loops;
+        } else {
+          nextTime = prevTime; // scheduled, not started yet
+        }
+      } else if (beatRunning) {
         const beatPos = beat!.currentTime;
         // Mobile Safari & Chrome can report the stale pre-wrap beat position for 1-2 frames
         // right after setting beat.currentTime = timing.start; ignore it so we never double-wrap.
@@ -481,8 +560,8 @@ export function useAudioEngine({
         const vocalRunning = Boolean(vocal && !vocal.paused && !vocal.ended && vocal.readyState >= 2);
         const hit = vocalRunning ? findVocalAtTime(sectionsRef.current, timingsRef.current, takeIndicesRef.current, prevTime) : null;
         if (vocalRunning && hit) {
-          const timing = timingsRef.current.find(st => st.id === hit.sectionId);
-          const anchor = takeAnchorSec(hit.take, timing?.start ?? 0);
+          const vocalTiming = timingsRef.current.find(st => st.id === hit.sectionId);
+          const anchor = takeAnchorSec(hit.take, vocalTiming?.start ?? 0);
           nextTime = vocal!.currentTime + anchor;
         } else {
           nextTime = prevTime + dt;
@@ -490,20 +569,52 @@ export function useAudioEngine({
       }
 
       const safeTotal = totalDurationRef.current;
-      const timing = findTimingAt(timingsRef.current, prevTime);
-      const section = sectionsRef.current.find(s => s.id === timing?.id);
       let jumped = false;
-      // While a take is counting in or recording, time must run straight on:
-      // a loop jump would desync the take from the beat, and stopping at the
-      // song end would freeze the timer while the mic is still capturing.
-      const tracking = isRecordingRef.current || isCountingDownRef.current;
+      /** True when this frame's vocal restart was already booked on the audio clock. */
+      let vocalBooked = false;
 
       if (tracking) {
         // No loops, no end-of-song stop. After the beat ends, wall time carries on.
-      } else if (section?.isLooping && timing && timing.end > timing.start) {
-        if (nextTime >= timing.end - LOOP_LOOKAHEAD_SEC) {
-          nextTime = timing.start;
-          jumped = true;
+      } else if (wantsLoop && timing) {
+        const beatInfo = importedBeatRef.current;
+        const copyReady = Boolean(beatInfo?.audioUrl && isBeatLoopReady(beatInfo.audioUrl, timing.start, timing.end));
+        if (loopClock) {
+          jumped = loopWrapped; // the audio already wrapped by itself, exactly on the bar line
+          // Book the vocal restart on the audio clock ahead of the wrap, so it lands on the same sample as the beat.
+          const pass = loopClock.elapsedSec >= 0 ? loopClock.loops + 1 : 0;
+          if (vocalBookedPassRef.current !== pass && loopClock.nextWrapCtxTime - loopClock.ctxNow <= getLoopLeadSec()) {
+            vocalBookedPassRef.current = pass;
+            syncVocalPlayback(timing.start, true, true, 4, loopClock.nextWrapCtxTime);
+          }
+          vocalBooked = true;
+        } else {
+          let armed = false;
+          if (copyReady && beatRunning && beat && beatInfo?.audioUrl && nextTime >= timing.end - getLoopLeadSec()) {
+            // Arm the seamless loop to take over exactly at the section's end.
+            const startsAt = startBeatLoop(beat, beatInfo.audioUrl, timing.start, timing.end, timing.end - nextTime);
+            if (startsAt !== null) {
+              armed = true;
+              loopPassesRef.current = 0;
+              vocalBookedPassRef.current = 0;
+              syncVocalPlayback(timing.start, true, true, 4, startsAt);
+              vocalBooked = true;
+              // Move the element back to the start once it is muted, after the hand-over.
+              const waitMs = Math.max(0, startsAt - (getBeatLoopClock()?.ctxNow ?? startsAt)) * 1000 + getLoopLeadSec() * 1000;
+              const target = timing.start;
+              const end = timing.end;
+              setTimeout(() => { if (!stopped && getBeatLoopClock()) seekBeatElement(target, end); }, waitMs);
+            }
+          }
+          if (!armed) {
+            if (nextTime >= timing.end - LOOP_LOOKAHEAD_SEC) {
+              // No seamless copy yet: wrap the element, with a smooth dip placed over its splice.
+              nextTime = timing.start;
+              jumped = true;
+            } else if (!copyReady && hasBeat && beatInfo?.audioUrl) {
+              // Decode this section ahead of its first wrap so the seamless loop is ready in time.
+              void prepareBeatLoop(beatInfo.audioUrl, beatInfo.audioBlob, beatInfo.audioUrl, timing.start, timing.end, beatInfo.duration);
+            }
+          }
         }
       } else if (safeTotal > 0 && nextTime >= safeTotal) {
         // End of song: stop on the last frame. The next Play starts from 0:00.
@@ -516,27 +627,10 @@ export function useAudioEngine({
         return;
       }
 
-      if (jumped) {
-        triggerLoopWrapFade(
-          beat,
-          settingsRef.current.beatVolume,
-          isVocalMutedRef.current ? 0 : settingsRef.current.vocalVolume,
-          8
-        );
-        if (hasBeat && beat!.readyState >= 1) {
-          loopWrapTargetRef.current = {
-            targetSec: nextTime,
-            prevEndSec: timing?.end ?? nextTime,
-            expiresAt: now + 350,
-          };
-          isInternalLoopSeekRef.current = true;
-          try {
-            beat!.currentTime = nextTime;
-          } finally {
-            isInternalLoopSeekRef.current = false;
-          }
-          if (beat!.paused) playElement(beat!);
-        }
+      if (jumped && hasBeat) {
+        // With the seamless loop the muted element is only kept near it, so it can take over again.
+        if (loopClock) seekBeatElement(timing!.start, timing!.end);
+        else wrapBeatElement(nextTime, timing?.end ?? nextTime);
       }
 
       currentTimeRef.current = nextTime;
@@ -545,7 +639,8 @@ export function useAudioEngine({
         setCurrentTime(nextTime);
       }
 
-      syncVocalPlayback(nextTime, true, jumped, jumped ? 8 : 0);
+      // While the loop is armed or running, vocal restarts are booked on the audio clock above.
+      if (!vocalBooked || !jumped) syncVocalPlayback(nextTime, true, jumped && !vocalBooked, jumped && !vocalBooked ? 8 : 0);
     };
 
     const scheduleFrame = () => {
@@ -586,15 +681,7 @@ export function useAudioEngine({
           const t = findTimingAt(timingsRef.current, currentTimeRef.current);
           const s = sectionsRef.current.find(sec => sec.id === t?.id);
           if (s?.isLooping && t && t.end > t.start && cur >= t.end - LOOP_LOOKAHEAD_SEC) {
-            triggerLoopWrapFade(
-              beat,
-              settingsRef.current.beatVolume,
-              isVocalMutedRef.current ? 0 : settingsRef.current.vocalVolume,
-              8
-            );
-            loopWrapTargetRef.current = { targetSec: t.start, prevEndSec: t.end, expiresAt: performance.now() + 350 };
-            isInternalLoopSeekRef.current = true;
-            try { beat.currentTime = t.start; } finally { isInternalLoopSeekRef.current = false; }
+            wrapBeatElement(t.start, t.end);
             currentTimeRef.current = t.start;
             setCurrentTime(t.start);
             syncVocalPlayback(t.start, true, true, 8);
@@ -652,6 +739,7 @@ export function useAudioEngine({
   // Drop audio elements and seek timers on unmount.
   useEffect(() => {
     return () => {
+      stopBeatLoop();
       if (globalBeatAudioRef.current) {
         globalBeatAudioRef.current.pause();
         detachFromMixer(globalBeatAudioRef.current);
@@ -704,6 +792,7 @@ export function useAudioEngine({
 
     if (isPlayingRef.current) {
       setIsGlobalPlaying(false);
+      stopBeatLoop();
       globalBeatAudioRef.current?.pause();
       stopVocalBufferPlayback();
       globalVocalAudioRef.current?.pause();
@@ -739,6 +828,7 @@ export function useAudioEngine({
 
   const stopPlayback = useCallback(() => {
     setIsGlobalPlaying(false);
+    stopBeatLoop();
     globalBeatAudioRef.current?.pause();
     stopVocalBufferPlayback();
     globalVocalAudioRef.current?.pause();
@@ -748,24 +838,23 @@ export function useAudioEngine({
     setIsGlobalPlaying(false);
     currentTimeRef.current = 0;
     setCurrentTime(0);
+    stopBeatLoop();
     globalBeatAudioRef.current?.pause();
     stopVocalBufferPlayback();
     globalVocalAudioRef.current?.pause();
   }, []);
 
   const jumpWithLoopFade = useCallback((targetTimeSec: number) => {
-    const beat = globalBeatAudioRef.current;
-    triggerLoopWrapFade(
-      beat,
-      settingsRef.current.beatVolume,
-      isVocalMutedRef.current ? 0 : settingsRef.current.vocalVolume,
-      8
-    );
+    stopBeatLoop();
     currentTimeRef.current = targetTimeSec;
     setCurrentTime(targetTimeSec);
+    const beat = globalBeatAudioRef.current;
     if (beat && importedBeatRef.current?.audioUrl && beat.readyState >= 1) {
-      beat.currentTime = targetTimeSec;
-      if (beat.paused) playElement(beat);
+      const waitSec = triggerLoopWrapFade(beat, settingsRef.current.beatVolume);
+      setTimeout(() => {
+        try { beat.currentTime = targetTimeSec; } catch { /* not seekable yet */ }
+        if (beat.paused) playElement(beat);
+      }, waitSec * 1000);
     }
     syncVocalPlayback(targetTimeSec, true, true, 8);
   }, [playElement, syncVocalPlayback]);

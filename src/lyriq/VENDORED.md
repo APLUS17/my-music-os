@@ -24,6 +24,22 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
    quotes the instant draft's BPM and section count ("loaded • finding sections…"); `App.tsx`
    announces the real ones when the analysis lands ("Sections ready: 8 sections • 140 BPM").
 
+7. **Loop playback is click-free (ours).** `utils/mixer.ts` + `hooks/useAudioEngine.ts`. A section loop used
+   to wrap by seeking the beat's media element and dipping the gain at that instant. Measured with a
+   continuous tone: every wrap was a hard cut (one sample jumping ~98% of full scale), because the playback
+   context's clock only advances in ~23 ms steps, so a 3-8 ms fade scheduled "now" ran in the past. Now:
+   - while a section loops, the beat plays from a decoded copy of just that section
+     (`AudioBufferSourceNode`, `loop = true`) with its end cross-faded into the audio before its start
+     (`renderLoopRegion`), so the seam is continuous and the loop length is exact; the media element keeps
+     running muted underneath and is the fallback while the copy decodes;
+   - the playhead follows that loop's audio clock, and the vocal restart is booked on the same clock ahead of
+     each wrap, so beat and vocal land on the same sample;
+   - every fade is scheduled `scheduleMargin()` (>= 25 ms, from `baseLatency`) ahead of `ctx.currentTime`;
+     vocal sources have their own fader and crossfade instead of stopping dead.
+   Verified by recording the context's output (an AudioWorklet tap) while looping a continuous-phase tone:
+   old engine 4 clicks in 4 wraps, new engine 0 in 4 (mid-file section) and none in steady-state wraps.
+   `__tests__/loopRegion.test.ts` covers the seam maths.
+
 ## Server side (ours, not vendored)
 
 - `src/app/api/transcribe-audio` -> Groq Whisper with word timestamps, your written lyrics as the
@@ -35,4 +51,4 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 ## Re-syncing
 
 Copy upstream `src/{components,hooks,services,utils,lib}`, `App.tsx`, `types.ts`, `index.css` over
-this folder, re-apply the six differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
+this folder, re-apply the seven differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
