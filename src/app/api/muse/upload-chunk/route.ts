@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 
 export const maxDuration = 60;
 
@@ -10,12 +9,6 @@ export const maxDuration = 60;
 // this server, so a direct browser PUT gets blocked by CORS. Each chunk is
 // small enough to stay under Vercel's 4.5 MB request body limit.
 export async function POST(request: NextRequest) {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
     try {
         const { searchParams } = new URL(request.url);
         const uploadId = searchParams.get('uploadId');

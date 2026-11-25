@@ -4,7 +4,19 @@
 
 **Lyriq Lab** (formerly "My Music OS") is a music studio web app for songwriters. It combines lyric writing, voice recording, beat playback, and AI-powered creative tools in a single offline-first, mobile-friendly interface.
 
-**Current Status**: Beta. Core writing, recording, auth, and AI transcription are shipped. Critical gaps: AI lyric suggestions UI, genre/mood selection, and export.
+**Current Status**: Beta. **`/` is now the minimal LYRIQ editor** (simple view, bottom dock, timed-lyrics popup, one-tap recording), with take transcription via Groq Whisper. Our previous studio is kept at `/classic`. **Auth is disabled for now** (see Auth).
+
+## Routes
+
+| Route | What it is |
+|---|---|
+| `/` | The minimal editor. Code in `src/lyriq/` (a vendored copy, see `src/lyriq/VENDORED.md`). Library + editor, bottom dock, timed-lyrics popup (tap the take chip, e.g. `C1`), keyboard bar, undo, rhymes, reorder. Own theme: black, amber, Cormorant/Inter. |
+| `/classic` | Our previous studio (`StudioWorkspace`, Vault, Muse, FX, 5 themes). Unchanged; everything below under "Song timeline" and "Project Structure" describes this one. |
+| `/mission-control` | Business dashboard (unchanged). |
+
+The two UIs are separate **route groups** with their own root layouts (`src/app/(lyriq)/`, `src/app/(classic)/`) so their CSS cannot collide. Navigating between them is a full page load.
+
+**New-app API** (`src/app/api/`): `transcribe-audio` (raw WAV in, `{lines:[{text,startSec,endSec}]}` out, via Groq Whisper with word timestamps and your written lyrics as a spelling hint; mapping in `src/lib/server/whisperLines.ts`), `health` (`{ai, features:{transcription,arrangement,suggestions}}`), and `analyze-beat` / `song-assistant` which always answer `503 ai_unavailable` (suggestions are not wired). **Beat sectioning runs in the browser** for instrumentals: `src/lyriq/utils/structure/` (beat 1 from the kick/808, bar-aligned 8/16-bar blocks, repeat groups, beat-style names Intro/Hook/Verse/Bridge/Outro from arrangement fullness) in a Web Worker, see its README; boundary benchmark on human-annotated songs in `scripts/structure-bench/`. A per-IP rate limiter guards them because auth is off. The classic app still uses `/api/transcribe` and `/api/muse/*`.
 
 ---
 
@@ -20,7 +32,7 @@
 | AI (analysis + chat) | Google Gemini 2.0 Flash (`@google/genai`) — audio structure analysis + Studio Facilitator |
 | Creative APIs | Datamuse (rhymes/synonyms), LRCLIB (lyrics search) |
 | Database | Supabase (PostgreSQL) via `@supabase/ssr` + Next.js Server Actions |
-| Auth | Supabase Auth — email OTP (magic link), wired and active |
+| Auth | **Removed for now** — no sign-in; the app is local-first |
 | Testing | Vitest, @testing-library/react, jsdom |
 | Language | TypeScript 5.9 |
 
@@ -42,10 +54,10 @@ npm run lint     # ESLint
 Required in `.env.local` (not committed):
 
 ```
-NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_URL          # only the waitlist/email-capture actions use Supabase now
 NEXT_PUBLIC_SUPABASE_ANON_KEY
-GOOGLE_API_KEY                  # Gemini API key (server-side; also checks GEMINI_API_KEY)
-GROQ_API_KEY                    # Groq Whisper key (server-side only, used by /api/transcribe)
+GOOGLE_API_KEY                  # Gemini key. Only the classic Muse recap uses it; the new app does not need it
+GROQ_API_KEY                    # Groq Whisper key (server-side). Powers take transcription in BOTH apps (/api/transcribe-audio and /api/transcribe)
 ```
 
 ---
@@ -54,15 +66,16 @@ GROQ_API_KEY                    # Groq Whisper key (server-side only, used by /a
 
 ```
 src/
+├── lyriq/                              # THE NEW EDITOR at `/` (vendored from the minimal app, see VENDORED.md)
+├── lib/server/                         # apiGuard (rate limit, error envelope), whisperLines (Groq -> lyric lines)
 ├── app/
-│   ├── layout.tsx                      # Root layout with AuthProvider
-│   ├── page.tsx                        # Homepage → mounts StudioWorkspace
-│   ├── globals.css                     # Global styles + 5 CSS theme variables
+│   ├── (lyriq)/                        # Root layout + page for `/`
+│   ├── (classic)/                      # Old root layout/globals + `/classic` + `/mission-control`
+│   │   ├── layout.tsx                  # Classic root layout (no auth provider)
+│   │   ├── globals.css                 # Classic global styles + 5 CSS theme variables
+│   │   └── classic/page.tsx            # Mounts StudioWorkspace at `/classic`
 │   ├── actions.ts                      # Server actions: Supabase CRUD, Gemini analysis, Facilitator AI
-│   ├── auth/
-│   │   └── page.tsx                    # Auth page (email OTP sign-in)
-│   ├── mission-control/
-│   │   └── page.tsx                    # Mission Control — business strategy dashboard
+│   │   └── mission-control/page.tsx    # Mission Control — business strategy dashboard (`/mission-control`)
 │   └── api/
 │       ├── transcribe/route.ts         # Proxies audio to Groq Whisper (keeps key server-side)
 │       └── mission-control-sync/route.ts  # Mission control data sync endpoint
@@ -86,7 +99,11 @@ src/
 │   │   ├── NoteAttachmentsView.tsx     # Attach recordings/beats to notes  ← DELETED
 │   │   ├── MuseDrawer.tsx              # AI assistant  ← DELETED
 │   │   ├── GeminiPanel.tsx             # Empty placeholder (0 bytes)
-│   │   ├── AuthGate.tsx                # Email OTP auth form
+│   │   ├── SectionTimeline.tsx         # Beat sectioning strip: waveform, draggable bar-snapped boundaries, auto-section, split/merge
+│   │   ├── KaraokeView.tsx             # Full-screen karaoke: active line centered + filled, click-to-seek
+│   │   ├── SyncSettingsPanel.tsx       # Lyric timing offset, recording latency, follow playback
+│   │   ├── KeyboardAccessoryBar.tsx    # Undo / Redo / Rhymes / Stanza / Done, shown while typing (above the mobile keyboard)
+│   │   ├── ReorderList.tsx             # Drag-to-reorder sections (keeps each section's length)
 │   │   ├── Waveform.tsx                # Canvas-based waveform renderer
 │   │   ├── SpectralEQ.tsx              # Visual EQ panel
 │   │   ├── FXPanel.tsx                 # Effects controls UI (reverb, delay, EQ, compression)
@@ -95,7 +112,6 @@ src/
 │   │   └── useActiveBeatSection.ts     # Hook: tracks which beat section is playing
 │   └── ui/                             # shadcn/ui primitives
 ├── contexts/
-│   └── AuthContext.tsx                 # Auth provider: signInWithEmail (OTP), verifyOtp, signOut
 ├── hooks/
 │   ├── useVocalFX.ts                   # Web Audio API: real reverb (convolution), delay, EQ, compression
 │   └── useVisualViewport.ts            # Mobile viewport resize handler
@@ -167,11 +183,25 @@ MediaRecorder → Blob → base64 → IndexedDB
 
 ### Auth
 
-Email OTP flow via Supabase Auth:
-1. `AuthContext` (`contexts/AuthContext.tsx`) — provides `signInWithEmail`, `verifyOtp`, `signOut`
-2. `AuthGate` component — email input → OTP code entry form
-3. `/auth` page — standalone auth route
-4. Supabase client/server split via `@supabase/ssr` in `lib/supabase/`
+**Disabled for now.** `AuthContext`, `AuthGate`, `/auth` and `proxy.ts` were removed, and the API routes (`/api/transcribe`, `/api/muse/*`) no longer check for a user. Everything works without signing in.
+
+- **Before deploying publicly:** those routes now spend your Groq/Gemini keys for anyone who can reach them. Add auth or rate limiting first.
+- The Supabase project CRUD in `app/actions.ts` (`createProject`, `getProjects`, ...) still calls `getAuthenticatedClient()` and throws `Unauthorized`. Nothing in the UI calls it. It is parked for when auth returns.
+
+### Song timeline (beat sections, auto-scroll, karaoke)
+
+All pure logic is in `lib/timeline/` and unit-tested; the UI is thin.
+
+- `timeline.ts` — section timings (`resolveSectionTimings`), the single source of truth for per-line times (`buildTimedLines`), `pickActiveLine`. Sections without explicit times split the song evenly.
+- `beatSections.ts` — non-AI beat analysis: tempo (refined to 0.05 BPM against the whole track), bar grid, per-bar energy, boundaries by DP, labels by energy. **The frame hop is 220 samples = 9.977 ms at 22.05 kHz, not 10 ms — always use `hopFor()`**; the nominal value drifts the grid ~0.4 s over a song.
+- `sectionEdit.ts` — move boundary / split / merge / apply analysed structure to lyric sections. Never drops lyrics. **Add / delete / reorder go through `insertSectionAfter`, `deleteSectionAt`, `reorderSections`**: they keep the timeline covering exactly `[0, duration]` (no gap, overlap or zero-width section). Never `setSections` with a bare append/filter/swap on a timed song. Hand edits set `isUserModified`, so Re-detect asks before overwriting them. `snapToBar` is magnetic (pulls within 35% of a bar, else leaves the time alone).
+- `history.ts` + `hooks/useSectionHistory.ts` — undo/redo for the sections. **Edit through `commitSections`**; typing in one stanza and a boundary drag each coalesce into one undo step. Anything that still calls `setSections` directly (loading a song) just invalidates the history, which is safe. Cmd/Ctrl+Z, Cmd+Shift+Z/Ctrl+Y work in the lyrics area; Space plays/pauses when nothing has focus.
+- `lib/creative/rhyme.ts` — offline rhyme groups (ported from the minimal app). `LyricCard` underlines them via a transparent mirror layer over each row's textarea. Note: every `-ing` word groups together, so gerunds underline even mid-line.
+- `songClock.ts` + `hooks/useSongClock.ts` — one clock read from the real audio elements (beat is the timeline when playing; a take is `take time + beatOffset`). Components subscribe to a derived value via `useClockValue` so only what changes re-renders.
+- `LyricSection` has optional `startTimeSec` / `endTimeSec` / `energy`; `SectionType` gained `'pre-chorus'`.
+- With a take loaded, the take drives the beat, so seeks outside the take's span clamp to its nearest edge (with a toast). Use `session.duration`, not the element's: `MediaRecorder` takes report `Infinity`.
+
+Known gaps: the "open" editor layout has no active-line highlight or rhyme underlines (use the card layout / karaoke); a take does not yet enter at its position while the beat plays on from elsewhere. The bar grid is not stored: after a reload it is recomputed from the audio once per beat.
 
 ---
 
@@ -192,12 +222,17 @@ Email OTP flow via Supabase Auth:
 | Studio Facilitator AI | ✅ Shipped | Conversational AI coach via Gemini in `actions.ts` |
 | Vocal FX (reverb/delay/EQ) | ✅ Shipped | Real Web Audio API via `useVocalFX` hook |
 | Vault library view | ✅ Shipped | `VaultView` — grid/list layout for all content |
-| Auth (email OTP) | ✅ Shipped | Supabase email magic link, `AuthContext` + `AuthGate` |
+| Auth | ⏸ Disabled | Removed for now, see Auth |
+| Beat sectioning | ✅ Shipped | Auto-detect from audio + drag/split/merge, `SectionTimeline` |
+| Editor follows playback | ✅ Shipped | Active section/line highlight + auto-scroll (pauses on manual scroll) |
+| Karaoke view | ✅ Shipped | `KaraokeView`, centered + filled active line, tap to seek |
 | Mission Control | ✅ Shipped | `/mission-control` — business strategy & growth dashboard |
 | 5 themes | ✅ Shipped | Dark, Light, Midnight, Matrix, Sonar |
 | Global search | ✅ Shipped | Projects, takes, beats, scraps |
 | Onboarding tour | ✅ Shipped | 6-step, restartable from Settings |
-| Rhyme finder | ⚠️ API ready | Datamuse integrated, no editor UI yet |
+| Rhyme highlighting | ✅ Shipped | Offline, toggle in the keyboard bar; Datamuse client still unused |
+| Undo / redo | ✅ Shipped | Sections text + structure + timing, `useSectionHistory` |
+| Reorder sections | ✅ Shipped | `ReorderList`, keeps section lengths |
 | **AI lyric suggestions (UX)** | ⚠️ Partial | `services/ai.ts` is `isMock: true` — no real suggestions UI |
 | **Genre/mood selection** | ❌ Missing | P0 — feeds AI context on project creation |
 | **Export (TXT/PDF/copy)** | ❌ Missing | P0 — critical for Phase 1 |

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { LyricSection, LyricScrap, RecordingSession, AutoSection, SectionType, Beat, SavedProject, RecordingLayer, RitualStat } from '../../types';
 import { randomId } from '@/lib/utils/id';
 import { LyricCard } from './LyricCard';
@@ -14,6 +14,27 @@ import { OnboardingTour } from './OnboardingTour';
 import { RecordingThread } from './RecordingThread';
 import { PlayerTab } from './PlayerTab';
 import { MiniPlayer } from './MiniPlayer';
+import { SectionTimeline, type BeatStructureSummary } from './SectionTimeline';
+import { KaraokeView } from './KaraokeView';
+import { SyncSettingsPanel } from './SyncSettingsPanel';
+import { useSongClock, useClockValue } from '@/hooks/useSongClock';
+import { useBeatAudio } from '@/hooks/useBeatAudio';
+import { useSyncSettings } from '@/hooks/useSyncSettings';
+import { useFollowPlayback } from '@/hooks/useFollowPlayback';
+import { useStableCallback } from '@/hooks/useStableCallback';
+import {
+    resolveSectionTimings, buildTimedLines, pickActiveLine, activeSectionIndex,
+    type TimedPhrase,
+} from '@/lib/timeline/timeline';
+import {
+    applyBeatSegments, moveBoundary, splitSectionAt, mergeWithNext, clearTimings,
+    insertSectionAfter, deleteSectionAt, reorderSections, getMinSectionSec, hasUserEdits,
+    type BarGrid,
+} from '@/lib/timeline/sectionEdit';
+import { useSectionHistory } from '@/hooks/useSectionHistory';
+import { KeyboardAccessoryBar } from './KeyboardAccessoryBar';
+import { ReorderList } from './ReorderList';
+import { buildRhymeWordMap } from '@/lib/creative/rhyme';
 import { FXPanel, FXSettings, defaultFXSettings } from './FXPanel';
 import { useVocalFX } from '@/hooks/useVocalFX';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
@@ -706,6 +727,276 @@ const StudioWorkspace: React.FC = () => {
         }
     };
 
+    // ─── Song timeline: beat sections, the song clock, karaoke ───────────────
+    // Everything here lives on the SONG timeline (seconds from the start of the
+    // beat, or of the take when there is no beat). See lib/timeline.
+    const [syncSettings, updateSyncSettings, resetSyncSettings] = useSyncSettings();
+    const getAnchorSec = useCallback(() => {
+        const list = sessionsRef.current;
+        const s = list.find(x => x.id === activeSessionIdRef.current) ?? list[0];
+        return s?.beatOffset ?? 0;
+    }, []);
+    const songClock = useSongClock(beatAudioRef, vocalAudioRef, getAnchorSec);
+    const beatAudio = useBeatAudio(uploadedBeat);
+
+    const [isAnalyzingStructure, setIsAnalyzingStructure] = useState(false);
+    const [structureSummary, setStructureSummary] = useState<BeatStructureSummary | null>(null);
+    const [barGrid, setBarGrid] = useState<BarGrid | null>(null);
+    const [showKaraoke, setShowKaraoke] = useState(false);
+    const [showSyncSettings, setShowSyncSettings] = useState(false);
+    const lyricsScrollRef = useRef<HTMLDivElement>(null);
+
+    const timelineDuration = useMemo(() => {
+        if (beatAudio.durationSec > 0) return beatAudio.durationSec;
+        if (activeSession && activeSession.kind !== 'muse' && activeSession.duration) {
+            return (activeSession.beatOffset ?? 0) + activeSession.duration;
+        }
+        return 0;
+    }, [beatAudio.durationSec, activeSession]);
+
+    const sectionTimings = useMemo(() => resolveSectionTimings(sections, timelineDuration), [sections, timelineDuration]);
+    const sectionsAreTimed = useMemo(
+        () => sections.some(sec => typeof sec.startTimeSec === 'number' && typeof sec.endTimeSec === 'number'),
+        [sections]
+    );
+
+    // Transcribed phrases of the active take, placed on the song timeline.
+    const songPhrases = useMemo<TimedPhrase[] | null>(() => {
+        if (!activeSession || activeSession.kind === 'muse' || !activeSession.lines?.length) return null;
+        const anchor = activeSession.beatOffset ?? 0;
+        return activeSession.lines.map(l => ({ text: l.text, startSec: l.startTime + anchor, endSec: l.endTime + anchor }));
+    }, [activeSession]);
+
+    const timedLines = useMemo(() => buildTimedLines(sections, sectionTimings, songPhrases), [sections, sectionTimings, songPhrases]);
+
+    const activeLineIdx = useClockValue(songClock, useCallback(
+        (t: number) => pickActiveLine(timedLines, t, syncSettings.lyricOffsetMs),
+        [timedLines, syncSettings.lyricOffsetMs]
+    ));
+    const activeSectionIdx = useClockValue(songClock, useCallback((t: number) => activeSectionIndex(sectionTimings, t), [sectionTimings]));
+    // 0 = idle at the start, 1 = paused somewhere, 2 = playing
+    const playState = useClockValue(songClock, useCallback((t: number, playing: boolean) => (playing ? 2 : t > 0.05 ? 1 : 0), []));
+    const isSongPlaying = playState === 2;
+    const activeTimedLine = playState > 0 && activeLineIdx >= 0 ? timedLines[activeLineIdx] : null;
+
+    const follow = useFollowPlayback({
+        containerRef: lyricsScrollRef,
+        enabled: syncSettings.followPlayback && playState > 0,
+        activeKey: activeTimedLine?.key ?? null,
+    });
+
+    /**
+     * Seek to a song-timeline time. A loaded take drives the beat (the beat is kept at
+     * take time + offset), so playback can only land inside the take's own span. Outside
+     * it we jump to the nearest edge and say so, rather than silently ignoring the tap.
+     */
+    const seekSong = useCallback((timeSec: number) => {
+        const hasTake = sessions.length > 0 && !!vocalAudioRef.current?.getAttribute('src');
+        const total = timelineDuration > 0 ? timelineDuration : Infinity;
+        const t = Math.max(0, Math.min(total, timeSec));
+        if (!hasTake) {
+            seekTo(t);
+            return;
+        }
+        const anchor = activeSession?.beatOffset ?? 0;
+        // The saved length, not the element's: a MediaRecorder take reports `Infinity` until fully read.
+        const takeLen = activeSession?.duration ?? (Number.isFinite(duration) && duration > 0 ? duration : Infinity);
+        const inTake = Math.max(0, Math.min(takeLen, t - anchor));
+        if (Math.abs(inTake - (t - anchor)) > 1) {
+            toast.info('That spot is outside this take, so I jumped to its nearest edge');
+        }
+        seekTo(inTake);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessions.length, activeSession, timelineDuration, duration]);
+
+    const handleSeekToSection = useStableCallback((id: string) => {
+        const timing = sectionTimings.find(tm => tm.id === id);
+        if (timing) seekSong(timing.start + 0.001);
+    });
+
+    const handleToggleSongPlayback = useStableCallback(() => {
+        if (!uploadedBeat && sessions.length === 0) {
+            toast.info('Add a beat or record a take first');
+            return;
+        }
+        togglePlayback(!songClock.playing);
+    });
+
+    const runAutoSection = useStableCallback(async () => {
+        if (!uploadedBeat) {
+            toast.info('Add a beat first, then I can find its sections');
+            return;
+        }
+        setIsAnalyzingStructure(true);
+        try {
+            const structure = await beatAudio.analyze();
+            if (!structure || structure.segments.length === 0) {
+                toast.error("Couldn't read this beat. Try another file.");
+                return;
+            }
+            commitSections(prev => applyBeatSegments(prev, structure.segments, structure.durationSec, () => randomId()));
+            setBarGrid(structure.method === 'audio' ? { gridStartSec: structure.gridStartSec, barSec: structure.barSec } : null);
+            setStructureSummary({ bpm: structure.bpm, method: structure.method, confidence: structure.confidence });
+            if (structure.method === 'audio' && structure.bpm) setProjectBpm(String(Math.round(structure.bpm)));
+            toast.success(
+                structure.method === 'audio'
+                    ? `Found ${structure.segments.length} sections at ${Math.round(structure.bpm ?? 0)} BPM`
+                    : "Couldn't find a steady tempo, so I split it evenly. Drag the handles to fit."
+            );
+        } catch (err) {
+            console.error('[auto-section] failed:', err);
+            toast.error('Something went wrong reading the beat');
+        } finally {
+            setIsAnalyzingStructure(false);
+        }
+    });
+
+    // A drag fires many moves; coalescing by boundary makes the whole drag one undo step.
+    const handleAutoSection = useStableCallback(() => {
+        if (sectionsAreTimed && hasUserEdits(sections)) {
+            setConfirmDialog({
+                title: 'Re-detect the sections?',
+                description: 'You adjusted some sections by hand. Re-detecting moves them to match the beat. Your lyrics are kept, and you can undo this.',
+                confirmLabel: 'Re-detect',
+                onConfirm: () => { void runAutoSection(); },
+            });
+            return;
+        }
+        void runAutoSection();
+    });
+
+    const handleMoveBoundary = useStableCallback((index: number, timeSec: number) => {
+        commitSections(
+            prev => moveBoundary(prev, index, timeSec, timelineDuration, getMinSectionSec(barGrid)),
+            { coalesceKey: `boundary:${index}` }
+        );
+    });
+    const handleSplitAtPlayhead = useStableCallback(() => {
+        const next = splitSectionAt(sections, songClock.time, timelineDuration, randomId(), getMinSectionSec(barGrid));
+        if (next === sections) {
+            toast.info('Move the playhead into a section (not at its edge) to split it');
+            return;
+        }
+        commitSections(next);
+    });
+    const handleMergeWithNext = useStableCallback((index: number) => {
+        commitSections(prev => mergeWithNext(prev, index, timelineDuration));
+    });
+    const handleResetTimings = useStableCallback(() => {
+        commitSections(prev => clearTimings(prev));
+        setBarGrid(null);
+        setStructureSummary(null);
+    });
+    const handleOpenKaraoke = useCallback(() => setShowKaraoke(true), []);
+    const handleCloseKaraoke = useCallback(() => setShowKaraoke(false), []);
+    const handleOpenSyncSettings = useCallback(() => setShowSyncSettings(true), []);
+    const handleChangeLyricOffset = useStableCallback((ms: number) => updateSyncSettings({ lyricOffsetMs: ms }));
+
+    // ─── Editing: undo/redo, rhymes, reorder, focus, keyboard tools ───────────
+    const history = useSectionHistory(sections, setSections);
+    const commitSections = history.commit;
+
+    const [showRhymes, setShowRhymes] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('lyriq_show_rhymes') === 'true';
+        return false;
+    });
+    useEffect(() => { localStorage.setItem('lyriq_show_rhymes', String(showRhymes)); }, [showRhymes]);
+    const rhymeWordMap = useMemo(
+        () => (showRhymes ? buildRhymeWordMap(sections.map(sec => sec.text).join('\n')) : undefined),
+        [showRhymes, sections]
+    );
+
+    const [isReorderMode, setIsReorderMode] = useState(false);
+    useEffect(() => {
+        if (isReorderMode && (sections.length <= 1 || viewMode !== 'studio')) setIsReorderMode(false);
+    }, [isReorderMode, sections.length, viewMode]);
+
+    // After adding or removing a stanza, put the cursor where the user expects it.
+    const focusRequestRef = useRef<{ sectionId: string; at: 'start' | 'end' } | null>(null);
+    useEffect(() => {
+        const req = focusRequestRef.current;
+        if (!req) return;
+        const sec = sections.find(x => x.id === req.sectionId);
+        if (!sec) return;
+        const rows = sec.text.split('\n');
+        const row = req.at === 'start' ? 0 : rows.length - 1;
+        const el = document.getElementById(`input-${sec.id}-${row}`) as HTMLTextAreaElement | null;
+        if (!el) return;
+        focusRequestRef.current = null;
+        el.focus();
+        const pos = req.at === 'start' ? 0 : el.value.length;
+        el.setSelectionRange(pos, pos);
+    }, [sections]);
+
+    const handleAddSectionBelow = useStableCallback((afterId: string) => {
+        const idx = sections.findIndex(x => x.id === afterId);
+        const fresh: LyricSection = { id: randomId(), type: 'verse', repeats: 1, text: '' };
+        focusRequestRef.current = { sectionId: fresh.id, at: 'start' };
+        commitSections(prev => insertSectionAfter(prev, idx < 0 ? prev.length - 1 : idx, fresh, timelineDuration, barGrid));
+    });
+    const handleDeleteEmptyAndFocusPrev = useStableCallback((id: string) => {
+        const idx = sections.findIndex(x => x.id === id);
+        if (idx <= 0 || sections[idx].text.length > 0) return;
+        focusRequestRef.current = { sectionId: sections[idx - 1].id, at: 'end' };
+        commitSections(prev => deleteSectionAt(prev, idx, timelineDuration, { id: randomId(), type: 'verse', repeats: 1, text: '' }));
+    });
+    const handleCommitReorder = useStableCallback((reordered: LyricSection[]) => {
+        commitSections(prev => reorderSections(reordered, prev, timelineDuration));
+    });
+    const handleToggleRhymes = useCallback(() => setShowRhymes(v => !v), []);
+    const handleDoneTyping = useCallback(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        setActiveSectionId(null);
+    }, []);
+
+    // Shortcuts (studio only): Cmd/Ctrl+Z undo, Cmd+Shift+Z / Ctrl+Y redo, Space play/pause.
+    // Text fields elsewhere (title, search) keep their own native undo.
+    useEffect(() => {
+        if (viewMode !== 'studio') return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (showKaraoke) return;
+            const el = document.activeElement as HTMLElement | null;
+            const tag = (el?.tagName || '').toLowerCase();
+            const inLyrics = !!el && !!lyricsScrollRef.current?.contains(el);
+            const mod = e.metaKey || e.ctrlKey;
+            if (mod && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
+                if (tag === 'input' || (tag === 'textarea' && !inLyrics)) return;
+                e.preventDefault();
+                if (e.key.toLowerCase() === 'y' || e.shiftKey) history.redo(); else history.undo();
+                return;
+            }
+            if (e.key === 'Escape' && isReorderMode) { e.preventDefault(); setIsReorderMode(false); return; }
+            // Space toggles playback only when nothing interactive has focus, so it can't double-fire a button.
+            if (e.code === 'Space' && !e.repeat && (!el || el === document.body) && !showRecorder) {
+                e.preventDefault();
+                handleToggleSongPlayback();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [viewMode, showKaraoke, showRecorder, isReorderMode, history, handleToggleSongPlayback]);
+
+    // After a reload the sections keep their times but the bar grid is gone, so boundaries would
+    // stop snapping. Recover it quietly from the audio (once per beat) without touching the sections.
+    const gridRecoveredFor = useRef<string | null>(null);
+    useEffect(() => {
+        if (beatAudio.status !== 'ready' || !sectionsAreTimed || barGrid || !uploadedBeat) return;
+        if (gridRecoveredFor.current === uploadedBeat) return;
+        gridRecoveredFor.current = uploadedBeat;
+        let cancelled = false;
+        beatAudio.analyze().then(structure => {
+            if (cancelled || !structure || structure.method !== 'audio') return;
+            setBarGrid({ gridStartSec: structure.gridStartSec, barSec: structure.barSec });
+        });
+        return () => { cancelled = true; };
+    }, [beatAudio, sectionsAreTimed, barGrid, uploadedBeat]);
+
+    // Stable handlers so memoised section cards only re-render when their own props change.
+    const stableUpdateSection = useStableCallback((id: string, updates: Partial<LyricSection>) => updateSection(id, updates));
+    const stableDeleteSection = useStableCallback((id: string) => deleteSection(id));
+    const stableMoveSection = useStableCallback((id: string, direction: 'up' | 'down') => moveSection(id, direction));
+    const stableSectionBlur = useCallback(() => setActiveSectionId(null), []);
+
     // RAF loop: drives currentTime at ~16fps and corrects beat drift every 2s
     useEffect(() => {
         if (!isPlaying) {
@@ -1141,6 +1432,10 @@ const StudioWorkspace: React.FC = () => {
                     blob.type || 'audio/webm'
                 )
                 : transcribeAudio(base64);
+
+        // Created now but awaited later: without this, a failure before the await is reported
+        // as an unhandled rejection. The real handling still happens where it is awaited.
+        transcriptionPromise.catch(() => { /* handled at the await below */ });
 
         const timestamp = new Date().toISOString();
 
@@ -2021,7 +2316,11 @@ ${sections.filter(s => s.text.trim()).map(s =>
     }, [searchQuery, searchFilter, savedProjects, sections, sessions, beats, scraps, projectTitle]);
 
     const updateSection = (id: string, updates: Partial<LyricSection>) => {
-        setSections(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+        // Typing in one stanza coalesces into a single undo step.
+        commitSections(
+            prev => prev.map(s => s.id === id ? { ...s, ...updates } : s),
+            { coalesceKey: updates.text !== undefined ? `text:${id}` : undefined }
+        );
     };
 
     const moveSection = (id: string, direction: 'up' | 'down') => {
@@ -2031,29 +2330,19 @@ ${sections.filter(s => s.text.trim()).map(s =>
         if (newIndex < 0 || newIndex >= sections.length) return;
         const newSections = [...sections];
         [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-        setSections(newSections);
+        // Each section keeps its own length; the timeline is re-laid-out end to end.
+        commitSections(reorderSections(newSections, sections, timelineDuration));
     };
 
     const deleteSection = (id: string) => {
-        setSections(prev => {
-            const index = prev.findIndex(s => s.id === id);
-            if (index === -1) return prev;
-            const removed = prev[index];
-            const next = prev.filter(s => s.id !== id);
-            // Non-blocking undo toast instead of a confirm gate — section deletes are a
-            // routine part of structuring a song, so we make them instantly reversible
-            // rather than interrupting the writing flow with a dialog every time.
-            toast(`${removed.type.charAt(0).toUpperCase() + removed.type.slice(1)} deleted`, {
-                action: {
-                    label: 'Undo',
-                    onClick: () => setSections(current => {
-                        const restored = [...current];
-                        restored.splice(Math.min(index, restored.length), 0, removed);
-                        return restored;
-                    }),
-                },
-            });
-            return next;
+        const index = sections.findIndex(s => s.id === id);
+        if (index === -1) return;
+        const removed = sections[index];
+        commitSections(prev => deleteSectionAt(prev, index, timelineDuration, { id: randomId(), type: 'verse', repeats: 1, text: '' }));
+        // Non-blocking undo toast instead of a confirm gate: deleting a section is routine, so it
+        // is made instantly reversible rather than interrupting the flow with a dialog.
+        toast(`${removed.type.charAt(0).toUpperCase() + removed.type.slice(1)} deleted`, {
+            action: { label: 'Undo', onClick: () => { history.undo(); } },
         });
     };
 
@@ -2062,12 +2351,8 @@ ${sections.filter(s => s.text.trim()).map(s =>
     ];
 
     const addSection = () => {
-        setSections(prev => [...prev, {
-            id: randomId(),
-            type: 'verse',
-            repeats: 1,
-            text: ""
-        }]);
+        const fresh: LyricSection = { id: randomId(), type: 'verse', repeats: 1, text: "" };
+        commitSections(prev => insertSectionAfter(prev, prev.length - 1, fresh, timelineDuration, barGrid));
         if (studioMode === 'flow') setStudioMode('write');
     };
 
@@ -2079,7 +2364,7 @@ ${sections.filter(s => s.text.trim()).map(s =>
                 repeats: 1,
                 text: text
             };
-            setSections(prev => [...prev, newSection]);
+            commitSections(prev => insertSectionAfter(prev, prev.length - 1, newSection, timelineDuration, barGrid));
         }
     };
 
@@ -2612,6 +2897,10 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                             onSeek={handleBeatSeek}
                                             isBeatLoading={isBeatLoading || isUserRecording}
                                             onUpload={async (file) => {
+                                                // Times from the previous beat don't fit this one.
+                                                setSections(prev => clearTimings(prev));
+                                                setBarGrid(null);
+                                                setStructureSummary(null);
                                                 setIsBeatLoading(true);
                                                 const url = URL.createObjectURL(file);
                                                 setUploadedBeat(url);
@@ -2649,6 +2938,9 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                 setUploadedBeatName("");
                                                 setUploadedBeatId(null);
                                                 setIsBeatPlaying(false);
+                                                setSections(prev => clearTimings(prev));
+                                                setBarGrid(null);
+                                                setStructureSummary(null);
                                             }}
                                         />
                                     </div>
@@ -2688,16 +2980,43 @@ ${sections.filter(s => s.text.trim()).map(s =>
                             </div>
                         </div>
 
+                        {(uploadedBeat || sessions.length > 0) && (
+                            <SectionTimeline
+                                sections={sections}
+                                timings={sectionTimings}
+                                durationSec={timelineDuration}
+                                peaks={beatAudio.peaks}
+                                clock={songClock}
+                                hasBeat={!!uploadedBeat}
+                                isAnalyzing={isAnalyzingStructure}
+                                summary={structureSummary}
+                                grid={barGrid}
+                                isTimed={sectionsAreTimed}
+                                onSeek={seekSong}
+                                onMoveBoundary={handleMoveBoundary}
+                                onSplitAtPlayhead={handleSplitAtPlayhead}
+                                onMergeWithNext={handleMergeWithNext}
+                                onAutoSection={handleAutoSection}
+                                onResetTimings={handleResetTimings}
+                                canUndo={history.canUndo}
+                                canRedo={history.canRedo}
+                                onUndo={history.undo}
+                                onRedo={history.redo}
+                                onOpenKaraoke={handleOpenKaraoke}
+                                onOpenSettings={handleOpenSyncSettings}
+                            />
+                        )}
+
                         <div id="tour-workspace" className="flex-1 relative overflow-hidden flex flex-col">
                             {/* Lyrics — always visible, scrollable */}
                             {(
-                                <div className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
+                                <div ref={lyricsScrollRef} className="absolute inset-0 overflow-y-auto scrollbar-hide bg-[var(--bg-main)] px-4 py-8 pb-[calc(10rem+env(safe-area-inset-bottom))]">
                                     <div className="max-w-3xl mx-auto space-y-12">
                                         <>
                                             {editorLayout === 'open' && !(sections.length === 0 && showTour) ? (
                                                 <OpenEditor
                                                     sections={sections}
-                                                    onUpdateSections={setSections}
+                                                    onUpdateSections={(next) => commitSections(next, { coalesceKey: 'open-text' })}
                                                     onFocus={() => setActiveSectionId('__open__')}
                                                     onBlur={() => setActiveSectionId(null)}
                                                 />
@@ -2786,27 +3105,53 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                                                  exit={{ opacity: 0 }}
                                                                  className="space-y-12"
                                                              >
-                                                                {sections.map((section, idx) => (
+                                                                {isReorderMode ? (
+                                                                    <ReorderList
+                                                                        key={sections.map(x => x.id).join('|')}
+                                                                        sections={sections}
+                                                                        timings={sectionTimings}
+                                                                        onCommit={handleCommitReorder}
+                                                                        onDone={() => setIsReorderMode(false)}
+                                                                    />
+                                                                ) : sections.map((section, idx) => (
                                                                     <motion.div key={section.id} id={idx === 0 ? 'tour-lyric-card' : undefined} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
                                                                         <LyricCard
                                                                             section={section}
-                                                                            onUpdate={updateSection}
-                                                                            onDelete={deleteSection}
-                                                                            onMove={moveSection}
+                                                                            timing={sectionsAreTimed || timelineDuration > 0 ? sectionTimings[idx] ?? null : null}
+                                                                            isPlayingSection={isSongPlaying && idx === activeSectionIdx}
+                                                                            activeLineIndex={activeTimedLine && activeTimedLine.sectionId === section.id ? activeTimedLine.lineIndex : null}
+                                                                            onSeekToSection={handleSeekToSection}
+                                                                            showRhymes={showRhymes}
+                                                                            rhymeWordMap={rhymeWordMap}
+                                                                            onAddSectionBelow={handleAddSectionBelow}
+                                                                            onDeleteEmptyAndFocusPrev={handleDeleteEmptyAndFocusPrev}
+                                                                            onUpdate={stableUpdateSection}
+                                                                            onDelete={stableDeleteSection}
+                                                                            onMove={stableMoveSection}
                                                                             showSyllables={showSyllables}
                                                                             onSectionFocus={setActiveSectionId}
-                                                                            onSectionBlur={() => setActiveSectionId(null)}
+                                                                            onSectionBlur={stableSectionBlur}
                                                                         />
                                                                     </motion.div>
                                                                 ))}
-                                                                <button
+                                                                {!isReorderMode && sections.length > 1 && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => { handleDoneTyping(); setIsReorderMode(true); }}
+                                                                        className="mx-auto flex items-center gap-1.5 px-3 h-8 rounded-full bg-[var(--bg-secondary)] text-[11px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-main)] active:scale-95"
+                                                                        data-testid="enter-reorder"
+                                                                    >
+                                                                        Reorder sections
+                                                                    </button>
+                                                                )}
+                                                                {!isReorderMode && <button
                                                                     onClick={addSection}
                                                                     className="w-full py-6 flex items-center justify-center gap-4 text-xs mono uppercase tracking-[0.3em] text-[var(--text-secondary)] hover:text-[var(--text-main)] transition-all group relative active:scale-95 focus:outline-none focus:ring-1 focus:ring-[var(--border-focus)] rounded-lg"
                                                                 >
                                                                     <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
                                                                     <span className="px-4 group-hover:scale-110 group-hover:tracking-[0.4em] transition-all duration-500 font-medium">+</span>
                                                                     <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent via-[var(--border-main)] to-[var(--border-focus)] opacity-30 group-hover:opacity-100 transition-all duration-500" />
-                                                                </button>
+                                                                </button>}
                                                             </motion.div>
                                                         )}
                                                     </AnimatePresence>
@@ -2814,6 +3159,18 @@ ${sections.filter(s => s.text.trim()).map(s =>
                                         </>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Follow paused because the user scrolled: offer a way back to the line being sung */}
+                            {follow.pausedByUser && isSongPlaying && syncSettings.followPlayback && (
+                                <button
+                                    type="button"
+                                    onClick={follow.recenter}
+                                    className="absolute bottom-28 right-4 z-40 flex items-center gap-1.5 px-3 h-8 rounded-full bg-[var(--accent)] text-white text-[11px] font-semibold shadow-lg active:scale-95"
+                                    data-testid="back-to-now"
+                                >
+                                    Back to now
+                                </button>
                             )}
 
                             {/* MiniPlayer pill — floats above lyrics, visible when beat or vocal loaded */}
@@ -2914,6 +3271,51 @@ ${sections.filter(s => s.text.trim()).map(s =>
                         </div>
 
                         {/* Floating record button removed — use FLOW tab to record */}
+
+                        <KeyboardAccessoryBar
+                            visible={activeSectionId !== null && activeSectionId !== '__open__' && !isReorderMode}
+                            keyboardInset={keyboardHeight}
+                            bottomOffset={(uploadedBeat || sessions.length > 0) && !showPlayerSheet ? 52 : 0}
+                            canUndo={history.canUndo}
+                            canRedo={history.canRedo}
+                            showRhymes={showRhymes}
+                            onUndo={history.undo}
+                            onRedo={history.redo}
+                            onToggleRhymes={handleToggleRhymes}
+                            onAddStanza={() => { if (activeSectionId) handleAddSectionBelow(activeSectionId); }}
+                            onDone={handleDoneTyping}
+                        />
+
+                        {showSyncSettings && (
+                            <div className="absolute inset-0 z-[70]" onClick={() => setShowSyncSettings(false)}>
+                                <div className="absolute right-3 top-40">
+                                    <SyncSettingsPanel
+                                        settings={syncSettings}
+                                        latencyMs={latencyCompensation}
+                                        onChange={updateSyncSettings}
+                                        onChangeLatency={setLatencyCompensation}
+                                        onReset={resetSyncSettings}
+                                        onClose={() => setShowSyncSettings(false)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {showKaraoke && (
+                            <KaraokeView
+                                sections={sections}
+                                timings={sectionTimings}
+                                lines={timedLines}
+                                clock={songClock}
+                                durationSec={timelineDuration}
+                                offsetMs={syncSettings.lyricOffsetMs}
+                                projectTitle={projectTitle}
+                                onClose={handleCloseKaraoke}
+                                onTogglePlay={handleToggleSongPlayback}
+                                onSeek={seekSong}
+                                onChangeOffset={handleChangeLyricOffset}
+                            />
+                        )}
                     </div>
                 );
             case 'muse':

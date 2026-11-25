@@ -3,9 +3,27 @@ import { LyricSection, SECTION_TYPES } from '@/types';
 import { X, ChevronUp, ChevronDown } from 'lucide-react';
 import { countSyllables } from '@/lib/utils/syllable';
 import { cn } from '@/lib/utils';
+import { sectionColor, withAlpha } from '@/lib/timeline/sectionColors';
+import { formatTime } from '@/lib/utils/time';
+import type { RhymeWordInfo } from '@/lib/creative/rhyme';
 
 interface LyricCardProps {
   section: LyricSection;
+  /** Where this section sits on the song timeline, when known. */
+  timing?: { start: number; end: number } | null;
+  /** The song is playing and this is the section being played. */
+  isPlayingSection?: boolean;
+  /** Raw line index (into `section.text.split('\n')`) being sung, or null. */
+  activeLineIndex?: number | null;
+  /** Jump playback to the start of this section. */
+  onSeekToSection?: (id: string) => void;
+  /** Underline words that rhyme with another word in the song. */
+  showRhymes?: boolean;
+  rhymeWordMap?: Map<string, RhymeWordInfo>;
+  /** Return pressed twice at the end of a stanza: start the next one. */
+  onAddSectionBelow?: (id: string) => void;
+  /** Backspace in an empty extra stanza: remove it and go back to the one above. */
+  onDeleteEmptyAndFocusPrev?: (id: string) => void;
   onUpdate: (id: string, updates: Partial<LyricSection>) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, direction: 'up' | 'down') => void;
@@ -68,8 +86,33 @@ const AutoResizeRowTextarea = ({
   );
 };
 
-export const LyricCard: React.FC<LyricCardProps> = ({
+/** Splits a line into words and underlines the ones that rhyme. Rendered invisibly over the textarea. */
+function renderRhymeUnderlines(text: string, rhymeWordMap: Map<string, RhymeWordInfo>) {
+  const tokens = text.split(/(\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b)/g);
+  return tokens.map((token, idx) => {
+    const clean = token.toLowerCase().replace(/[^a-z]/g, '');
+    const info = clean ? rhymeWordMap.get(clean) : undefined;
+    if (info) {
+      return (
+        <span key={idx} className={`underline ${info.colorClass} decoration-[2.5px] underline-offset-[5px]`}>
+          {token}
+        </span>
+      );
+    }
+    return <span key={idx}>{token}</span>;
+  });
+}
+
+const LyricCardBase: React.FC<LyricCardProps> = ({
   section,
+  timing = null,
+  isPlayingSection = false,
+  activeLineIndex = null,
+  onSeekToSection,
+  showRhymes = false,
+  rhymeWordMap,
+  onAddSectionBelow,
+  onDeleteEmptyAndFocusPrev,
   onUpdate,
   onDelete,
   onMove,
@@ -82,6 +125,7 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   const [pendingFocus, setPendingFocus] = useState<{ index: number; caretPos: number } | null>(null);
 
   const lines = section.text.split('\n');
+  const color = sectionColor(section.type);
 
   // Caret positioning and row focusing side-effect
   useEffect(() => {
@@ -111,6 +155,17 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       const currentLines = [...lines];
       const lineText = currentLines[index] || '';
 
+      // Return on an empty last line, right after a written one: that blank line is the
+      // "new stanza" gesture. Drop it and start the next stanza instead.
+      if (
+        onAddSectionBelow && !e.shiftKey && index === currentLines.length - 1 && index > 0 &&
+        lineText.trim() === '' && (currentLines[index - 1] || '').trim() !== ''
+      ) {
+        onUpdate(section.id, { text: currentLines.slice(0, -1).join('\n') });
+        onAddSectionBelow(section.id);
+        return;
+      }
+
       const before = lineText.slice(0, selectionStart);
       const after = lineText.slice(selectionStart);
 
@@ -120,7 +175,10 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       onUpdate(section.id, { text: currentLines.join('\n') });
       setPendingFocus({ index: index + 1, caretPos: 0 });
     } else if (e.key === 'Backspace' && selectionStart === 0 && selectionEnd === 0) {
-      if (index > 0) {
+      if (index === 0 && section.text === '' && onDeleteEmptyAndFocusPrev) {
+        e.preventDefault();
+        onDeleteEmptyAndFocusPrev(section.id);
+      } else if (index > 0) {
         e.preventDefault();
         const currentLines = [...lines];
         const prevLineText = currentLines[index - 1] || '';
@@ -181,19 +239,36 @@ export const LyricCard: React.FC<LyricCardProps> = ({
   };
 
   return (
-    <div className={cn(
-      "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]"
-    )}>
+    <div
+      className={cn(
+        "animate-in fade-in slide-in-from-bottom-2 duration-500 group relative px-1 py-3 rounded-xl transition-colors duration-300 hover:bg-[var(--bg-hover)]",
+        isPlayingSection && "bg-[var(--bg-hover)]"
+      )}
+      style={isPlayingSection ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
+      data-section-id={section.id}
+      data-playing-section={isPlayingSection ? 'true' : undefined}
+    >
       <div className="flex items-center justify-between mb-2 select-none">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-main)] text-[10px] mono uppercase tracking-wider text-[var(--text-main)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all font-medium active:scale-95 cursor-pointer"
           >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
             {section.type}
             <ChevronDown size={10} className="opacity-70" />
           </button>
-
+          {timing && timing.end > timing.start && (
+            <button
+              type="button"
+              onClick={() => onSeekToSection?.(section.id)}
+              title="Jump to this section"
+              className="text-[10px] mono tabular-nums text-[var(--text-tertiary)] hover:text-[var(--text-main)] transition-colors px-1.5 py-0.5 rounded-md hover:bg-[var(--bg-secondary)] cursor-pointer"
+              data-testid="section-time-chip"
+            >
+              {formatTime(timing.start).replace(/^0/, '')} – {formatTime(timing.end).replace(/^0/, '')}
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -227,13 +302,30 @@ export const LyricCard: React.FC<LyricCardProps> = ({
       {/* Row-Based Lyrics Content */}
       <div className="space-y-1.5 relative transition-all">
         {lines.map((lineText, idx) => (
-          <div key={`${section.id}-row-${idx}`} className="flex items-start w-full gap-1">
+          <div
+            key={`${section.id}-row-${idx}`}
+            className={cn(
+              "flex items-start w-full gap-1 rounded-md transition-colors duration-200",
+              activeLineIndex === idx && "-mx-1.5 px-1.5"
+            )}
+            style={activeLineIndex === idx ? { background: withAlpha(color, 0.16), boxShadow: `inset 2px 0 0 ${color}` } : undefined}
+            data-active-lyric-line={activeLineIndex === idx ? 'true' : undefined}
+          >
             {showSyllables && (
               <div className="w-6 text-right pr-1.5 text-xs font-mono text-[var(--text-tertiary)] opacity-60 pt-1.5 select-none tabular-nums flex-shrink-0 animate-in fade-in duration-200">
                 {countSyllables(lineText) || '\u00A0'}
               </div>
             )}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 relative">
+              {showRhymes && rhymeWordMap && rhymeWordMap.size > 0 && lineText && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none select-none text-base leading-relaxed font-sans py-0.5 whitespace-pre-wrap break-words overflow-hidden text-transparent"
+                  data-testid="rhyme-overlay"
+                >
+                  {renderRhymeUnderlines(lineText, rhymeWordMap)}
+                </div>
+              )}
               <AutoResizeRowTextarea
                 id={`input-${section.id}-${idx}`}
                 value={lineText}
@@ -268,3 +360,5 @@ export const LyricCard: React.FC<LyricCardProps> = ({
     </div>
   );
 };
+
+export const LyricCard = React.memo(LyricCardBase);
