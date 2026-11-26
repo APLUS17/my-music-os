@@ -14,6 +14,8 @@
 // - The recorder has its own AudioContext that it closes when the mic goes
 //   idle. Playback uses a separate context so that never cuts the music.
 
+import { VocalDriftTracker } from './vocalDrift';
+
 type AudioContextCtor = typeof AudioContext;
 
 function getCtor(): AudioContextCtor | null {
@@ -255,6 +257,7 @@ export function preloadVocalBuffer(key: string, blob?: Blob, url?: string): Prom
 
 /** Stops any active Web Audio vocal source, fading it out just ahead of the audio thread so it never clicks. */
 export function stopVocalBufferPlayback(): void {
+  vocalDrift.reset();
   if (!ctx || !activeVocal) return;
   const current = activeVocal;
   activeVocal = null;
@@ -308,7 +311,9 @@ export type VocalBufferStatus = 'playing' | 'pending' | 'ended' | 'fallback';
  * - 'ended': offset is outside the decoded buffer duration
  * - 'fallback': Web Audio is unavailable or decoding failed (use HTMLAudioElement)
  */
-export const VOCAL_SYNC_DRIFT_TOLERANCE_SEC = 0.08;
+/** Decides when the running vocal has really drifted (see vocalDrift.ts); a per-frame 80 ms check made iPhone playback choppy. */
+const vocalDrift = new VocalDriftTracker();
+const wallSec = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
 
 export function syncVocalBufferPlayback(
   key: string,
@@ -346,13 +351,19 @@ export function syncVocalBufferPlayback(
   if (!strict && activeVocal && activeVocal.startedCtxTime > ctx.currentTime) return 'playing';
 
   const wasSameTake = Boolean(activeVocal && activeVocal.key === key);
-  if (wasSameTake && activeVocal) {
+  /** True when this restart corrects drift, so the learned offset is kept rather than learned again. */
+  let isDriftCorrection = false;
+  if (wasSameTake && activeVocal && !strict) {
     const livePos = activeVocal.startedOffset + (ctx.currentTime - activeVocal.startedCtxTime);
-    if (!strict && Math.abs(livePos - offsetSec) <= VOCAL_SYNC_DRIFT_TOLERANCE_SEC) {
+    const correction = vocalDrift.check(wallSec(), livePos - offsetSec);
+    if (correction === null) {
       gain.gain.setTargetAtTime(clampLevel(volume), ctx.currentTime, 0.015);
       return 'playing';
     }
+    offsetSec = Math.max(0, offsetSec + correction);
+    isDriftCorrection = true;
   }
+  if (!isDriftCorrection) vocalDrift.reset();
 
   // Start the new source on the audio clock, far enough ahead to be honoured, beginning that much further
   // into the take so it still lines up. The running source (if any) fades out to end exactly then.
