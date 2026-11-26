@@ -2,12 +2,11 @@ import { lazy, memo, Suspense, useRef, useEffect, useState, useCallback, useMemo
 import {
   Play,
   Pause,
-  ChevronUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Volume2,
   VolumeX,
+  MoreHorizontal,
   SlidersHorizontal,
   Mic,
   MicOff,
@@ -122,6 +121,15 @@ export function getSectionColorPalette(type?: SectionType): SectionColorPalette 
   }
 }
 
+/**
+ * Dock waveform colours: the active section is amber, everything else is neutral.
+ * (The per-type palette above is still used by the lyric labels and karaoke.)
+ */
+function barFill(isActive: boolean, isPast: boolean): string {
+  if (isActive) return isPast ? '#f59e0b' : 'rgba(245, 158, 11, 0.55)';
+  return isPast ? 'rgba(255, 255, 255, 0.36)' : 'rgba(255, 255, 255, 0.15)';
+}
+
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) return '0:00';
   const mins = Math.floor(seconds / 60);
@@ -166,8 +174,21 @@ function MasterPlaybackDock({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // Starts minimized as the floating pill at the bottom
   const [isMinimized, setIsMinimized] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isMenuOpenRef = useRef(false);
+  useEffect(() => {
+    isMenuOpenRef.current = isMenuOpen;
+  }, [isMenuOpen]);
+  const menuWrapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // The canvas mounts in both the collapsed bar and the sheet, and AnimatePresence
+  // swaps them one after the other, so effects follow the element, not isMinimized.
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
+  const setCanvasRef = useCallback((el: HTMLCanvasElement | null) => {
+    canvasRef.current = el;
+    setCanvasEl(el);
+  }, []);
   const isDraggingRef = useRef(false);
   const [scrubPreviewTime, setScrubPreviewTime] = useState<number | null>(null);
   const boundaryDragRef = useRef<{
@@ -228,6 +249,10 @@ function MasterPlaybackDock({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !e.defaultPrevented) {
+        if (isMenuOpenRef.current) {
+          setIsMenuOpen(false);
+          return;
+        }
         setIsSettingsOpen(false);
         setIsMinimized(prev => !prev);
       }
@@ -235,6 +260,22 @@ function MasterPlaybackDock({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Close the ⋯ menu on an outside press, and whenever the dock collapses or expands
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (menuWrapRef.current && !menuWrapRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [isMinimized]);
 
   const beatWaveform = importedBeat?.waveform || [];
   const hasBeatAudio = Boolean(importedBeat?.audioUrl || beatWaveform.length > 0);
@@ -279,6 +320,9 @@ function MasterPlaybackDock({
     sectionTimings.length > 1 &&
     effectiveDuration > 0
   );
+
+  // Boundaries are only editable in the expanded sheet; the collapsed bar just scrubs.
+  const boundaryEditable = canDragBoundaries && !isMinimized;
 
   const activeVocalSpans = useMemo(() => {
     return sections
@@ -344,7 +388,44 @@ function MasterPlaybackDock({
       : sectionTimings;
 
     if (hasRealAudio && effectiveDuration > 0) {
-      if (hasBeatAudio) {
+      if (isMinimized) {
+        // Collapsed bar: one compact lane (loudest of vocal / beat per bar)
+        const centerY = height / 2;
+        const maxBarH = Math.max(6, height - 6);
+
+        for (let i = 0; i < barCount; i++) {
+          const x = i * step;
+          const barTime = (x / width) * effectiveDuration;
+
+          const sectionMatch = renderTimings.find(st => barTime >= st.start && barTime < st.end);
+          const isActiveSection = Boolean(sectionMatch && sectionMatch.id === activeSection?.id);
+          const isPast = barTime <= displayTime;
+
+          let norm = 0.1;
+          if (beatWaveform.length > 0) {
+            const waveIdx = Math.floor((i / barCount) * beatWaveform.length);
+            norm = Math.max(norm, Math.min(1.0, (beatWaveform[waveIdx] || 15) / 100));
+          } else if (hasBeatAudio) {
+            norm = 0.2;
+          }
+          const vocalHit = activeVocalSpans.find(s => barTime >= s.anchor && barTime < (s.anchor + s.duration));
+          if (vocalHit) {
+            let vocalNorm = 0.25;
+            if (vocalHit.waveform.length > 0) {
+              const vocalProgress = Math.max(0, Math.min(1, (barTime - vocalHit.anchor) / Math.max(0.01, vocalHit.duration)));
+              const waveIdx = Math.floor(vocalProgress * vocalHit.waveform.length);
+              vocalNorm = Math.max(0.12, Math.min(1.0, (vocalHit.waveform[waveIdx] || 15) / 100));
+            }
+            norm = Math.max(norm, vocalNorm);
+          }
+
+          const barH = Math.max(3, norm * maxBarH);
+          ctx.fillStyle = barFill(isActiveSection, isPast);
+          ctx.beginPath();
+          ctx.roundRect(x, centerY - barH / 2, barWidth, barH, 1.2);
+          ctx.fill();
+        }
+      } else if (hasBeatAudio) {
         // Dual-Lane: Top Lane = Vocal Takes, Bottom Lane = Backing Beat
         const midY = Math.floor(height / 2);
         const topCenterY = midY / 2;
@@ -356,18 +437,11 @@ function MasterPlaybackDock({
           const x = i * step;
           const barTime = (x / width) * effectiveDuration;
 
-          // Determine which section this bar belongs to (retaining section colors across both lanes)
+          // Determine which section this bar belongs to (active section amber, the rest neutral)
           const sectionMatch = renderTimings.find(st => barTime >= st.start && barTime < st.end);
-          const sectionPalette = getSectionColorPalette(sectionMatch?.type);
           const isActiveSection = Boolean(sectionMatch && sectionMatch.id === activeSection?.id);
           const isPast = barTime <= displayTime;
-
-          let barColor: string;
-          if (isActiveSection) {
-            barColor = isPast ? sectionPalette.solid : sectionPalette.translucent;
-          } else {
-            barColor = isPast ? sectionPalette.translucent : sectionPalette.dim;
-          }
+          const barColor = barFill(isActiveSection, isPast);
 
           // Top Row: Vocal Takes
           const vocalHit = activeVocalSpans.find(s => barTime >= s.anchor && barTime < (s.anchor + s.duration));
@@ -422,16 +496,9 @@ function MasterPlaybackDock({
           const barTime = (x / width) * effectiveDuration;
 
           const sectionMatch = renderTimings.find(st => barTime >= st.start && barTime < st.end);
-          const sectionPalette = getSectionColorPalette(sectionMatch?.type);
           const isActiveSection = Boolean(sectionMatch && sectionMatch.id === activeSection?.id);
           const isPast = barTime <= displayTime;
-
-          let barColor: string;
-          if (isActiveSection) {
-            barColor = isPast ? sectionPalette.solid : sectionPalette.translucent;
-          } else {
-            barColor = isPast ? sectionPalette.translucent : sectionPalette.dim;
-          }
+          const barColor = barFill(isActiveSection, isPast);
 
           const vocalHit = activeVocalSpans.find(s => barTime >= s.anchor && barTime < (s.anchor + s.duration));
           let normalizedAmp = 0.08;
@@ -464,10 +531,9 @@ function MasterPlaybackDock({
           const secStartX = (st.start / effectiveDuration) * width;
           const secEndX = (st.end / effectiveDuration) * width;
           const secW = Math.max(2, secEndX - secStartX);
-          const secPalette = getSectionColorPalette(st.type);
           const isCurrent = st.id === activeSection?.id;
 
-          ctx.fillStyle = isCurrent ? secPalette.translucent : secPalette.dim;
+          ctx.fillStyle = isCurrent ? 'rgba(245, 158, 11, 0.55)' : 'rgba(255, 255, 255, 0.12)';
           ctx.beginPath();
           ctx.roundRect(secStartX, trackY, secW, trackHeight, 2);
           ctx.fill();
@@ -481,8 +547,7 @@ function MasterPlaybackDock({
 
       // Elapsed Progress (Highlighted with active section color)
       if (playheadX > 0) {
-        const activePalette = getSectionColorPalette(activeSection?.type);
-        ctx.fillStyle = activePalette.solid;
+        ctx.fillStyle = '#f59e0b';
         ctx.beginPath();
         ctx.roundRect(0, trackY, Math.min(width, playheadX), trackHeight, 2);
         ctx.fill();
@@ -528,7 +593,7 @@ function MasterPlaybackDock({
           ctx.stroke();
 
           // Subtle top/bottom handle caps so draggable boundaries are discoverable
-          if (canDragBoundaries) {
+          if (boundaryEditable) {
             ctx.fillStyle = isDragged
               ? '#fbbf24'
               : isHovered
@@ -546,6 +611,19 @@ function MasterPlaybackDock({
     }
 
     // 3. High-Precision Playhead Indicator
+    if (isMinimized) {
+      // Collapsed bar: a slim amber line, no knob
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(playheadX, 1);
+      ctx.lineTo(playheadX, height - 1);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+
     ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
     ctx.shadowBlur = 4;
     ctx.strokeStyle = '#ffffff';
@@ -570,7 +648,7 @@ function MasterPlaybackDock({
     ctx.fill();
 
     ctx.restore();
-  }, [currentTime, scrubPreviewTime, effectiveDuration, sectionTimings, beatWaveform, hasBeatAudio, hasRealAudio, hasTimeline, activeVocalSpans, activeSection, isPlaying, isVocalMuted, canDragBoundaries, snapToGrid, activeBeatGrid]);
+  }, [currentTime, scrubPreviewTime, effectiveDuration, sectionTimings, beatWaveform, hasBeatAudio, hasRealAudio, hasTimeline, activeVocalSpans, activeSection, isPlaying, isVocalMuted, boundaryEditable, isMinimized, snapToGrid, activeBeatGrid]);
 
   const drawWaveformRef = useRef(drawWaveform);
   drawWaveformRef.current = drawWaveform;
@@ -592,24 +670,22 @@ function MasterPlaybackDock({
     };
   }, []);
 
-  // ResizeObserver created only when the expanded canvas mounts (never torn down on 20Hz ticks)
+  // ResizeObserver follows the canvas element (bar or sheet), never torn down on 20Hz ticks
   useEffect(() => {
-    if (isMinimized) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvasEl) return;
 
     const ro = new ResizeObserver(() => {
       scheduleDraw();
     });
-    ro.observe(canvas);
+    ro.observe(canvasEl);
 
     return () => ro.disconnect();
-  }, [isMinimized, scheduleDraw]);
+  }, [canvasEl, scheduleDraw]);
 
   // Redraw waveform on playhead or state update smoothly via rAF
   useEffect(() => {
-    if (!isMinimized) scheduleDraw();
-  }, [isMinimized, drawWaveform, scheduleDraw]);
+    if (canvasEl) scheduleDraw();
+  }, [canvasEl, drawWaveform, scheduleDraw]);
 
   // --- SCRUBBING / TIME SEEKING ENGINE ---
   const lastSeekEmitTimeRef = useRef<number>(0);
@@ -662,7 +738,7 @@ function MasterPlaybackDock({
   // --- SECTION BOUNDARY DRAGGING (60fps ref preview -> commit on pointerup) ---
   const hitTestBoundary = useCallback(
     (clientX: number, pointerType: string): number | null => {
-      if (!canDragBoundaries) return null;
+      if (!boundaryEditable) return null;
       const canvas = canvasRef.current;
       if (!canvas) return null;
       const rect = canvas.getBoundingClientRect();
@@ -681,7 +757,7 @@ function MasterPlaybackDock({
       }
       return bestIdx;
     },
-    [canDragBoundaries, sectionTimings, effectiveDuration]
+    [boundaryEditable, sectionTimings, effectiveDuration]
   );
 
   const updateBoundaryDrag = useCallback(
@@ -749,66 +825,283 @@ function MasterPlaybackDock({
   // pen, and pointer capture keeps a drag tracking outside the canvas. Adding
   // mouse/touch handlers too would fire every tap two or three times.
 
+  // --- SHARED PIECES (used by both the collapsed bar and the expanded sheet) ---
+  const displayedTime =
+    dragBoundaryFeedback !== null
+      ? dragBoundaryFeedback.timeSec
+      : isDraggingRef.current && scrubPreviewTime !== null
+        ? scrubPreviewTime
+        : currentTime;
+  const sectionLabel =
+    activeSection && activeSection.type !== 'none' ? activeSection.type.toUpperCase() : 'STANZA';
+  const playheadPct =
+    hasTimeline && effectiveDuration > 0
+      ? Math.min(100, Math.max(0, (displayedTime / effectiveDuration) * 100))
+      : 0;
+
+  const renderCanvas = (className: string) => (
+    <canvas
+      ref={setCanvasRef}
+      className={className}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        if (isRecording || isCountingDown) return;
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+        const hitIdx = hitTestBoundary(e.clientX, e.pointerType);
+        if (hitIdx !== null) {
+          const minSec = getMinSectionSec(activeBeatGrid);
+          const left = sectionTimings[hitIdx - 1];
+          const right = sectionTimings[hitIdx];
+          const minBound = round3(left.start + minSec);
+          const maxBound = round3(right.end - minSec);
+          if (minBound < maxBound) {
+            boundaryDragRef.current = {
+              index: hitIdx,
+              timeSec: right.start,
+              minSec: minBound,
+              maxSec: maxBound,
+              snapped: false,
+            };
+            setIsBoundaryCursor(true);
+            updateBoundaryDrag(e.clientX, e.altKey);
+            return;
+          }
+        }
+        isDraggingRef.current = true;
+        handleScrub(e.clientX, true);
+      }}
+      onPointerMove={(e) => {
+        if (boundaryDragRef.current) {
+          updateBoundaryDrag(e.clientX, e.altKey);
+          return;
+        }
+        if (isDraggingRef.current) {
+          handleScrub(e.clientX, false);
+          return;
+        }
+        if (e.pointerType !== 'touch') {
+          const hitIdx = hitTestBoundary(e.clientX, e.pointerType);
+          if (hoveredBoundaryRef.current !== hitIdx) {
+            hoveredBoundaryRef.current = hitIdx;
+            setIsBoundaryCursor(hitIdx !== null);
+            scheduleDraw();
+          }
+        }
+      }}
+      onPointerLeave={() => {
+        if (!boundaryDragRef.current && hoveredBoundaryRef.current !== null) {
+          hoveredBoundaryRef.current = null;
+          setIsBoundaryCursor(false);
+          scheduleDraw();
+        }
+      }}
+      onPointerUp={(e) => {
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+        if (boundaryDragRef.current) {
+          finishBoundaryDrag(true);
+          setIsBoundaryCursor(false);
+          return;
+        }
+        handleScrubEnd();
+      }}
+      onPointerCancel={(e) => {
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+        if (boundaryDragRef.current) {
+          finishBoundaryDrag(false);
+          setIsBoundaryCursor(false);
+          return;
+        }
+        handleScrubEnd();
+      }}
+    />
+  );
+
+  const renderPlayButton = (compact: boolean) => (
+    <button
+      type="button"
+      onClick={onTogglePlay}
+      disabled={isRecording || isCountingDown}
+      className={
+        compact
+          ? 'w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed'
+          : 'w-12 h-12 sm:w-11 sm:h-11 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100'
+      }
+      title={isRecording || isCountingDown ? 'Use the record button to stop' : isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+      aria-label={isPlaying ? 'Pause' : 'Play'}
+    >
+      {isPlaying ? (
+        <Pause className={compact ? 'w-5 h-5 fill-white' : 'w-4 h-4 fill-black'} />
+      ) : (
+        <Play className={compact ? 'w-5 h-5 fill-white ml-0.5' : 'w-4 h-4 fill-black ml-0.5'} />
+      )}
+    </button>
+  );
+
+  const renderRecordButton = (compact: boolean) => {
+    const label = isCountingDown
+      ? 'Cancel Pre-Roll'
+      : isRecording
+        ? 'Stop Recording'
+        : compact
+          ? 'Start Recording'
+          : 'Record Voice Memo';
+    return (
+      <button
+        type="button"
+        onClick={onToggleRecord}
+        className={`${
+          compact ? 'w-11 h-11' : 'w-12 h-12 sm:w-11 sm:h-11'
+        } shrink-0 rounded-full border-2 p-1 flex items-center justify-center active:scale-95 transition-all cursor-pointer group ${
+          isCountingDown ? 'border-amber-400/80 bg-amber-500/10' : 'border-white/85 hover:bg-white/[0.06]'
+        }`}
+        title={label}
+        aria-label={label}
+      >
+        {isCountingDown ? (
+          <span className="font-mono text-sm font-black text-amber-400 animate-pulse">{countdownVal ?? 3}</span>
+        ) : (
+          <div
+            className={`transition-all duration-200 bg-red-500 ${
+              isRecording
+                ? 'w-4.5 h-4.5 rounded-[3px] animate-pulse'
+                : 'w-7.5 h-7.5 rounded-full group-hover:scale-105'
+            }`}
+          />
+        )}
+      </button>
+    );
+  };
+
+  const hasSnapOption = Boolean(canDragBoundaries && onToggleSnapToGrid);
+
+  const renderMenuButton = (compact: boolean) => (
+    <div className="relative shrink-0" ref={menuWrapRef}>
+      {isMenuOpen && (
+        <div
+          role="menu"
+          aria-label="Dock options"
+          className="absolute bottom-full right-0 mb-2 w-52 rounded-2xl bg-[#1c1c1f] p-1 shadow-[0_12px_32px_rgba(0,0,0,0.6)] z-50 animate-fadeIn"
+        >
+          {hasSnapOption && (
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={snapToGrid}
+              onClick={onToggleSnapToGrid}
+              className="w-full min-h-[44px] px-3 rounded-xl flex items-center gap-2.5 text-sm text-zinc-200 hover:bg-white/[0.06] active:bg-white/[0.1] transition-colors cursor-pointer"
+              title={snapToGrid ? 'Downbeat snap: On (hold Alt to drag freely)' : 'Downbeat snap: Off'}
+              aria-label={snapToGrid ? 'Disable downbeat grid snap' : 'Enable downbeat grid snap'}
+            >
+              <Magnet className="w-4 h-4 text-zinc-400" />
+              <span className="flex-1 text-left">Snap to bar</span>
+              <span className={`font-mono text-[11px] ${snapToGrid ? 'text-amber-400' : 'text-zinc-500'}`}>
+                {snapToGrid ? 'On' : 'Off'}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setIsMenuOpen(false);
+              setIsSettingsOpen(v => !v);
+            }}
+            className="w-full min-h-[44px] px-3 rounded-xl flex items-center gap-2.5 text-sm text-zinc-200 hover:bg-white/[0.06] active:bg-white/[0.1] transition-colors cursor-pointer"
+            aria-label="Audio and sync settings"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-zinc-400" />
+            <span className="flex-1 text-left">Sync settings</span>
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          // With nothing but Sync settings to offer, skip the one-item menu and open the panel.
+          if (!hasSnapOption) {
+            setIsMenuOpen(false);
+            setIsSettingsOpen(v => !v);
+            return;
+          }
+          setIsMenuOpen(v => !v);
+        }}
+        aria-haspopup={hasSnapOption ? 'menu' : 'dialog'}
+        aria-expanded={hasSnapOption ? isMenuOpen : isSettingsOpen}
+        className={`${
+          compact ? 'w-11 h-11' : 'hit-44 min-w-[36px] min-h-[36px]'
+        } rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
+          isMenuOpen || isSettingsOpen ? 'text-amber-300' : 'text-zinc-400 hover:text-zinc-100'
+        }`}
+        title="More options"
+        aria-label="More dock options"
+      >
+        <MoreHorizontal className="w-5 h-5" />
+      </button>
+    </div>
+  );
+
+  const settingsPanel = isSettingsOpen && (
+    <Suspense fallback={null}>
+      <SyncSettingsPanel
+        settings={syncSettings}
+        onChange={onChangeSyncSettings}
+        onReset={onResetSyncSettings}
+        className="absolute bottom-full right-0 mb-2"
+      />
+    </Suspense>
+  );
+
   // --- RENDER DOCK WITH SMOOTH SPRING ANIMATION ---
   return (
     <AnimatePresence mode="wait">
       {isMinimized ? (
         !hideCollapsedPill && (
-          <div
-            key="collapsed-pill-wrapper"
-            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-6 inset-x-0 z-40 flex justify-center pointer-events-none px-4"
+          /* COLLAPSED: one flat transport bar. Scrub and play only; boundary editing lives in the sheet. */
+          <motion.div
+            key="dock-bar"
+            id="master-playback-bar"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ type: 'spring', stiffness: 450, damping: 34 }}
+            onPanEnd={(_, info) => {
+              if (info.offset.y < -28 && Math.abs(info.offset.y) > Math.abs(info.offset.x)) {
+                setIsMinimized(false);
+              }
+            }}
+            className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-5 inset-x-3 sm:inset-x-6 max-w-xl mx-auto z-40 h-14 rounded-full bg-[#141416] px-1.5 flex items-center gap-1 select-none touch-pan-x"
           >
-            <motion.div
-              key="collapsed-pill"
-              initial={{ opacity: 0, scale: 0.9, y: 14 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 14 }}
-              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-              className="pointer-events-auto ios-glass border border-white/12 rounded-full shadow-[0_14px_38px_rgba(0,0,0,0.78)] flex items-center p-1"
+            {settingsPanel}
+
+            {renderPlayButton(true)}
+
+            {/* Mini sectioned waveform; the bubble above the playhead names the section and expands the sheet */}
+            <div
+              className="relative flex-1 min-w-0 h-11 flex items-center"
+              onPointerDown={(e) => e.stopPropagation()}
             >
-              {/* Direct 1-tap Record button */}
-              <button
-                type="button"
-                onClick={onToggleRecord}
-                className="min-h-[44px] pl-4 pr-3.5 rounded-full flex items-center gap-2 text-xs font-medium text-white hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-                title={isCountingDown ? 'Cancel Pre-Roll' : isRecording ? 'Stop Recording' : 'Start Recording'}
-                aria-label={isCountingDown ? 'Cancel Pre-Roll' : isRecording ? 'Stop Recording' : 'Start Recording'}
-              >
-                {isRecording ? (
-                  <span className="w-2.5 h-2.5 rounded-[2px] bg-[#ff453a] animate-pulse shadow-[0_0_8px_rgba(255,69,58,0.9)] shrink-0" />
-                ) : isCountingDown ? (
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping shrink-0" />
-                ) : (
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff453a] shadow-[0_0_8px_rgba(255,69,58,0.65)] shrink-0" />
-                )}
-                <span className="text-xs font-semibold tracking-tight text-white">
-                  {isCountingDown
-                    ? `Pre-Roll ${countdownVal ?? 3}`
-                    : isRecording
-                      ? `Rec ${recordingTakeCode}`
-                      : 'Record'}
-                </span>
-              </button>
-
-              <span className="w-px h-4 bg-white/12 shrink-0" aria-hidden="true" />
-
-              {/* Time & Expand Playback Dock */}
               <button
                 type="button"
                 onClick={() => setIsMinimized(false)}
-                className="min-h-[44px] pl-3.5 pr-4 rounded-full flex items-center gap-1.5 text-xs hover:bg-white/[0.06] active:scale-95 transition-all cursor-pointer group whitespace-nowrap"
+                style={{ left: `clamp(56px, ${playheadPct}%, calc(100% - 56px))` }}
+                className="absolute bottom-full mb-1 -translate-x-1/2 z-10 h-6 px-2.5 rounded-full bg-amber-400 text-black text-[11px] font-semibold font-mono tabular-nums whitespace-nowrap flex items-center cursor-pointer active:scale-95 before:absolute before:-inset-x-2 before:-inset-y-2.5"
                 title="Expand playback & waveform dock (Esc)"
                 aria-label="Expand playback and waveform dock"
               >
-                <span className={`font-mono tabular-nums text-xs ${isPlaying ? 'text-amber-400 font-medium' : 'text-zinc-300'}`}>
-                  {formatTime(currentTime)}
-                </span>
-                <ChevronUp className="w-3.5 h-3.5 text-zinc-400 group-hover:text-amber-400 transition-colors shrink-0" />
+                {hasBeatAudio || hasAnyTakes || sectionTimings.length > 1 ? `${sectionLabel} ` : ''}
+                {formatTime(displayedTime)}
               </button>
-            </motion.div>
-          </div>
+              {renderCanvas(
+                `w-full h-9 block touch-none ${isRecording || isCountingDown ? 'cursor-default' : 'cursor-pointer'}`
+              )}
+            </div>
+
+            {renderMenuButton(true)}
+            {renderRecordButton(true)}
+          </motion.div>
         )
       ) : (
+        /* EXPANDED: flat sheet. Same canvas, boundary drag, takes and loop as before. */
         <motion.div
           key="full-dock"
           id="master-playback-dock"
@@ -827,7 +1120,7 @@ function MasterPlaybackDock({
             }
           }}
           transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-5 inset-x-3 sm:inset-x-6 max-w-xl mx-auto z-40 rounded-3xl bg-[#141416]/95 backdrop-blur-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.85)] pt-1.5 pb-3.5 sm:pb-4 px-3.5 sm:px-5 select-none"
+          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-5 inset-x-3 sm:inset-x-6 max-w-xl mx-auto z-40 rounded-3xl bg-[#111113] pt-1.5 pb-3.5 sm:pb-4 px-4 sm:px-5 select-none"
         >
           {/* Tactile Swipe Handle (sole vertical drag initiator so touch waveform/buttons never conflict) */}
           <div
@@ -843,49 +1136,42 @@ function MasterPlaybackDock({
             <div className="w-11 h-1.5 rounded-full bg-white/25 group-hover:bg-white/50 group-active:bg-white/70 transition-colors" />
           </div>
 
-          {isSettingsOpen && (
-            <Suspense fallback={null}>
-              <SyncSettingsPanel
-                settings={syncSettings}
-                onChange={onChangeSyncSettings}
-                onReset={onResetSyncSettings}
-                className="absolute bottom-full right-0 mb-2"
-              />
-            </Suspense>
-          )}
+          {settingsPanel}
 
           <div className="w-full flex flex-col gap-2">
-            
-            {/* 1. Section Header & Time */}
+
+            {/* 1. Active section + time, loop and menu */}
             <div className="flex items-center justify-between gap-2 text-xs min-h-[36px]">
-              {/* Left: Active section pill */}
               <div className="flex items-center gap-2 min-w-0 shrink">
                 {activeSection && (
                   <span
-                    className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
+                    className={`w-2 h-2 rounded-full bg-amber-500 shrink-0 transition-colors ${
                       isPlaying ? 'animate-pulse' : ''
                     }`}
-                    style={{
-                      backgroundColor: getSectionColorPalette(activeSection.type).solid,
-                      boxShadow: isPlaying
-                        ? `0 0 8px ${getSectionColorPalette(activeSection.type).solid}`
-                        : undefined
-                    }}
+                    style={isPlaying ? { boxShadow: '0 0 8px #f59e0b' } : undefined}
                   />
                 )}
                 <span className="font-semibold uppercase tracking-wider text-xs text-white truncate">
-                  {activeSection?.type.toUpperCase() || 'STANZA'}
+                  {sectionLabel}
                 </span>
               </div>
 
-              {/* Right: loop + grid snap + settings + time */}
-              <div className="ml-auto flex items-center gap-0.5">
+              <div className="ml-auto flex items-center gap-1 shrink-0">
+                <span
+                  className={`font-mono text-xs tracking-tight whitespace-nowrap mr-1 ${
+                    dragBoundaryFeedback !== null ? 'invisible' : ''
+                  }`}
+                >
+                  <span className="text-white font-medium tabular-nums">{formatTime(displayedTime)}</span>
+                  <span className="text-zinc-600"> / </span>
+                  <span className="text-zinc-400 tabular-nums">{hasTimeline ? formatTime(totalDuration) : '–:––'}</span>
+                </span>
                 {activeSection && onToggleSectionLoop && (
                   <button
                     type="button"
                     onClick={() => onToggleSectionLoop(activeSection.id)}
                     aria-pressed={Boolean(activeSection.isLooping)}
-                    className={`min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
+                    className={`hit-44 min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
                       activeSection.isLooping
                         ? 'bg-amber-500/20 text-amber-300'
                         : 'text-zinc-500 hover:text-zinc-200'
@@ -893,64 +1179,17 @@ function MasterPlaybackDock({
                     title={activeSection.isLooping ? 'Section loop: On (tap to disable)' : 'Loop this section'}
                     aria-label={activeSection.isLooping ? 'Disable section loop' : 'Loop this section'}
                   >
-                    <Repeat className="w-3.5 h-3.5" />
+                    <Repeat className="w-4 h-4" />
                   </button>
                 )}
-                {canDragBoundaries && onToggleSnapToGrid && (
-                  <button
-                    type="button"
-                    onClick={onToggleSnapToGrid}
-                    aria-pressed={snapToGrid}
-                    className={`min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
-                      snapToGrid ? 'bg-amber-500/20 text-amber-300' : 'text-zinc-500 hover:text-zinc-200'
-                    }`}
-                    title={snapToGrid ? 'Downbeat snap: On (hold Alt to drag freely)' : 'Downbeat snap: Off'}
-                    aria-label={snapToGrid ? 'Disable downbeat grid snap' : 'Enable downbeat grid snap'}
-                  >
-                    <Magnet className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsSettingsOpen(v => !v)}
-                  aria-expanded={isSettingsOpen}
-                  className={`min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
-                    isSettingsOpen ? 'bg-amber-500/20 text-amber-300' : 'text-zinc-500 hover:text-zinc-200'
-                  }`}
-                  title="Audio and sync settings"
-                  aria-label="Audio and sync settings"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                </button>
+                {renderMenuButton(false)}
               </div>
-              <button
-                type="button"
-                onClick={() => setIsMinimized(true)}
-                className="min-h-[36px] pl-1 flex items-center gap-1 font-mono text-xs tracking-tight whitespace-nowrap shrink-0 cursor-pointer text-zinc-400 hover:text-zinc-200 transition-colors"
-                title="Click to minimize (Esc)"
-                aria-label="Minimize playback dock"
-              >
-                <span className="text-white font-medium tabular-nums">
-                  {formatTime(
-                    dragBoundaryFeedback !== null
-                      ? dragBoundaryFeedback.timeSec
-                      : isDraggingRef.current && scrubPreviewTime !== null
-                        ? scrubPreviewTime
-                        : currentTime
-                  )}
-                </span>
-                <span className="text-zinc-600">/</span>
-                <span className="text-zinc-400 tabular-nums">
-                  {hasTimeline ? formatTime(totalDuration) : '–:––'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 ml-0.5" />
-              </button>
             </div>
 
-            {/* 2. Waveform ribbon with dual-lane display, section splits & draggable boundaries */}
+            {/* 2. Waveform: dual-lane display, section splits and draggable boundaries (no box around it) */}
             <div
               onPointerDown={(e) => e.stopPropagation()}
-              className={`relative w-full h-12 rounded-xl bg-black/55 border border-white/[0.08] overflow-visible group touch-none ${
+              className={`relative w-full h-14 overflow-visible group touch-none ${
                 isRecording || isCountingDown
                   ? 'cursor-default'
                   : isBoundaryCursor
@@ -965,130 +1204,40 @@ function MasterPlaybackDock({
                 </div>
               )}
               <div className="relative w-full h-full rounded-xl overflow-hidden touch-none">
-              {hasBeatAudio && (
-                <div className="absolute inset-x-2 top-0 bottom-0 pointer-events-none flex flex-col justify-between py-1.5 select-none z-10">
-                  <div className="flex items-center">
-                    {isVocalMuted ? (
-                      <MicOff className="w-2.5 h-2.5 text-zinc-500/85" aria-label="Vocals muted" />
-                    ) : (
-                      <Mic className="w-2.5 h-2.5 text-amber-400/85" aria-label="Vocals" />
-                    )}
+                {hasBeatAudio && (
+                  <div className="absolute inset-x-2 top-0 bottom-0 pointer-events-none flex flex-col justify-between py-1.5 select-none z-10">
+                    <div className="flex items-center">
+                      {isVocalMuted ? (
+                        <MicOff className="w-2.5 h-2.5 text-zinc-500/85" aria-label="Vocals muted" />
+                      ) : (
+                        <Mic className="w-2.5 h-2.5 text-amber-400/85" aria-label="Vocals" />
+                      )}
+                    </div>
+                    <div className="flex items-center">
+                      <AudioLines className="w-2.5 h-2.5 text-zinc-400/85" aria-label="Beat audio" />
+                    </div>
                   </div>
-                  <div className="flex items-center">
-                    <AudioLines className="w-2.5 h-2.5 text-zinc-400/85" aria-label="Beat audio" />
-                  </div>
-                </div>
-              )}
-              <canvas
-                ref={canvasRef}
-                className="w-full h-full block touch-none"
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  if (isRecording || isCountingDown) return;
-                  try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-                  const hitIdx = hitTestBoundary(e.clientX, e.pointerType);
-                  if (hitIdx !== null) {
-                    const minSec = getMinSectionSec(activeBeatGrid);
-                    const left = sectionTimings[hitIdx - 1];
-                    const right = sectionTimings[hitIdx];
-                    const minBound = round3(left.start + minSec);
-                    const maxBound = round3(right.end - minSec);
-                    if (minBound < maxBound) {
-                      boundaryDragRef.current = {
-                        index: hitIdx,
-                        timeSec: right.start,
-                        minSec: minBound,
-                        maxSec: maxBound,
-                        snapped: false,
-                      };
-                      setIsBoundaryCursor(true);
-                      updateBoundaryDrag(e.clientX, e.altKey);
-                      return;
-                    }
-                  }
-                  isDraggingRef.current = true;
-                  handleScrub(e.clientX, true);
-                }}
-                onPointerMove={(e) => {
-                  if (boundaryDragRef.current) {
-                    updateBoundaryDrag(e.clientX, e.altKey);
-                    return;
-                  }
-                  if (isDraggingRef.current) {
-                    handleScrub(e.clientX, false);
-                    return;
-                  }
-                  if (e.pointerType !== 'touch') {
-                    const hitIdx = hitTestBoundary(e.clientX, e.pointerType);
-                    if (hoveredBoundaryRef.current !== hitIdx) {
-                      hoveredBoundaryRef.current = hitIdx;
-                      setIsBoundaryCursor(hitIdx !== null);
-                      scheduleDraw();
-                    }
-                  }
-                }}
-                onPointerLeave={() => {
-                  if (!boundaryDragRef.current && hoveredBoundaryRef.current !== null) {
-                    hoveredBoundaryRef.current = null;
-                    setIsBoundaryCursor(false);
-                    scheduleDraw();
-                  }
-                }}
-                onPointerUp={(e) => {
-                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-                  if (boundaryDragRef.current) {
-                    finishBoundaryDrag(true);
-                    setIsBoundaryCursor(false);
-                    return;
-                  }
-                  handleScrubEnd();
-                }}
-                onPointerCancel={(e) => {
-                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-                  if (boundaryDragRef.current) {
-                    finishBoundaryDrag(false);
-                    setIsBoundaryCursor(false);
-                    return;
-                  }
-                  handleScrubEnd();
-                }}
-              />
+                )}
+                {renderCanvas('w-full h-full block touch-none')}
               </div>
             </div>
 
             {/* 3. Transport: play, take switcher or beat status, record */}
             <div className="flex items-center justify-between gap-2 pt-0.5">
-              
-              {/* Left Transport: Single Play/Pause Button */}
-              <div className="flex items-center shrink-0">
-                <button
-                  type="button"
-                  onClick={onTogglePlay}
-                  disabled={isRecording || isCountingDown}
-                  className="w-12 h-12 sm:w-11 sm:h-11 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  title={isRecording || isCountingDown ? 'Use the record button to stop' : isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-4 h-4 fill-black" />
-                  ) : (
-                    <Play className="w-4 h-4 fill-black ml-0.5" />
-                  )}
-                </button>
-              </div>
+
+              <div className="flex items-center shrink-0">{renderPlayButton(false)}</div>
 
               {/* Center: Dynamic Contextual Status */}
               <div className="flex-1 flex items-center justify-center min-w-0 px-1 text-center">
                 {isCountingDown ? (
-                  /* Non-obtrusive 3-2-1 Countdown Pill */
-                  <div className="inline-flex items-center gap-2 bg-amber-500/15 border border-amber-500/35 rounded-full px-3.5 py-2 shadow-sm">
+                  <div className="inline-flex items-center gap-2 bg-amber-500/15 border border-amber-500/35 rounded-full px-3.5 py-2">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                     <span className="font-mono text-xs font-bold text-amber-400 tracking-wider">
                       PRE-ROLL {countdownVal ?? 3}
                     </span>
                   </div>
                 ) : isRecording ? (
-                  /* Live Recording Indicator */
-                  <div className="inline-flex items-center gap-2 bg-red-500/15 border border-red-500/35 rounded-full px-3.5 py-2 shadow-[0_0_12px_rgba(255,69,58,0.25)]">
+                  <div className="inline-flex items-center gap-2 bg-red-500/15 border border-red-500/35 rounded-full px-3.5 py-2">
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
                     <span className="font-mono text-xs font-bold text-red-400 tracking-wider">
                       REC {recordingTakeCode}
@@ -1096,12 +1245,12 @@ function MasterPlaybackDock({
                   </div>
                 ) : activeTakes.length > 0 ? (
                   /* Take switcher (< V1 >) with vocal mute */
-                  <div className="inline-flex items-center gap-0.5 bg-[#1b1b1d] border border-white/[0.08] rounded-full px-1.5 py-1 shadow-sm">
+                  <div className="inline-flex items-center gap-0.5 bg-[#1b1b1d] border border-white/[0.08] rounded-full px-1.5 py-1">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); if (takeSection) onCycleTake(takeSection.id, -1); }}
                       disabled={activeTakes.length <= 1 || isRecording || isCountingDown}
-                      className="min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                      className="hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                       title="Previous take"
                       aria-label="Previous take"
                     >
@@ -1111,7 +1260,7 @@ function MasterPlaybackDock({
                       type="button"
                       onClick={() => onOpenLiveLyrics?.()}
                       aria-busy={isCurrentTakeTranscribing || undefined}
-                      className="min-h-[34px] inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-amber-400 hover:text-amber-300 px-2 cursor-pointer transition-colors whitespace-nowrap active:scale-95"
+                      className="hit-44 min-h-[34px] inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-amber-400 hover:text-amber-300 px-2 cursor-pointer transition-colors whitespace-nowrap active:scale-95"
                       title={isCurrentTakeTranscribing ? 'Transcribing take…' : 'View timed lyrics'}
                     >
                       <span>{currentTakeCode}</span>
@@ -1124,7 +1273,7 @@ function MasterPlaybackDock({
                           e.stopPropagation();
                           onRetryTranscription(takeSection.id, currentTake.id);
                         }}
-                        className="min-h-[28px] inline-flex items-center gap-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 whitespace-nowrap"
+                        className="hit-44 min-h-[28px] inline-flex items-center gap-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 whitespace-nowrap"
                         title="Retry lyrics transcription"
                         aria-label={`Retry transcription for ${currentTakeCode}`}
                       >
@@ -1136,7 +1285,7 @@ function MasterPlaybackDock({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); if (takeSection) onCycleTake(takeSection.id, 1); }}
                       disabled={activeTakes.length <= 1 || isRecording || isCountingDown}
-                      className="min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                      className="hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                       title="Next take"
                       aria-label="Next take"
                     >
@@ -1149,7 +1298,7 @@ function MasterPlaybackDock({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onToggleMuteVocal(); }}
                           aria-pressed={isVocalMuted}
-                          className={`min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center transition-colors cursor-pointer ${isVocalMuted ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-300 hover:text-white'}`}
+                          className={`hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center transition-colors cursor-pointer ${isVocalMuted ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-300 hover:text-white'}`}
                           title={isVocalMuted ? 'Unmute vocals' : 'Mute vocals (hear the beat solo)'}
                           aria-label={isVocalMuted ? 'Unmute vocals' : 'Mute vocals'}
                         >
@@ -1161,41 +1310,14 @@ function MasterPlaybackDock({
                 ) : null}
               </div>
 
-              {/* Right Transport: Authentic iOS Voice Memos Record Button */}
-              <div className="flex items-center shrink-0">
-                <button
-                  type="button"
-                  onClick={onToggleRecord}
-                  className={`w-12 h-12 sm:w-11 sm:h-11 rounded-full border-2 p-1 flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer group ${
-                    isCountingDown
-                      ? 'border-amber-400/80 bg-amber-500/10 shadow-[0_0_12px_rgba(245,158,11,0.35)]'
-                      : 'border-white/85 shadow-[0_0_12px_rgba(255,69,58,0.25)]'
-                  }`}
-                  title={isCountingDown ? 'Cancel Pre-Roll' : isRecording ? 'Stop Recording' : 'Record Voice Memo'}
-                  aria-label={isCountingDown ? 'Cancel Pre-Roll' : isRecording ? 'Stop Recording' : 'Record Voice Memo'}
-                >
-                  {isCountingDown ? (
-                    <span className="font-mono text-sm font-black text-amber-400 animate-pulse">
-                      {countdownVal ?? 3}
-                    </span>
-                  ) : (
-                    <div
-                      className={`transition-all duration-200 bg-red-500 ${
-                        isRecording
-                          ? 'w-4.5 h-4.5 rounded-[3px] shadow-[0_0_14px_rgba(255,69,58,0.95)] animate-pulse'
-                          : 'w-7.5 h-7.5 rounded-full shadow-[0_0_8px_rgba(255,69,58,0.6)] group-hover:scale-105'
-                      }`}
-                    />
-                  )}
-                </button>
-              </div>
+              <div className="flex items-center shrink-0">{renderRecordButton(false)}</div>
 
             </div>
 
           </div>
         </motion.div>
-    )}
-  </AnimatePresence>
+      )}
+    </AnimatePresence>
   );
 }
 

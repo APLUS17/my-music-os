@@ -1,12 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "@/lyriq/index.css";
 
-// The editor is a phone-first app: no pinch zoom, and it runs under the notch.
+// Phone-first and runs under the notch (every top/bottom bar pads by the safe-area insets).
+// Pinch zoom stays on for accessibility; inputs are 16px+ so iOS does not zoom on focus.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
   themeColor: "#000000",
 };
@@ -33,11 +32,11 @@ export default function LyriqRootLayout({ children }: Readonly<{ children: React
   return (
     <html lang="en">
       <head>
-        {/* Cormorant Garamond (titles), Inter, Space Mono: the editor's own type system. */}
+        {/* Cormorant Garamond (titles) and Inter (body fallback). The service worker caches them for offline use. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Inter+Tight:wght@500;600&family=Inter:wght@300;400;500;600&family=Noto+Sans+JP:wght@500;800&family=Space+Mono:wght@400;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Inter:wght@300;400;500;600&display=swap"
           rel="stylesheet"
         />
       </head>

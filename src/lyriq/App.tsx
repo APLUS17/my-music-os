@@ -1305,24 +1305,60 @@ export default function App() {
     requestFocusSection(blank.id, 'start');
   };
 
+  // A deleted song stays restorable while its Undo notice is up; its takes are released after that.
+  const UNDO_DELETE_MS = 12000; // matches how long a notice with a button stays up
+  const pendingSongCleanupRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    const timers = pendingSongCleanupRef.current;
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  const restoreDeletedSession = useStableCallback((doomed: SongSession, index: number, wasActive: boolean) => {
+    const timer = pendingSongCleanupRef.current.get(doomed.id);
+    if (timer) clearTimeout(timer);
+    pendingSongCleanupRef.current.delete(doomed.id);
+    if (sessions.some(s => s.id === doomed.id)) return;
+    if (wasActive && isBusyRecording()) return showNotice('Stop recording before restoring that song.');
+
+    setSessions(prev => {
+      const next = [...prev];
+      next.splice(Math.min(index, next.length), 0, doomed);
+      return next;
+    });
+    if (wasActive) switchToSession(doomed);
+    showNotice(`Restored "${doomed.title || 'Untitled Track'}".`);
+  });
+
   const handleDeleteSession = (id: string) => {
     if (sessions.length <= 1) return;
     if (id === activeSessionId && isBusyRecording()) return showNotice('Stop recording before deleting this song.');
 
     const doomed = liveSessions.find(s => s.id === id);
+    const doomedIndex = liveSessions.findIndex(s => s.id === id);
+    const wasActive = activeSessionId === id;
     const remaining = liveSessions.filter(s => s.id !== id);
-    if (activeSessionId === id) switchToSession(remaining[0]);
+    if (wasActive) switchToSession(remaining[0]);
     setSessions(remaining);
+    if (!doomed) return;
 
-    // Release vocal takes this song was holding in memory (beats remain in the Beat Vault unless deleted there).
-    if (doomed) {
-      doomed.sections.forEach(sec =>
-        sec.voiceNotes?.forEach(t => {
-          abortTakeTranscription(t.id);
-          evictVocalBuffer(t.id);
-        })
-      );
-    }
+    // Release vocal takes this song was holding in memory once Undo is no longer offered
+    // (beats remain in the Beat Vault unless deleted there).
+    pendingSongCleanupRef.current.set(
+      doomed.id,
+      setTimeout(() => {
+        pendingSongCleanupRef.current.delete(doomed.id);
+        doomed.sections.forEach(sec =>
+          sec.voiceNotes?.forEach(t => {
+            abortTakeTranscription(t.id);
+            evictVocalBuffer(t.id);
+          })
+        );
+      }, UNDO_DELETE_MS + 500)
+    );
+    showNotice(`Deleted "${doomed.title || 'Untitled Track'}".`, 'info', {
+      label: 'Undo',
+      onClick: () => restoreDeletedSession(doomed, doomedIndex, wasActive),
+    });
   };
 
   const handleRenameSession = (id: string, newTitle: string) => {
@@ -1810,7 +1846,7 @@ export default function App() {
   ]);
 
   return (
-    <div className="bg-ios-bg text-ios-text font-sans h-screen flex flex-col relative overflow-hidden w-full select-text">
+    <div className="bg-ios-bg text-ios-text font-sans h-dvh flex flex-col relative overflow-hidden w-full select-text">
       {viewMode === 'library' ? (
         <LibraryView
           sessions={liveSessions}
@@ -1858,7 +1894,7 @@ export default function App() {
           />
 
           {isGlobalPlaying && isAutoScrollPausedByUser && !isLiveLyricsOpen && (
-            <div className="fixed top-16 left-1/2 -translate-x-1/2 z-30 animate-fadeIn">
+            <div className="fixed top-[calc(4rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-30 animate-fadeIn">
               <button
                 type="button"
                 onClick={handleRecenterWorkspace}
@@ -2030,7 +2066,7 @@ export default function App() {
         <div
           key={notice.id}
           role={notice.tone === 'error' ? 'alert' : 'status'}
-          className={`fixed top-16 left-1/2 -translate-x-1/2 z-[60] max-w-[min(92vw,28rem)] px-4 py-2.5 rounded-xl text-xs font-medium shadow-2xl border backdrop-blur-xl animate-fadeIn ${
+          className={`fixed top-[calc(4rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[60] max-w-[min(92vw,28rem)] px-4 py-2.5 rounded-xl text-xs font-medium shadow-2xl border backdrop-blur-xl animate-fadeIn ${
             notice.tone === 'error'
               ? 'bg-red-950/90 border-red-500/30 text-red-100'
               : 'bg-zinc-900/90 border-white/10 text-zinc-100'

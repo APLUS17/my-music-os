@@ -77,7 +77,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
             type="button"
             onClick={() => onChange({ headphones: true })}
             aria-pressed={settings.headphones}
-            className={`min-h-[40px] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs border cursor-pointer transition-colors ${
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs border cursor-pointer transition-colors ${
               settings.headphones ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
             }`}
           >
@@ -87,7 +87,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
             type="button"
             onClick={() => onChange({ headphones: false })}
             aria-pressed={!settings.headphones}
-            className={`min-h-[40px] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs border cursor-pointer transition-colors ${
+            className={`min-h-[44px] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs border cursor-pointer transition-colors ${
               !settings.headphones ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
             }`}
           >
@@ -101,7 +101,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
           type="button"
           onClick={() => setShowAdvanced(prev => !prev)}
           aria-expanded={showAdvanced}
-          className="w-full min-h-[40px] flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
+          className="w-full min-h-[44px] flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
         >
           <span className="flex items-center gap-1.5">
             {showAdvanced ? (
@@ -123,7 +123,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
                 <button
                   type="button"
                   onClick={() => onChange({ lyricOffsetMs: settings.lyricOffsetMs - 10 })}
-                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-sm cursor-pointer flex items-center justify-center shrink-0"
+                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-sm cursor-pointer flex items-center justify-center shrink-0"
                   aria-label="Lyrics 10 milliseconds earlier"
                 >
                   −
@@ -141,7 +141,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
                 <button
                   type="button"
                   onClick={() => onChange({ lyricOffsetMs: settings.lyricOffsetMs + 10 })}
-                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-sm cursor-pointer flex items-center justify-center shrink-0"
+                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-sm cursor-pointer flex items-center justify-center shrink-0"
                   aria-label="Lyrics 10 milliseconds later"
                 >
                   +
@@ -183,7 +183,7 @@ export default function SyncSettingsPanel({ settings, onChange, onReset, classNa
       <button
         type="button"
         onClick={onReset}
-        className="self-end min-h-[36px] px-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-white cursor-pointer"
+        className="self-end min-h-[44px] px-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-white cursor-pointer"
       >
         <RotateCcw className="w-3 h-3" /> Reset to defaults
       </button>

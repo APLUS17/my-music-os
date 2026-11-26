@@ -149,3 +149,23 @@ textarea.notes-textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Minimum touch target (44 x 44 pt, Apple HIG) for small controls, without changing how they look:
+ * an invisible hit area centered on the control. Use on icon buttons and compact labels whose
+ * neighbours are at least a few px away; give menu rows a real min-h-[44px] instead.
+ */
+@layer utilities {
+  .hit-44 {
+    position: relative;
+  }
+  .hit-44::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}

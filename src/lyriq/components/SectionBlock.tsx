@@ -349,7 +349,7 @@ function SectionBlock({
                   if (isReorderMode) return;
                   setIsTypeDropdownOpen(!isTypeDropdownOpen);
                 }}
-                className={`flex items-center gap-1 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors cursor-pointer whitespace-nowrap ${
+                className={`hit-44 flex items-center gap-1 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors cursor-pointer whitespace-nowrap ${
                   isCurrentlyPlaying
                     ? 'text-zinc-100'
                     : 'text-zinc-500 hover:text-amber-400'
@@ -363,7 +363,7 @@ function SectionBlock({
               </button>
 
               {isTypeDropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 z-40 w-36 rounded-xl ios-glass border border-ios-border/80 shadow-2xl p-1 animate-fadeIn">
+                <div className="absolute left-0 top-full mt-1 z-40 w-36 max-h-[60dvh] overflow-y-auto rounded-xl ios-glass border border-ios-border/80 shadow-2xl p-1 animate-fadeIn">
                   {SECTION_TYPES.map((t) => (
                     <button
                       key={t}
@@ -373,7 +373,7 @@ function SectionBlock({
                         onUpdateType(section.id, t);
                         setIsTypeDropdownOpen(false);
                       }}
-                      className={`flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                      className={`flex items-center justify-between w-full min-h-[44px] px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
                         section.type === t
                           ? 'text-amber-400 bg-white/[0.08]'
                           : 'text-zinc-200 hover:bg-white/[0.04]'
@@ -395,7 +395,7 @@ function SectionBlock({
                   e.stopPropagation();
                   if (onCycleLoopState) onCycleLoopState(section.id);
                 }}
-                className="inline-flex items-center justify-center p-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:text-amber-300 hover:bg-amber-500/25 cursor-pointer shrink-0 transition"
+                className="hit-44 inline-flex items-center justify-center p-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:text-amber-300 hover:bg-amber-500/25 cursor-pointer shrink-0 transition"
                 title="Loop enabled (Click to disable)"
                 aria-label="Loop enabled (Click to disable)"
               >
@@ -411,7 +411,7 @@ function SectionBlock({
             <button
               type="button"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-1.5 -mr-1.5 rounded-lg text-zinc-600 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer opacity-35 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+              className="hit-44 p-1.5 -mr-1.5 rounded-lg text-zinc-600 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer opacity-35 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
               title="Stanza actions"
               aria-label="Stanza actions"
             >
@@ -428,7 +428,7 @@ function SectionBlock({
                       onSuggestNextLines(section.id);
                       setIsMenuOpen(false);
                     }}
-                    className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer disabled:opacity-50"
+                    className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer disabled:opacity-50"
                   >
                     <Wand2 className="w-3.5 h-3.5 text-amber-400" />
                     <span>{isGeneratingLyrics ? 'Thinking…' : 'Suggest Next Lines'}</span>
@@ -441,7 +441,7 @@ function SectionBlock({
                       onToggleRhymes();
                       setIsMenuOpen(false);
                     }}
-                    className={`flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs hover:bg-white/[0.06] cursor-pointer ${
+                    className={`flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs hover:bg-white/[0.06] cursor-pointer ${
                       showRhymes ? 'text-amber-400 font-medium' : 'text-ios-text'
                     }`}
                   >
@@ -459,7 +459,7 @@ function SectionBlock({
                       onRecordTake(section.id);
                       setIsMenuOpen(false);
                     }}
-                    className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
+                    className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
                   >
                     <Mic className="w-3.5 h-3.5 text-red-400" />
                     <span>Record Take</span>
@@ -472,7 +472,7 @@ function SectionBlock({
                       onAddSectionBelow(section.id);
                       setIsMenuOpen(false);
                     }}
-                    className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
+                    className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 text-ios-amber" />
                     <span>Add Stanza Below</span>
@@ -484,7 +484,7 @@ function SectionBlock({
                     onDuplicate(section.id);
                     setIsMenuOpen(false);
                   }}
-                  className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
+                  className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
                 >
                   <Copy className="w-3.5 h-3.5" />
                   <span>Duplicate Stanza</span>
@@ -496,7 +496,7 @@ function SectionBlock({
                       onCycleLoopState(section.id);
                       setIsMenuOpen(false);
                     }}
-                    className={`flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs hover:bg-white/[0.06] cursor-pointer transition ${
+                    className={`flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs hover:bg-white/[0.06] cursor-pointer transition ${
                       section.isLooping ? 'text-amber-400 font-medium' : 'text-ios-text'
                     }`}
                   >
@@ -511,7 +511,7 @@ function SectionBlock({
                       setIsMenuOpen(false);
                       onEnterReorderMode();
                     }}
-                    className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
+                    className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-text hover:bg-white/[0.06] cursor-pointer"
                   >
                     <ArrowUpDown className="w-3.5 h-3.5 text-zinc-400" />
                     <span>Reorder Stanzas</span>
@@ -524,7 +524,7 @@ function SectionBlock({
                       onDelete(section.id);
                       setIsMenuOpen(false);
                     }}
-                    className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs text-ios-red hover:bg-ios-red/10 cursor-pointer"
+                    className="flex items-center gap-2 w-full min-h-[44px] px-2.5 py-2 rounded-lg text-xs text-ios-red hover:bg-ios-red/10 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete Stanza</span>

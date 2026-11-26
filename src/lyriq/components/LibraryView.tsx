@@ -387,11 +387,11 @@ export default function LibraryView({
       onDrop={handleDrop}
     >
       {/* Minimal Floating Top Bar */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex items-center justify-between px-4 sm:px-8 pt-4 sm:pt-6">
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex items-center justify-between px-4 sm:px-8 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={onCloseLibrary}
-          className="pointer-events-auto inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-2"
+          className="pointer-events-auto inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors cursor-pointer min-h-[44px]"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Studio</span>
@@ -412,7 +412,7 @@ export default function LibraryView({
                 role="tab"
                 aria-selected={active}
                 onClick={() => setFilter(tab)}
-                className={`text-[11px] font-mono uppercase tracking-[0.18em] py-1 transition-colors cursor-pointer ${
+                className={`hit-44 text-[11px] font-mono uppercase tracking-[0.18em] py-1 transition-colors cursor-pointer ${
                   active
                     ? 'text-foreground border-b border-foreground'
                     : 'text-muted-foreground/65 hover:text-foreground'
@@ -438,7 +438,7 @@ export default function LibraryView({
             type="button"
             onClick={() => beatInputRef.current?.click()}
             disabled={isImportingBeat}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer py-2"
+            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer min-h-[44px] min-w-[44px] justify-center"
             title="Import Beat"
           >
             {isImportingBeat ? (
@@ -452,7 +452,7 @@ export default function LibraryView({
           <button
             type="button"
             onClick={handleStartSong}
-            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.16em] text-foreground hover:opacity-75 transition-opacity cursor-pointer py-2"
+            className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.16em] text-foreground hover:opacity-75 transition-opacity cursor-pointer min-h-[44px] min-w-[44px] justify-center"
           >
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">New</span>
