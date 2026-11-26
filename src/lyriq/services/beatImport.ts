@@ -6,10 +6,13 @@ import { beatBlobKey, blobUrlRegistry } from '../utils/storage';
 const MAX_BEAT_BYTES = 200 * 1024 * 1024;
 const AUDIO_EXT_RE = /\.(mp3|wav|m4a|aac|flac|ogg|aif|aiff)$/i;
 
-/** Reads "120bpm" / "bpm 120" from a file name. Bare numbers are ignored: too many false positives. */
-function parseBpmFromFilename(name: string): number | undefined {
-  const m = name.match(/(\d{2,3})\s*bpm/i) || name.match(/bpm[\s_\-:]*(\d{2,3})/i);
-  const n = m ? parseInt(m[1], 10) : NaN;
+/**
+ * Reads "120bpm" / "bpm 120" / "132.00bpm" / "128.5 bpm" from a file name (sample packs write
+ * decimals). Bare numbers are ignored: too many false positives.
+ */
+export function parseBpmFromFilename(name: string): number | undefined {
+  const m = name.match(/(\d{2,3}(?:[.,]\d{1,2})?)\s*bpm/i) || name.match(/bpm[\s_\-:]*(\d{2,3}(?:[.,]\d{1,2})?)/i);
+  const n = m ? Math.round(parseFloat(m[1].replace(',', '.')) * 100) / 100 : NaN;
   return n >= 40 && n <= 240 ? n : undefined;
 }
 
