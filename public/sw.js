@@ -10,7 +10,7 @@
  *
  * Bump VERSION to drop every old cache on the next visit.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `lyriq-shell-${VERSION}`;
 const ASSET_CACHE = `lyriq-assets-${VERSION}`;
 const PRECACHE = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png'];

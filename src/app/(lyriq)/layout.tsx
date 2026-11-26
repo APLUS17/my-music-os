@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "@/lyriq/index.css";
 
-// Phone-first and runs under the notch (every top/bottom bar pads by the safe-area insets).
+// Phone-first. Status bar is opaque black on the Home Screen app so the header can never sit under the clock;
+// bars still pad by the safe-area insets (notch in landscape, home indicator at the bottom).
 // Pinch zoom stays on for accessibility; inputs are 16px+ so iOS does not zoom on focus.
 export const viewport: Viewport = {
   width: "device-width",
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
     title: "LYRIQ",
     description: "Write lyrics, record vocal takes over your beat, and see them timed line by line.",
   },
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "LYRIQ" },
+  appleWebApp: { capable: true, statusBarStyle: "black", title: "LYRIQ" },
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
