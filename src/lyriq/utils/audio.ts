@@ -573,8 +573,13 @@ export interface RecordingResult {
   /** Amplitude profile for display (48 bars), computed from the captured PCM. */
   waveform: number[];
   warnings: RecorderWarning[];
-  /** Input + output latency the browser reports, in seconds (0 if unknown). */
+  /**
+   * Capture context's output latency plus the mic's input latency, in seconds (0 if unknown).
+   * Only a fallback: the beat plays through the mixer's context, not this one (see resolveAutoLatencySec).
+   */
   reportedLatencySec: number;
+  /** Input latency the mic track reports, in seconds (0 if unknown, e.g. Safari). */
+  inputLatencySec: number;
   /** Duration of the initial capture buffer accumulated before onFirstChunk fired, in seconds. */
   firstChunkBufferSec: number;
   /** Where the take has singing, measured from the captured PCM; used to time lyric lines. */
@@ -606,6 +611,23 @@ export function computeRecordingAnchorSec(params: {
       ? manualLatencyMs / 1000
       : reportedLatencySec + (firstChunkTimelineSec !== null ? firstChunkBufferSec : 0);
   return Math.max(0, baseTime - latencySec);
+}
+
+/**
+ * Automatic round-trip latency for placing a take: the delay from the beat leaving `currentTime` to the
+ * singer hearing it (the playback context's output latency) plus the mic's input latency.
+ * When the beat's own context can't be read (`playbackOutputSec === null`: no beat, or it isn't routed
+ * through the mixer) it falls back to the capture context's reading, the old behaviour.
+ */
+export function resolveAutoLatencySec(params: {
+  playbackOutputSec: number | null;
+  inputSec: number;
+  captureReportedSec: number;
+}): number {
+  const { playbackOutputSec, inputSec, captureReportedSec } = params;
+  const safe = (n: number) => (Number.isFinite(n) && n > 0 ? n : 0);
+  if (playbackOutputSec === null || !Number.isFinite(playbackOutputSec)) return safe(captureReportedSec);
+  return safe(playbackOutputSec) + safe(inputSec);
 }
 
 export interface MicOptions {
@@ -933,14 +955,19 @@ export class UniversalVoiceRecorder {
     this.sink = null;
   }
 
-  /** Latency the browser reports for the capture context (input + output), seconds. */
+  /** Input latency the mic track reports, seconds (0 when the browser doesn't say). */
+  inputLatencySec(): number {
+    const track = UniversalVoiceRecorder.sharedStream?.getAudioTracks()[0];
+    const input = (track?.getSettings() as MediaTrackSettings & { latency?: number } | undefined)?.latency;
+    return typeof input === 'number' && Number.isFinite(input) && input > 0 ? input : 0;
+  }
+
+  /** Latency the browser reports for the capture context (input + output), seconds. Fallback only. */
   reportedLatencySec(): number {
     const ctx = this.ctx;
     if (!ctx) return 0;
     const out = typeof ctx.outputLatency === 'number' ? ctx.outputLatency : 0;
-    const track = UniversalVoiceRecorder.sharedStream?.getAudioTracks()[0];
-    const input = (track?.getSettings() as MediaTrackSettings & { latency?: number } | undefined)?.latency;
-    return (ctx.baseLatency || 0) + out + (typeof input === 'number' ? input : 0);
+    return (ctx.baseLatency || 0) + out + this.inputLatencySec();
   }
 
   async stop(): Promise<RecordingResult> {
@@ -996,6 +1023,7 @@ export class UniversalVoiceRecorder {
       waveform: merged.length > 0 ? calcWaveformSync(merged, 48) : [],
       warnings: [...this.warnings],
       reportedLatencySec: this.reportedLatencySec(),
+      inputLatencySec: this.inputLatencySec(),
       firstChunkBufferSec,
       vocal,
       transcriptionBlob,

@@ -90,6 +90,19 @@ export async function resumeMixerIfNeeded(): Promise<boolean> {
   return (ctx?.state as string) === 'running';
 }
 
+/**
+ * Output delay of the playback context that `el` plays through, in seconds: how far the sound the
+ * singer hears lags the element's `currentTime`. `null` when the element is not routed through the
+ * mixer (then it plays on the browser's own path and this context's numbers don't describe it).
+ * Browsers that don't report `outputLatency` (Safari) give `baseLatency` only, so this undercounts there.
+ */
+export function getPlaybackOutputLatencySec(el: HTMLMediaElement | null | undefined): number | null {
+  if (!el || !ctx || ctx.state === 'closed' || !gains.has(el)) return null;
+  const base = Number.isFinite(ctx.baseLatency) ? ctx.baseLatency : 0;
+  const out = typeof ctx.outputLatency === 'number' && Number.isFinite(ctx.outputLatency) ? ctx.outputLatency : 0;
+  return Math.max(0, base) + Math.max(0, out);
+}
+
 /** Registers an element with the mixer at the given level (0..1). */
 export function attachToMixer(el: HTMLMediaElement, level: number): void {
   const l = clampLevel(level);

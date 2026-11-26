@@ -8,6 +8,7 @@ import {
   calcWaveformSync,
   pcmToTranscriptionWav,
   computeRecordingAnchorSec,
+  resolveAutoLatencySec,
   pickAnalysisSampleRate,
   buildAnalysisWav,
   calcRmsEnvelope,
@@ -162,6 +163,18 @@ test('computeRecordingAnchorSec subtracts reportedLatencySec plus initial captur
     firstChunkBufferSec: workletChunkSec,
   });
   assert.equal(clampedZero, 0);
+});
+
+test('resolveAutoLatencySec uses the beat context output delay plus mic input delay', () => {
+  // Beat routed through the mixer ('playback' context): its numbers win over the capture context's.
+  assert.ok(Math.abs(resolveAutoLatencySec({ playbackOutputSec: 0.09, inputSec: 0.01, captureReportedSec: 0.03 }) - 0.1) < 1e-9);
+  // Mic reports no input latency (Safari): output delay alone.
+  assert.ok(Math.abs(resolveAutoLatencySec({ playbackOutputSec: 0.006, inputSec: 0, captureReportedSec: 0.02 }) - 0.006) < 1e-9);
+  // No beat playing, or beat not routed: fall back to the capture context's reading.
+  assert.equal(resolveAutoLatencySec({ playbackOutputSec: null, inputSec: 0.01, captureReportedSec: 0.03 }), 0.03);
+  // Garbage in never makes the take land early or late by NaN.
+  assert.equal(resolveAutoLatencySec({ playbackOutputSec: Number.NaN, inputSec: 0, captureReportedSec: Number.NaN }), 0);
+  assert.equal(resolveAutoLatencySec({ playbackOutputSec: 0.05, inputSec: -1, captureReportedSec: 0 }), 0.05);
 });
 
 test('pickAnalysisSampleRate snaps to standard 16000 Hz or 8000 Hz instead of odd numbers', () => {
