@@ -475,7 +475,7 @@ function KaraokeLyricsModal({
         className="fixed inset-0 z-50 bg-black/95 backdrop-blur-3xl flex flex-col select-none overflow-hidden"
       >
         {/* Header */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 sm:px-8 py-5 sm:py-6 bg-gradient-to-b from-black/90 via-black/50 to-transparent">
+        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 sm:px-8 pb-5 sm:pb-6 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))] bg-gradient-to-b from-black/90 via-black/50 to-transparent">
           
           {/* Left: Section Color Dot, Section Name & Take Label */}
           <div className="flex items-center gap-3">
@@ -520,7 +520,7 @@ function KaraokeLyricsModal({
                     onDeleteTake(activeSection.id, activeTake.id);
                     setConfirmDeleteTakeId(null);
                   }}
-                  className="h-10 px-3 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-xs font-semibold text-red-300 transition-all cursor-pointer active:scale-95"
+                  className="h-11 px-3 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-xs font-semibold text-red-300 transition-all cursor-pointer active:scale-95"
                   title="Tap again to delete this take"
                 >
                   Delete?
@@ -529,7 +529,7 @@ function KaraokeLyricsModal({
                 <button
                   type="button"
                   onClick={() => setConfirmDeleteTakeId(activeTake.id)}
-                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-red-500/15 active:scale-95 flex items-center justify-center text-zinc-400 hover:text-red-300 transition-all cursor-pointer border border-white/10 shadow-lg"
+                  className="w-11 h-11 rounded-full bg-white/10 hover:bg-red-500/15 active:scale-95 flex items-center justify-center text-zinc-400 hover:text-red-300 transition-all cursor-pointer border border-white/10 shadow-lg"
                   title="Delete this take"
                   aria-label="Delete this take"
                 >
@@ -541,7 +541,7 @@ function KaraokeLyricsModal({
               type="button"
               onClick={() => setIsSettingsOpen(v => !v)}
               aria-expanded={isSettingsOpen}
-              className={`w-10 h-10 rounded-full active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-lg ${
+              className={`w-11 h-11 rounded-full active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-white/10 shadow-lg ${
                 isSettingsOpen ? 'bg-amber-500/25 text-amber-300' : 'bg-white/10 hover:bg-white/20 text-zinc-300'
               }`}
               title="Audio and sync settings"
@@ -562,7 +562,7 @@ function KaraokeLyricsModal({
             <button
               type="button"
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 shadow-lg group"
+              className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer border border-white/10 shadow-lg group"
               title="Close Live Lyrics (Esc)"
               aria-label="Close Live Lyrics"
             >
@@ -617,7 +617,7 @@ function KaraokeLyricsModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors cursor-pointer border border-white/10"
+                  className="min-h-[44px] px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors cursor-pointer border border-white/10"
                 >
                   Back to Canvas
                 </button>
@@ -638,7 +638,7 @@ function KaraokeLyricsModal({
                     <button
                       type="button"
                       onClick={onToggleRecord}
-                      className="px-5 py-2 rounded-full bg-red-500 hover:bg-red-600 text-xs font-medium text-white transition-colors cursor-pointer shadow-lg flex items-center gap-2"
+                      className="min-h-[44px] px-5 py-2 rounded-full bg-red-500 hover:bg-red-600 text-xs font-medium text-white transition-colors cursor-pointer shadow-lg flex items-center gap-2"
                     >
                       <Mic className="w-3.5 h-3.5" />
                       <span>Record Take Now</span>
@@ -647,7 +647,7 @@ function KaraokeLyricsModal({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors cursor-pointer border border-white/10"
+                    className="min-h-[44px] px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition-colors cursor-pointer border border-white/10"
                   >
                     Back to Canvas
                   </button>
@@ -731,7 +731,7 @@ function KaraokeLyricsModal({
         </main>
 
         {/* Floating Playback Dock Bar */}
-        <footer className="absolute bottom-0 left-0 right-0 z-20 px-4 sm:px-8 py-5 bg-gradient-to-t from-black via-black/85 to-transparent">
+        <footer className="absolute bottom-0 left-0 right-0 z-20 px-4 sm:px-8 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black via-black/85 to-transparent">
           <div className="max-w-xl mx-auto flex flex-col gap-3 px-5 py-3.5 rounded-3xl bg-white/[0.06] backdrop-blur-2xl border border-white/10 shadow-2xl">
             {/* Top Row: Track Scrubber & Time Display */}
             <div className="flex items-center gap-3 w-full">
@@ -809,7 +809,7 @@ function KaraokeLyricsModal({
                       if (onCycleTake) onCycleTake(activeSection.id, -1);
                     }}
                     disabled={totalTakesCount <= 1}
-                    className="p-0.5 text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                    className="hit-44 p-0.5 text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                     title="Previous Take"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
@@ -825,7 +825,7 @@ function KaraokeLyricsModal({
                       if (onCycleTake) onCycleTake(activeSection.id, 1);
                     }}
                     disabled={totalTakesCount <= 1}
-                    className="p-0.5 text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                    className="hit-44 p-0.5 text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                     title="Next Take"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -837,7 +837,7 @@ function KaraokeLyricsModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs sm:text-sm font-semibold tracking-wider text-amber-400 hover:text-amber-300 transition-colors uppercase cursor-pointer pr-1"
+                className="hit-44 text-xs sm:text-sm font-semibold tracking-wider text-amber-400 hover:text-amber-300 transition-colors uppercase cursor-pointer pr-1"
               >
                 Done
               </button>

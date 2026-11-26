@@ -294,7 +294,7 @@ function Header({
   };
 
   return (
-    <header className="w-full transition-colors duration-200 sticky top-0 z-40 shrink-0 bg-black">
+    <header className="w-full transition-colors duration-200 sticky top-0 z-40 shrink-0 bg-black pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       {/* Hidden File Input for Direct Audio Upload */}
       <input
         type="file"
@@ -314,7 +314,7 @@ function Header({
               onClick={onOpenLibrary}
               aria-label="Back to Library"
               title="Songs & Beats Library"
-              className="min-w-[40px] min-h-[40px] -ml-1.5 rounded-xl flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-white/[0.05] active:scale-95 transition-all cursor-pointer shrink-0"
+              className="min-w-[44px] min-h-[44px] -ml-2 rounded-xl flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-white/[0.05] active:scale-95 transition-all cursor-pointer shrink-0"
             >
               <ChevronLeft className="w-5 h-5 stroke-[2.2]" />
             </button>
@@ -335,7 +335,7 @@ function Header({
                   }
                 }}
                 autoFocus
-                className="text-sm px-2.5 py-1 rounded-lg border outline-none font-medium w-36 sm:w-56 font-serif bg-black/90 border-amber-400 text-white"
+                className="text-base sm:text-sm px-2.5 py-1 rounded-lg border outline-none font-medium w-36 sm:w-56 font-serif bg-black/90 border-amber-400 text-white"
                 placeholder="Song title..."
               />
               <button
@@ -369,7 +369,7 @@ function Header({
                   setTempTitle(isUntitled ? '' : activeSessionTitle);
                   setIsRenaming(true);
                 }}
-                className={`flex items-center transition-colors cursor-pointer text-left py-1.5 hover:opacity-90 ${
+                className={`min-h-[44px] flex items-center transition-colors cursor-pointer text-left py-1.5 hover:opacity-90 ${
                   isUntitled ? 'text-zinc-500' : 'text-zinc-100'
                 }`}
                 title="Switch songs or double-click to rename"
@@ -394,7 +394,7 @@ function Header({
                         onCreateSession();
                         setIsSessionDropdownOpen(false);
                       }}
-                      className="flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-400 cursor-pointer"
+                      className="hit-44 flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-400 cursor-pointer"
                     >
                       <Plus className="w-3 h-3" />
                       <span>New Song</span>
@@ -405,7 +405,7 @@ function Header({
                     {sessions.map((sess) => (
                       <div
                         key={sess.id}
-                        className={`flex items-center justify-between px-3 py-2 text-xs transition cursor-pointer ${
+                        className={`min-h-[52px] flex items-center justify-between px-3 py-2 text-xs transition cursor-pointer ${
                           sess.id === activeSessionId
                             ? 'bg-amber-500/15 text-amber-300 font-semibold'
                             : 'hover:bg-white/5 text-gray-300'
@@ -430,7 +430,7 @@ function Header({
                                 setTempTitle(sess.title);
                                 setIsRenaming(true);
                               }}
-                              className="p-1 hover:text-amber-400 opacity-50 hover:opacity-100 transition"
+                              className="w-11 h-11 -my-2 flex items-center justify-center hover:text-amber-400 opacity-50 hover:opacity-100 transition"
                               title="Rename song"
                             >
                               <Pencil className="w-3 h-3" />
@@ -441,9 +441,11 @@ function Header({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Close the menu so the Undo notice that follows is not hidden behind it.
+                                setIsSessionDropdownOpen(false);
                                 onDeleteSession(sess.id);
                               }}
-                              className="p-1 hover:text-red-500 opacity-40 hover:opacity-100 transition"
+                              className="w-11 h-11 -my-2 flex items-center justify-center hover:text-red-500 opacity-40 hover:opacity-100 transition"
                               title="Delete song"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -461,7 +463,7 @@ function Header({
                           setIsSessionDropdownOpen(false);
                           onOpenLibrary();
                         }}
-                        className="w-full py-1.5 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        className="w-full min-h-[44px] py-1.5 px-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] font-medium text-zinc-200 hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <Disc3 className="w-3.5 h-3.5 text-amber-400" />
                         <span>Open Full Library</span>
@@ -480,7 +482,7 @@ function Header({
             <button
               type="button"
               onClick={onExitReorderMode}
-              className="min-h-[40px] px-3 py-1.5 text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer whitespace-nowrap"
+              className="min-h-[44px] px-3 py-1.5 text-sm font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer whitespace-nowrap"
             >
               Done
             </button>
@@ -493,7 +495,7 @@ function Header({
                   setIsBeatMenuOpen(!isBeatMenuOpen);
                   stopPreviewAudio();
                 }}
-                className={`min-h-[40px] flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                className={`min-h-[44px] flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                   importedBeat
                     ? 'text-amber-300 hover:text-amber-200'
                     : 'text-zinc-400 hover:text-zinc-100'
@@ -530,7 +532,7 @@ function Header({
                       setIsBeatMenuOpen(false);
                       stopPreviewAudio();
                     }}
-                    className="p-1 rounded-md transition cursor-pointer hover:bg-white/10 text-zinc-400 hover:text-white"
+                    className="hit-44 p-1 rounded-md transition cursor-pointer hover:bg-white/10 text-zinc-400 hover:text-white"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -561,7 +563,7 @@ function Header({
                           <button
                             type="button"
                             onClick={handleToggleCurrentBeatPreview}
-                            className={`p-2 rounded-lg transition cursor-pointer border ${
+                            className={`w-11 h-11 flex items-center justify-center rounded-lg transition cursor-pointer border ${
                               isBeatAudioPreviewPlaying
                                 ? 'bg-amber-500 text-black border-amber-400'
                                 : 'bg-black/40 text-amber-300 border-amber-500/40 hover:bg-amber-500/20'
@@ -582,7 +584,7 @@ function Header({
                               if (onRemoveBeat) onRemoveBeat();
                               showFeedback('Beat removed');
                             }}
-                            className="p-2 rounded-lg transition cursor-pointer border text-red-500 hover:bg-red-500/15 border-red-500/30 bg-black/40"
+                            className="w-11 h-11 flex items-center justify-center rounded-lg transition cursor-pointer border text-red-500 hover:bg-red-500/15 border-red-500/30 bg-black/40"
                             title="Remove backing beat"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -601,7 +603,7 @@ function Header({
                           setIsBeatMenuOpen(false);
                           onReanalyzeBeat();
                         }}
-                        className="w-full py-2 px-3 rounded-xl border border-amber-500/25 hover:border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/15 text-xs font-medium text-amber-300 hover:text-amber-200 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="w-full min-h-[44px] py-2 px-3 rounded-xl border border-amber-500/25 hover:border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/15 text-xs font-medium text-amber-300 hover:text-amber-200 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isAnalyzingBeatExternal ? 'animate-spin' : ''}`} />
                         <span>{isAnalyzingBeatExternal ? 'Analyzing Arrangement...' : 'Re-analyze Beat Arrangement'}</span>
@@ -615,7 +617,7 @@ function Header({
                         stopPreviewAudio();
                         beatFileInputRef.current?.click();
                       }}
-                      className="w-full py-2 px-3 rounded-xl border border-white/10 hover:border-amber-500/40 bg-white/5 hover:bg-amber-500/10 text-xs font-medium text-zinc-300 hover:text-amber-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full min-h-[44px] py-2 px-3 rounded-xl border border-white/10 hover:border-amber-500/40 bg-white/5 hover:bg-amber-500/10 text-xs font-medium text-zinc-300 hover:text-amber-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <UploadCloud className="w-3.5 h-3.5 text-amber-400" />
                       <span>Upload Different Audio File</span>
@@ -629,7 +631,7 @@ function Header({
                           setIsBeatMenuOpen(false);
                           onWipeAudioAndBeat();
                         }}
-                        className="w-full py-2 px-3 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/10 hover:bg-red-500/15 text-xs font-medium text-red-400 hover:text-red-300 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1"
+                        className="w-full min-h-[44px] py-2 px-3 rounded-xl border border-red-500/20 hover:border-red-500/40 bg-red-500/10 hover:bg-red-500/15 text-xs font-medium text-red-400 hover:text-red-300 transition-colors flex items-center justify-center gap-2 cursor-pointer mt-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Wipe Audio Recordings & Beat</span>
@@ -711,7 +713,7 @@ function Header({
                           setIsBpmEditing(true);
                         }}
                         title={isTakeInProgress ? 'Stop recording before changing tempo' : 'Edit count-in tempo'}
-                        className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 font-mono text-xs text-zinc-200 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="min-h-[44px] px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 font-mono text-xs text-zinc-200 cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <span className="font-bold text-amber-400">{bpm}</span>{' '}
                         <span className="text-zinc-400">BPM</span>
@@ -728,7 +730,7 @@ function Header({
 
       {/* Subtle Floating Audio Upload Feedback Toast */}
       {uploadFeedback && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-fadeIn">
+        <div className="fixed top-[calc(3.5rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-fadeIn">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#161619]/95 text-white border border-amber-500/40 shadow-[0_12px_32px_rgba(0,0,0,0.85)] backdrop-blur-2xl text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)]" />
             <span className="font-medium text-amber-200">{uploadFeedback}</span>

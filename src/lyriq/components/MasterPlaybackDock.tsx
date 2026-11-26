@@ -972,6 +972,8 @@ function MasterPlaybackDock({
     );
   };
 
+  const hasSnapOption = Boolean(canDragBoundaries && onToggleSnapToGrid);
+
   const renderMenuButton = (compact: boolean) => (
     <div className="relative shrink-0" ref={menuWrapRef}>
       {isMenuOpen && (
@@ -980,7 +982,7 @@ function MasterPlaybackDock({
           aria-label="Dock options"
           className="absolute bottom-full right-0 mb-2 w-52 rounded-2xl bg-[#1c1c1f] p-1 shadow-[0_12px_32px_rgba(0,0,0,0.6)] z-50 animate-fadeIn"
         >
-          {canDragBoundaries && onToggleSnapToGrid && (
+          {hasSnapOption && (
             <button
               type="button"
               role="menuitemcheckbox"
@@ -1014,11 +1016,19 @@ function MasterPlaybackDock({
       )}
       <button
         type="button"
-        onClick={() => setIsMenuOpen(v => !v)}
-        aria-haspopup="menu"
-        aria-expanded={isMenuOpen}
+        onClick={() => {
+          // With nothing but Sync settings to offer, skip the one-item menu and open the panel.
+          if (!hasSnapOption) {
+            setIsMenuOpen(false);
+            setIsSettingsOpen(v => !v);
+            return;
+          }
+          setIsMenuOpen(v => !v);
+        }}
+        aria-haspopup={hasSnapOption ? 'menu' : 'dialog'}
+        aria-expanded={hasSnapOption ? isMenuOpen : isSettingsOpen}
         className={`${
-          compact ? 'w-10 h-11' : 'min-w-[36px] min-h-[36px]'
+          compact ? 'w-11 h-11' : 'hit-44 min-w-[36px] min-h-[36px]'
         } rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
           isMenuOpen || isSettingsOpen ? 'text-amber-300' : 'text-zinc-400 hover:text-zinc-100'
         }`}
@@ -1074,7 +1084,7 @@ function MasterPlaybackDock({
                 type="button"
                 onClick={() => setIsMinimized(false)}
                 style={{ left: `clamp(56px, ${playheadPct}%, calc(100% - 56px))` }}
-                className="absolute bottom-full mb-1 -translate-x-1/2 z-10 h-6 px-2.5 rounded-full bg-amber-400 text-black text-[11px] font-semibold font-mono tabular-nums whitespace-nowrap flex items-center cursor-pointer active:scale-95 before:absolute before:-inset-2"
+                className="absolute bottom-full mb-1 -translate-x-1/2 z-10 h-6 px-2.5 rounded-full bg-amber-400 text-black text-[11px] font-semibold font-mono tabular-nums whitespace-nowrap flex items-center cursor-pointer active:scale-95 before:absolute before:-inset-x-2 before:-inset-y-2.5"
                 title="Expand playback & waveform dock (Esc)"
                 aria-label="Expand playback and waveform dock"
               >
@@ -1161,7 +1171,7 @@ function MasterPlaybackDock({
                     type="button"
                     onClick={() => onToggleSectionLoop(activeSection.id)}
                     aria-pressed={Boolean(activeSection.isLooping)}
-                    className={`min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
+                    className={`hit-44 min-w-[36px] min-h-[36px] rounded-full flex items-center justify-center cursor-pointer transition-colors active:scale-95 ${
                       activeSection.isLooping
                         ? 'bg-amber-500/20 text-amber-300'
                         : 'text-zinc-500 hover:text-zinc-200'
@@ -1240,7 +1250,7 @@ function MasterPlaybackDock({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); if (takeSection) onCycleTake(takeSection.id, -1); }}
                       disabled={activeTakes.length <= 1 || isRecording || isCountingDown}
-                      className="min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                      className="hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                       title="Previous take"
                       aria-label="Previous take"
                     >
@@ -1250,7 +1260,7 @@ function MasterPlaybackDock({
                       type="button"
                       onClick={() => onOpenLiveLyrics?.()}
                       aria-busy={isCurrentTakeTranscribing || undefined}
-                      className="min-h-[34px] inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-amber-400 hover:text-amber-300 px-2 cursor-pointer transition-colors whitespace-nowrap active:scale-95"
+                      className="hit-44 min-h-[34px] inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-amber-400 hover:text-amber-300 px-2 cursor-pointer transition-colors whitespace-nowrap active:scale-95"
                       title={isCurrentTakeTranscribing ? 'Transcribing take…' : 'View timed lyrics'}
                     >
                       <span>{currentTakeCode}</span>
@@ -1263,7 +1273,7 @@ function MasterPlaybackDock({
                           e.stopPropagation();
                           onRetryTranscription(takeSection.id, currentTake.id);
                         }}
-                        className="min-h-[28px] inline-flex items-center gap-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 whitespace-nowrap"
+                        className="hit-44 min-h-[28px] inline-flex items-center gap-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-300 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 whitespace-nowrap"
                         title="Retry lyrics transcription"
                         aria-label={`Retry transcription for ${currentTakeCode}`}
                       >
@@ -1275,7 +1285,7 @@ function MasterPlaybackDock({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); if (takeSection) onCycleTake(takeSection.id, 1); }}
                       disabled={activeTakes.length <= 1 || isRecording || isCountingDown}
-                      className="min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
+                      className="hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-25 disabled:cursor-not-allowed active:scale-90 transition-all cursor-pointer"
                       title="Next take"
                       aria-label="Next take"
                     >
@@ -1288,7 +1298,7 @@ function MasterPlaybackDock({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onToggleMuteVocal(); }}
                           aria-pressed={isVocalMuted}
-                          className={`min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center transition-colors cursor-pointer ${isVocalMuted ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-300 hover:text-white'}`}
+                          className={`hit-44 min-w-[34px] min-h-[34px] rounded-full flex items-center justify-center transition-colors cursor-pointer ${isVocalMuted ? 'text-zinc-500 hover:text-zinc-300' : 'text-zinc-300 hover:text-white'}`}
                           title={isVocalMuted ? 'Unmute vocals' : 'Mute vocals (hear the beat solo)'}
                           aria-label={isVocalMuted ? 'Unmute vocals' : 'Mute vocals'}
                         >

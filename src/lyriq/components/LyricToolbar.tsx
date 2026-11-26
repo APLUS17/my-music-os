@@ -69,7 +69,7 @@ function LyricToolbar({
           className={
             isVirtualKeyboardOpen
               ? 'fixed inset-x-0 z-50 bg-[#141416]/95 backdrop-blur-2xl border-t border-white/[0.08] px-3 py-1.5'
-              : 'fixed bottom-[4.75rem] sm:bottom-[5.25rem] inset-x-0 z-30 flex justify-center pointer-events-none px-4'
+              : 'fixed bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+6rem)] sm:bottom-[6.5rem] inset-x-0 z-30 flex justify-center pointer-events-none px-4'
           }
         >
           <div
@@ -88,7 +88,7 @@ function LyricToolbar({
                 disabled={isGenerating}
                 title={isGenerating ? 'Generating next lines...' : 'Suggest next lyric lines'}
                 aria-label="Suggest next lyric lines"
-                className={`min-h-[36px] px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`min-h-[44px] px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   isGenerating
                     ? 'bg-amber-500/20 text-amber-300 cursor-wait'
                     : 'text-zinc-300 hover:text-white hover:bg-white/[0.07] active:scale-95'
@@ -106,7 +106,7 @@ function LyricToolbar({
                 aria-pressed={isRhymeActive}
                 title={isRhymeActive ? 'Hide rhyme highlights' : 'Highlight rhyming words'}
                 aria-label="Highlight rhyming words"
-                className={`min-h-[36px] px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                className={`min-h-[44px] px-2.5 rounded-full flex items-center gap-1.5 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   isRhymeActive
                     ? 'bg-amber-500/20 text-amber-300'
                     : 'text-zinc-300 hover:text-white hover:bg-white/[0.07] active:scale-95'
@@ -124,7 +124,7 @@ function LyricToolbar({
                 onClick={onAddSection}
                 title="Insert new stanza (or press Return twice)"
                 aria-label="New stanza"
-                className="min-h-[36px] px-2.5 rounded-full flex items-center gap-1 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.07] active:scale-95 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="min-h-[44px] px-2.5 rounded-full flex items-center gap-1 text-xs font-medium text-zinc-300 hover:text-white hover:bg-white/[0.07] active:scale-95 transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <Plus className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
                 <span>Stanza</span>
@@ -139,7 +139,7 @@ function LyricToolbar({
                 <button
                   type="button"
                   onClick={onDone}
-                  className="min-h-[36px] px-2.5 rounded-full text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  className="min-h-[44px] px-2.5 rounded-full text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
                   Done
                 </button>

@@ -40,6 +40,12 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
    old engine 4 clicks in 4 wraps, new engine 0 in 4 (mid-file section) and none in steady-state wraps.
    `__tests__/loopRegion.test.ts` covers the seam maths.
 
+8. **Mobile fixes (ours).** The new flat dock (`MasterPlaybackDock.tsx`) plus: safe-area padding on every
+   top bar (`Header`, `LibraryView`, `KaraokeLyricsModal`, notices), `h-dvh` root, 44 px touch targets
+   (`hit-44` utility in `index.css` for icon buttons, `min-h-[44px]` for menu rows), song delete with
+   Undo (`handleDeleteSession` / `restoreDeletedSession` in `App.tsx`), keyboard bar lifted clear of
+   the dock bubble, dock menu opens Sync settings directly when it would hold one item.
+
 ## Server side (ours, not vendored)
 
 - `src/app/api/transcribe-audio` -> Groq Whisper with word timestamps, your written lyrics as the
@@ -51,4 +57,4 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 ## Re-syncing
 
 Copy upstream `src/{components,hooks,services,utils,lib}`, `App.tsx`, `types.ts`, `index.css` over
-this folder, re-apply the seven differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
+this folder, re-apply the eight differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
