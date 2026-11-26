@@ -13,6 +13,7 @@
 | `/` | The minimal editor. Code in `src/lyriq/` (a vendored copy, see `src/lyriq/VENDORED.md`). Library + editor, bottom dock, timed-lyrics popup (tap the take chip, e.g. `C1`), keyboard bar, undo, rhymes, reorder. Own theme: black, amber, Cormorant/Inter. |
 | `/classic` | Our previous studio (`StudioWorkspace`, Vault, Muse, FX, 5 themes). Unchanged; everything below under "Song timeline" and "Project Structure" describes this one. |
 | `/mission-control` | Business dashboard (unchanged). |
+| `/launch` | Apple-style launch page (`src/app/(launch)/`, own root layout + `launch.css`). Tokens from `/mnt/project-files/design-system/lyriq-apple-style.md`. Film, poster, phone stills and OG image in `public/launch/`; swap the film by replacing `public/launch/lyriq-film.mp4`. Every CTA goes to `/`. |
 
 The two UIs are separate **route groups** with their own root layouts (`src/app/(lyriq)/`, `src/app/(classic)/`) so their CSS cannot collide. Navigating between them is a full page load.
 
