@@ -1,11 +1,12 @@
-import { lazy, memo, Suspense, useRef, useEffect, useMemo, useState, useCallback, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from 'react';
+import { lazy, memo, Suspense, useRef, useEffect, useMemo, useState, useCallback, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { X, Play, Pause, Check, Mic, ChevronLeft, ChevronRight, SlidersHorizontal, Trash2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, animate, useDragControls, useMotionValue, type PanInfo } from 'framer-motion';
 import { SongSection, Take, ImportedBeat, LyricLine, getSectionTakeCode } from '../types';
 import { distributeLines, pickActiveLine, resolveSectionTimings, takeAnchorSec } from '../utils/timeline';
 import type { SyncSettings } from '../utils/settings';
 import { getSectionColorPalette } from './MasterPlaybackDock';
 import { Bars } from './Bars';
+import { shouldDismissSheet, isSheetDragStartTarget } from '../utils/sheetGesture';
 
 const SyncSettingsPanel = lazy(() => import('./SyncSettingsPanel'));
 
@@ -78,6 +79,33 @@ function KaraokeLyricsModal({
     setConfirmDeleteTakeId(null);
   }, [activeTake?.id, isOpen]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Swipe down from the header to close, like Apple Music's lyrics sheet.
+  const sheetY = useMotionValue(0);
+  const sheetDragControls = useDragControls();
+  const isClosingRef = useRef(false);
+  const canSwipeClose = !isRecording && !isCountingDown;
+  useEffect(() => {
+    if (isOpen) {
+      isClosingRef.current = false;
+      sheetY.set(0);
+    }
+  }, [isOpen, sheetY]);
+  const handleSheetPointerDown = (e: ReactPointerEvent) => {
+    if (!canSwipeClose || isClosingRef.current) return;
+    if (!isSheetDragStartTarget(e.target)) return;
+    sheetDragControls.start(e);
+  };
+  const handleSheetDragEnd = (_: unknown, info: PanInfo) => {
+    if (isClosingRef.current) return;
+    if (shouldDismissSheet(info.offset.y, info.velocity.y)) {
+      isClosingRef.current = true;
+      const height = typeof window !== 'undefined' ? window.innerHeight : 1000;
+      animate(sheetY, height, { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }).then(() => onClose());
+    } else {
+      animate(sheetY, 0, { type: 'spring', stiffness: 420, damping: 36 });
+    }
+  };
   const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [insertedLines, setInsertedLines] = useState<Record<string, boolean>>({});
   const insertedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -472,11 +500,29 @@ function KaraokeLyricsModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.24 }}
+        drag={canSwipeClose ? 'y' : false}
+        dragControls={sheetDragControls}
+        dragListener={false}
+        dragConstraints={{ top: 0 }}
+        dragElastic={{ top: 0, bottom: 0 }}
+        dragMomentum={false}
+        onDragEnd={handleSheetDragEnd}
+        style={{ y: sheetY }}
         className="fixed inset-0 z-50 bg-black/95 backdrop-blur-3xl flex flex-col select-none overflow-hidden"
       >
         {/* Header */}
-        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 sm:px-8 pb-5 sm:pb-6 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))] bg-gradient-to-b from-black/90 via-black/50 to-transparent">
+        <header
+          onPointerDown={handleSheetPointerDown}
+          className="absolute top-0 left-0 right-0 z-20 touch-none flex items-center justify-between px-6 sm:px-8 pb-5 sm:pb-6 pt-[calc(1.25rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))] bg-gradient-to-b from-black/90 via-black/50 to-transparent">
           
+          {/* Grab handle: swipe down anywhere on the header to close */}
+          {canSwipeClose && (
+            <span
+              aria-hidden="true"
+              className="absolute left-1/2 -translate-x-1/2 top-[calc(0.5rem+env(safe-area-inset-top))] w-10 h-1.5 rounded-full bg-white/25"
+            />
+          )}
+
           {/* Left: Section Color Dot, Section Name & Take Label */}
           <div className="flex items-center gap-3">
             {(() => {
