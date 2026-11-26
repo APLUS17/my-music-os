@@ -15,10 +15,10 @@ import {
   type SttPhrase,
   type Take,
 } from '../types';
-import { UniversalVoiceRecorder, computeRecordingAnchorSec } from '../utils/audio';
+import { UniversalVoiceRecorder, computeRecordingAnchorSec, resolveAutoLatencySec } from '../utils/audio';
 import { transcribeTakeBatch } from '../services/transcription';
 import { checkAiHealth } from '../services/ai';
-import { unlockMixer, preloadVocalBuffer } from '../utils/mixer';
+import { unlockMixer, preloadVocalBuffer, getPlaybackOutputLatencySec } from '../utils/mixer';
 import type { SyncSettings } from '../utils/settings';
 import { barDurationSec } from '../utils/arrangement';
 import type { SectionTiming } from '../utils/timeline';
@@ -132,6 +132,8 @@ export function useVoiceRecorder({
   }, []);
   /** Song-timeline position when the first mic sample arrived. */
   const firstChunkTimelineRef = useRef<number | null>(null);
+  /** Output delay of the context the beat played through, read with the first chunk; null if no beat was playing. */
+  const playbackLatencyRef = useRef<number | null>(null);
 
   // Abort pending take transcriptions and drop mic/timer resources on unmount.
   useEffect(() => {
@@ -331,7 +333,11 @@ export function useVoiceRecorder({
         firstChunkTimelineSec: firstChunkTimelineRef.current,
         targetStartSec: target.startSec,
         manualLatencyMs: settings.recordingLatencyMs,
-        reportedLatencySec: result.reportedLatencySec,
+        reportedLatencySec: resolveAutoLatencySec({
+          playbackOutputSec: playbackLatencyRef.current,
+          inputSec: result.inputLatencySec,
+          captureReportedSec: result.reportedLatencySec,
+        }),
         firstChunkBufferSec: result.firstChunkBufferSec,
       });
 
@@ -387,6 +393,7 @@ export function useVoiceRecorder({
       recordingTargetRef.current = null;
       setRecordingSectionId(null);
       firstChunkTimelineRef.current = null;
+      playbackLatencyRef.current = null;
       recordingBusyRef.current = false;
       // Only now (take saved and playhead parked) may Play and seeking work again.
       takeInProgressRef.current = false;
@@ -443,6 +450,7 @@ export function useVoiceRecorder({
       }
 
       firstChunkTimelineRef.current = null;
+      playbackLatencyRef.current = null;
 
       const recorder = new UniversalVoiceRecorder();
       recorderRef.current = recorder;
@@ -450,7 +458,10 @@ export function useVoiceRecorder({
         headphones: settingsRef.current.headphones,
         onFirstChunk: () => {
           const b = globalBeatAudioRef.current;
-          firstChunkTimelineRef.current = b && !b.paused ? b.currentTime : currentTimeRef.current;
+          const beatPlaying = Boolean(b && !b.paused);
+          firstChunkTimelineRef.current = beatPlaying ? b!.currentTime : currentTimeRef.current;
+          // What the singer hears lags the beat's currentTime by the beat context's output delay.
+          playbackLatencyRef.current = beatPlaying ? getPlaybackOutputLatencySec(b) : null;
         },
         onLimit: () => {
           showNotice('Reached the 15 minute limit. Saving your take.');

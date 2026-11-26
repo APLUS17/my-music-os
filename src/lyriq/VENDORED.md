@@ -52,6 +52,13 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
    (`hit-44` utility in `index.css` for icon buttons, `min-h-[44px]` for menu rows), song delete with
    Undo (`handleDeleteSession` / `restoreDeletedSession` in `App.tsx`), keyboard bar lifted clear of
    the dock bubble, dock menu opens Sync settings directly when it would hold one item.
+10. **Auto latency reads the beat's context (ours).** `utils/mixer.ts` (`getPlaybackOutputLatencySec`),
+   `utils/audio.ts` (`resolveAutoLatencySec`, `RecordingResult.inputLatencySec`), `hooks/useVoiceRecorder.ts`.
+   Take placement used to subtract the *capture* context's `baseLatency + outputLatency`, but the beat plays
+   through the mixer's `'playback'` context, which buffers more. Now, when the beat is playing and routed
+   through the mixer, auto latency = mixer `baseLatency + outputLatency` (read with the first chunk) + the mic
+   track's `latency`; otherwise it falls back to the old reading. Safari reports no `outputLatency`, so
+   iPhone still undercounts until loopback calibration lands.
 
 ## Server side (ours, not vendored)
 
