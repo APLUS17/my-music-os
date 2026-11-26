@@ -122,12 +122,14 @@ export function getSectionColorPalette(type?: SectionType): SectionColorPalette 
 }
 
 /**
- * Dock waveform colours: the active section is amber, everything else is neutral.
- * (The per-type palette above is still used by the lyric labels and karaoke.)
+ * Dock waveform colours: every bar takes its section's colour (verse amber, hook blue, ...),
+ * so the song reads as coloured blocks. The section that is playing is brightest; played
+ * bars are fuller than upcoming ones.
  */
-function barFill(isActive: boolean, isPast: boolean): string {
-  if (isActive) return isPast ? '#f59e0b' : 'rgba(245, 158, 11, 0.55)';
-  return isPast ? 'rgba(255, 255, 255, 0.36)' : 'rgba(255, 255, 255, 0.15)';
+export function sectionBarFill(type: SectionType | undefined, isActive: boolean, isPast: boolean): string {
+  const palette = getSectionColorPalette(type);
+  if (isActive) return isPast ? palette.solid : palette.translucent;
+  return isPast ? palette.translucent : palette.dim;
 }
 
 function formatTime(seconds: number): string {
@@ -420,7 +422,7 @@ function MasterPlaybackDock({
           }
 
           const barH = Math.max(3, norm * maxBarH);
-          ctx.fillStyle = barFill(isActiveSection, isPast);
+          ctx.fillStyle = sectionBarFill(sectionMatch?.type, isActiveSection, isPast);
           ctx.beginPath();
           ctx.roundRect(x, centerY - barH / 2, barWidth, barH, 1.2);
           ctx.fill();
@@ -437,11 +439,11 @@ function MasterPlaybackDock({
           const x = i * step;
           const barTime = (x / width) * effectiveDuration;
 
-          // Determine which section this bar belongs to (active section amber, the rest neutral)
+          // Determine which section this bar belongs to (each section keeps its own colour across both lanes)
           const sectionMatch = renderTimings.find(st => barTime >= st.start && barTime < st.end);
           const isActiveSection = Boolean(sectionMatch && sectionMatch.id === activeSection?.id);
           const isPast = barTime <= displayTime;
-          const barColor = barFill(isActiveSection, isPast);
+          const barColor = sectionBarFill(sectionMatch?.type, isActiveSection, isPast);
 
           // Top Row: Vocal Takes
           const vocalHit = activeVocalSpans.find(s => barTime >= s.anchor && barTime < (s.anchor + s.duration));
@@ -498,7 +500,7 @@ function MasterPlaybackDock({
           const sectionMatch = renderTimings.find(st => barTime >= st.start && barTime < st.end);
           const isActiveSection = Boolean(sectionMatch && sectionMatch.id === activeSection?.id);
           const isPast = barTime <= displayTime;
-          const barColor = barFill(isActiveSection, isPast);
+          const barColor = sectionBarFill(sectionMatch?.type, isActiveSection, isPast);
 
           const vocalHit = activeVocalSpans.find(s => barTime >= s.anchor && barTime < (s.anchor + s.duration));
           let normalizedAmp = 0.08;
@@ -532,8 +534,9 @@ function MasterPlaybackDock({
           const secEndX = (st.end / effectiveDuration) * width;
           const secW = Math.max(2, secEndX - secStartX);
           const isCurrent = st.id === activeSection?.id;
+          const secPalette = getSectionColorPalette(st.type);
 
-          ctx.fillStyle = isCurrent ? 'rgba(245, 158, 11, 0.55)' : 'rgba(255, 255, 255, 0.12)';
+          ctx.fillStyle = isCurrent ? secPalette.translucent : secPalette.dim;
           ctx.beginPath();
           ctx.roundRect(secStartX, trackY, secW, trackHeight, 2);
           ctx.fill();
@@ -547,7 +550,7 @@ function MasterPlaybackDock({
 
       // Elapsed Progress (Highlighted with active section color)
       if (playheadX > 0) {
-        ctx.fillStyle = '#f59e0b';
+        ctx.fillStyle = getSectionColorPalette(activeSection?.type).solid;
         ctx.beginPath();
         ctx.roundRect(0, trackY, Math.min(width, playheadX), trackHeight, 2);
         ctx.fill();
@@ -1145,10 +1148,13 @@ function MasterPlaybackDock({
               <div className="flex items-center gap-2 min-w-0 shrink">
                 {activeSection && (
                   <span
-                    className={`w-2 h-2 rounded-full bg-amber-500 shrink-0 transition-colors ${
+                    className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
                       isPlaying ? 'animate-pulse' : ''
                     }`}
-                    style={isPlaying ? { boxShadow: '0 0 8px #f59e0b' } : undefined}
+                    style={{
+                      backgroundColor: getSectionColorPalette(activeSection.type).solid,
+                      boxShadow: isPlaying ? `0 0 8px ${getSectionColorPalette(activeSection.type).solid}` : undefined,
+                    }}
                   />
                 )}
                 <span className="font-semibold uppercase tracking-wider text-xs text-white truncate">
