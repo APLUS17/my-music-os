@@ -40,6 +40,13 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
    old engine 4 clicks in 4 wraps, new engine 0 in 4 (mid-file section) and none in steady-state wraps.
    `__tests__/loopRegion.test.ts` covers the seam maths.
 
+8. **Vocal drift check tolerates iPhone's clock (ours).** `utils/vocalDrift.ts` (new) + `utils/mixer.ts`.
+   `syncVocalBufferPlayback` used to restart the vocal whenever it was more than 80 ms from the song clock,
+   checked every frame. iOS Safari reports the beat element's position late and in coarse steps, so that
+   fired constantly and the vocal sounded choppy. Now it learns the normal offset after each start and only
+   corrects drift that leaves it by more than 200 ms for 300 ms, at most once every 1.5 s. Seeks and loop
+   wraps still restart the vocal at once. Tests: `__tests__/vocalDrift.test.ts`.
+
 ## Server side (ours, not vendored)
 
 - `src/app/api/transcribe-audio` -> Groq Whisper with word timestamps, your written lyrics as the
@@ -51,4 +58,4 @@ Treat it as upstream code: fix things there first, then re-sync, rather than div
 ## Re-syncing
 
 Copy upstream `src/{components,hooks,services,utils,lib}`, `App.tsx`, `types.ts`, `index.css` over
-this folder, re-apply the seven differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
+this folder, re-apply the eight differences above, run `npx tsc --noEmit` and `npx vitest run src/lyriq`.
